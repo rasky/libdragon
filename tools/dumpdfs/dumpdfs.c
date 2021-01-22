@@ -1,3 +1,6 @@
+// Copyright dragonminded.
+// Attribution 2021 - Rasky, NetworkFusion
+
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -23,7 +26,7 @@ enum
 /* Internal filesystem stuff */
 static void *base_ptr = 0;
 static open_file_t open_files[MAX_OPEN_FILES];
-static uint32_t directories[MAX_DIRECTORY_DEPTH];
+static uintptr_t directories[MAX_DIRECTORY_DEPTH];
 static uint32_t directory_top = 0;
 static directory_entry_t *next_entry = 0;
 
@@ -96,7 +99,7 @@ static inline uint32_t get_size(directory_entry_t *dirent)
 /* Functions for easier traversal of directories */
 static inline directory_entry_t *get_first_entry(directory_entry_t *dirent)
 {
-    return (directory_entry_t *)(dirent->file_pointer ? (dirent->file_pointer + base_ptr) : 0);
+    return (directory_entry_t *)(dirent->file_pointer ? (dirent->file_pointer + (char*)base_ptr) : 0);
 }
 
 static inline directory_entry_t *get_next_entry(directory_entry_t *dirent)
@@ -107,12 +110,12 @@ static inline directory_entry_t *get_next_entry(directory_entry_t *dirent)
 /* Functions for easier traversal of fiels */
 static inline file_entry_t *get_first_sector(directory_entry_t *dirent)
 {
-    return (file_entry_t *)(dirent->file_pointer ? (dirent->file_pointer + base_ptr) : 0);
+    return (file_entry_t *)(dirent->file_pointer ? (dirent->file_pointer + (char*)base_ptr) : 0);
 }
 
 static inline file_entry_t *get_next_sector(file_entry_t *fileent)
 {
-    return (file_entry_t *)(fileent->next_sector ? (fileent->next_sector + base_ptr) : 0);
+    return (file_entry_t *)(dirent->file_pointer ? (dirent->file_pointer + (char*)base_ptr) : 0);
 }
 
 /* Sector walking */
@@ -142,7 +145,7 @@ static inline void push_directory(directory_entry_t *dirent)
     if(directory_top < MAX_DIRECTORY_DEPTH)
     {
         /* Order of execution for assignment undefined in C, lets force it */
-        directories[directory_top] = (uint32_t)dirent;
+        directories[directory_top] = (uintptr_t)dirent;
 
         directory_top++;
     }
@@ -159,7 +162,7 @@ static inline directory_entry_t *pop_directory()
     }
 
     /* Just return the root pointer */
-    return (directory_entry_t *)(base_ptr + SECTOR_SIZE);
+    return (directory_entry_t *)((char*)base_ptr + SECTOR_SIZE);
 }
 
 static inline directory_entry_t *peek_directory()
@@ -169,7 +172,7 @@ static inline directory_entry_t *peek_directory()
         return (directory_entry_t *)directories[directory_top-1];
     }
 
-    return (directory_entry_t *)(base_ptr + SECTOR_SIZE);
+    return (directory_entry_t *)((char*)base_ptr + SECTOR_SIZE);
 }
 
 /* Parse out the next token in a path delimited by '\' */
@@ -812,7 +815,7 @@ int main( int argc, char *argv[] )
             fseek( fp, 0, SEEK_SET );
             
             void *filesystem = malloc( lSize );
-            fread( filesystem, 1, lSize, fp );
+            ret = fread( filesystem, 1, lSize, fp );
             fclose( fp );
 
             dfs_init_pc( filesystem, 1 );
@@ -833,7 +836,7 @@ int main( int argc, char *argv[] )
             fseek( fp, 0, SEEK_SET );
             
             void *filesystem = malloc( lSize );
-            fread( filesystem, 1, lSize, fp );
+            ret = fread( filesystem, 1, lSize, fp );
             fclose( fp );
 
             dfs_init_pc( filesystem, 1 );
@@ -861,7 +864,7 @@ int main( int argc, char *argv[] )
             fseek( fp, 0, SEEK_SET );
             
             void *filesystem = malloc( lSize );
-            fread( filesystem, 1, lSize, fp );
+            ret = fread( filesystem, 1, lSize, fp );
             fclose( fp );
 
             dfs_init_pc( filesystem, 1 );
