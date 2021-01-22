@@ -1,4 +1,6 @@
 ## Build files
+*.obj
+*.exe
 *.a
 build/
 build_gcc/
