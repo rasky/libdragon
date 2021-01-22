@@ -1,3 +1,6 @@
+// Copyright dragonminded.
+// Attribution 2021 - Rasky, NetworkFusion
+
 /**
  * @file dfsinternal.h
  * @brief Internal DFS Definitions
@@ -11,6 +14,13 @@
  * @{
  */
 
+#ifndef _MSC_VER
+#define PACK( __Declaration__ ) __Declaration__ __attribute__((__packed__))
+#else
+#define PACK( __Declaration__ ) __pragma( pack(push, 1) ) __Declaration__ __pragma( pack(pop) )
+#endif // !_MSC_VER
+
+
 /** @brief The special ID value in #directory_entry::flags defining the master sector */
 #define FLAGS_ID        0xFFFFFFFF
 /** @brief The special ID value in #directory_entry::next_entry defining the master sector */
@@ -22,6 +32,7 @@
 #define SECTOR_PAYLOAD  252
 
 /** @brief Representation of a directory entry */
+PACK(
 struct directory_entry
 {
     /** @brief File size and flags.  See #FLAGS_FILE, #FLAGS_DIR and #FLAGS_EOF */
@@ -32,19 +43,20 @@ struct directory_entry
     char path[MAX_FILENAME_LEN+1];
     /** @brief Offset to start sector of the file */
     uint32_t file_pointer;
-} __attribute__((__packed__));
+});
 
 /** @brief Type definition */
 typedef struct directory_entry directory_entry_t;
 
 /** @brief Representation of a file sector */
+PACK(
 struct file_entry
 {
     /** @brief Offset of next sector of the file */
     uint32_t next_sector;
     /** @brief File data */
     uint8_t data[SECTOR_PAYLOAD];
-} __attribute__((__packed__));
+});
 
 /** @brief Type definition */
 typedef struct file_entry file_entry_t;
