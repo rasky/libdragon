@@ -158,6 +158,7 @@ int assert_equal_mem(TestContext *ctx, const char *file, int line, const uint8_t
  * TEST FILES
  **********************************************************************/
 
+#include "test_kernel.c"
 #include "test_dfs.c"
 #include "test_eepromfs.c"
 #include "test_cache.c"
@@ -187,7 +188,15 @@ static const struct Testsuite
 	uint32_t flags;
 } tests[] = {
 	TEST_FUNC(test_exception,              	   5, TEST_FLAGS_NO_BENCHMARK),
-	TEST_FUNC(test_ticks,                  	   0, TEST_FLAGS_NO_BENCHMARK | TEST_FLAGS_NO_EMULATOR),
+	TEST_FUNC(test_kernel_basic,               5, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_kernel_event_1,             5, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_kernel_event_2,             5, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_kernel_mbox_1,              5, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_kernel_mbox_2,              5, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_kernel_mbox_3,              5, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_kernel_priority,            5, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_kernel_sleep,               5, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_ticks,                      0, TEST_FLAGS_NO_BENCHMARK | TEST_FLAGS_NO_EMULATOR),
 	TEST_FUNC(test_timer_ticks,          	 292, TEST_FLAGS_NO_BENCHMARK),
 	TEST_FUNC(test_timer_oneshot,        	 596, TEST_FLAGS_RESET_COUNT),
 	TEST_FUNC(test_timer_slow_callback, 	1468, TEST_FLAGS_RESET_COUNT),

@@ -192,7 +192,7 @@ void test_timer_ticks(TestContext *ctx) {
 			ASSERT(t2 < t3, "invalid timer_ticks [start=%lx]: %llx < %llx", start, t2, t3);
 			ASSERT(t3 < t4, "invalid timer_ticks [start=%lx]: %llx < %llx", start, t3, t4);
 			ASSERT(t4 < t5, "invalid timer_ticks [start=%lx,%d]: %llx < %llx < %llx < %llx < %llx < %llx", start, j, t0, t1, t2, t3, t4, t5);
-			ASSERT(t5-t0 < 1000, "invalid timer_ticks [start=%lx]: %llx - %llx", start, t0, t5);
+			ASSERT(t5-t0 < 2000, "invalid timer_ticks [start=%lx]: %llx - %llx", start, t0, t5);
 		}
 	}
 
@@ -231,7 +231,7 @@ void test_timer_ticks(TestContext *ctx) {
 		// Check that all ticks are monotonically increasing, that there are
 		// no large jumps (eg: high part incremented twice), and that the
 		// timer callback was called (if it was meant to).
-		ASSERT(t0 < t1 && t1 < t2 && t2 < t3 && t3 < t4 && t4 < t5 && (t5-t0)<1000 && cbcalled == use_timer, 
+		ASSERT(t0 < t1 && t1 < t2 && t2 < t3 && t3 < t4 && t4 < t5 && (t5-t0)<2000 && cbcalled == use_timer, 
 			"invalid timer_ticks %d:[start=%lx,irq=%d,tt1=%d:%lx/%d]\n%llx < %llx < %llx < %llx < %llx < %llx",
 			i, start, with_irq, use_timer, tt1->left, cbcalled, t0, t1, t2, t3, t4, t5);
 	}

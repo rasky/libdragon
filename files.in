@@ -1,5 +1,6 @@
 OFILES_LD  = $(CURDIR)/build/n64sys.o
 OFILES_LD += $(CURDIR)/build/interrupt.o
+OFILES_LD += $(CURDIR)/build/kernel.o
 OFILES_LD += $(CURDIR)/build/inthandler.o
 OFILES_LD += $(CURDIR)/build/entrypoint.o
 OFILES_LD += $(CURDIR)/build/debug.o
@@ -32,6 +33,9 @@ $(CURDIR)/build/n64sys.o: $(CURDIR)/src/n64sys.c
 $(CURDIR)/build/interrupt.o: $(CURDIR)/src/interrupt.c ./include/cop0.h
 	mkdir -p $(CURDIR)/build
 	$(CC) $(CFLAGS) -c -o $(CURDIR)/build/interrupt.o $(CURDIR)/src/interrupt.c
+$(CURDIR)/build/kernel.o: $(CURDIR)/src/kernel.c
+	mkdir -p $(CURDIR)/build
+	$(CC) $(CFLAGS) -c -o $(CURDIR)/build/kernel.o $(CURDIR)/src/kernel.c
 $(CURDIR)/build/dma.o: $(CURDIR)/src/dma.c ./include/n64sys.h
 	mkdir -p $(CURDIR)/build
 	$(CC) $(CFLAGS) -c -o $(CURDIR)/build/dma.o $(CURDIR)/src/dma.c
