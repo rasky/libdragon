@@ -953,17 +953,20 @@ int dfs_read(void * const buf, int size, int count, uint32_t handle)
     if (!to_read)
         return 0;
 
-    /* If the destination pointer, ROM location and the amount of data to read
-       are all 8-bytes aligned, we can DMA directly into the destination buffer.
+    /* If the RDRAM destination pointer is 8-bytes aligned, and ROM location
+       is 2-bytes aligned, we can DMA directly into the destination buffer.
        This is much faster than using cached data, so bypass also our local
-       cache as well. */
-    uint32_t align = ((uint32_t)buf | (file->cart_start_loc + file->loc) | to_read) & 0xF;
-    if ((align&7) == 0)
+       cache as well. Note that, contrary to popular belief, there is no
+       constraint on DMA length, any value works including odd lengths (the
+       testsuite covers this). */
+    uint32_t rom_align = file->loc & 1;
+    uint32_t ram_align = (uint32_t)buf & 7;
+    if (ram_align == 0 && rom_align == 0)
     {
         /* 16-byte alignment: we can simply invalidate the buffer.
          * 8-byte alignment: we need to also writeback in case the partial
          *  cachelines have hot data to write back. */
-        if (align == 0)
+        if ((((uint32_t)buf | to_read) & 15) == 0)
             data_cache_hit_invalidate(buf, to_read);
         else
             data_cache_hit_writeback_invalidate(buf, to_read);

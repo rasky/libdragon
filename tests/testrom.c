@@ -193,7 +193,7 @@ static const struct Testsuite
 	TEST_FUNC(test_timer_continuous,     688, TEST_FLAGS_RESET_COUNT),
 	TEST_FUNC(test_timer_mixed,         1467, TEST_FLAGS_RESET_COUNT),
 	TEST_FUNC(test_irq_reentrancy,       230, TEST_FLAGS_RESET_COUNT),
-	TEST_FUNC(test_dfs_read,            1104, TEST_FLAGS_IO),
+	TEST_FUNC(test_dfs_read,             946, TEST_FLAGS_IO),
 	TEST_FUNC(test_cache_invalidate,    1763, TEST_FLAGS_NONE),
 	TEST_FUNC(test_debug_sdfs,             0, TEST_FLAGS_NO_BENCHMARK),
 };
