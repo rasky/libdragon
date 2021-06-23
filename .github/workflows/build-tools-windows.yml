@@ -9,7 +9,7 @@ on: [push, pull_request]
 
 defaults:
   run:
-    shell: pwsh
+    shell: cmd
 
 jobs:
   build-windows-tools:
@@ -30,10 +30,11 @@ jobs:
           curl -L https://windows.php.net/downloads/php-sdk/deps/vs16/x86/libpng-1.6.34-6-vs16-x86.zip --output libpng.zip
 
       - name: Extract required dependencies
+        shell: pwsh
         run: Expand-Archive -Path 'libpng.zip' -DestinationPath "libpng"
 
       - name: Setup MSBuild Path x64
-        run: start-process "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
+        run: call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
 
       - name: Build chksum64.exe
         run: cl .\tools\chksum64.c
