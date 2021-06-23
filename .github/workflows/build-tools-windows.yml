@@ -32,8 +32,8 @@ jobs:
       - name: Extract required dependencies
         run: Expand-Archive -Path 'libpng.zip' -DestinationPath "libpng"
 
-      - name: Setup MSBuild Path
-        uses: microsoft/setup-msbuild@v1.0.2
+      - name: Setup MSBuild Path x64
+        run:  call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
 
       - name: Build chksum64.exe
         run: cl .\tools\chksum64.c
