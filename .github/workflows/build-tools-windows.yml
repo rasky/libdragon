@@ -33,26 +33,15 @@ jobs:
         shell: pwsh
         run: Expand-Archive -Path 'libpng.zip' -DestinationPath "libpng"
 
-      - name: Setup MSBuild Path x64
-        run: call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
-
-      - name: Build chksum64.exe
-        run: call cl .\tools\chksum64.c
-        
-      - name: Build n64tool.exe
-        run: call cl .\tools\n64tool.c
-        
-      - name: Build dumpdfs.exe
-        run: call cl .\tools\dumpdfs\dumpdfs.c -I .\include\
-        
-      - name: Build mkdfs.exe
-        run: call cl .\tools\mkdfs\mkdfs.c -I .\include\
-
-      - name: Build convtool.exe
-        run: call cl .\tools\mksprite\convtool.c
-        
-      - name: Build mksprite.exe
-        run: call cl /MD .\tools\mksprite\mksprite.c .\libpng\lib\libpng.lib /I .\libpng\include\libpng16\ /link
+      - name: Build tools using MSVC
+        run: |
+          "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
+          cl .\tools\chksum64.c
+          cl .\tools\n64tool.c
+          cl .\tools\dumpdfs\dumpdfs.c -I .\include\
+          cl .\tools\mkdfs\mkdfs.c -I .\include\
+          cl .\tools\mksprite\convtool.c
+          cl /MD .\tools\mksprite\mksprite.c .\libpng\lib\libpng.lib /I .\libpng\include\libpng16\ /link
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v2
