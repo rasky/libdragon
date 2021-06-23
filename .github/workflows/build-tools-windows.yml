@@ -1,0 +1,61 @@
+# Copyright (c) libdragon 2021
+# See LICENSE file in the project root for full license information.
+
+# This workflow will build the solution and release a nuget.
+
+name: Build libdragon for Windows.
+
+on: [push, pull_request]
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  build-windows-tools:
+    name: Build Windows tools.
+    timeout-minutes: 15
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Install required dependencies
+        shell: bash
+        run: |
+          curl -L https://raw.githubusercontent.com/tronkko/dirent/master/include/dirent.h --output ./include/dirent.h
+          curl -L https://windows.php.net/downloads/php-sdk/deps/vs16/x86/libpng-1.6.34-6-vs16-x86.zip --output libpng.zip
+
+      - name: Extract required dependencies
+        run: Expand-Archive -Path 'libpng.zip' -DestinationPath "libpng"
+
+      - name: Setup MSBuild Path
+        uses: microsoft/setup-msbuild@v1.0.2
+
+      - name: Build chksum64.exe
+        run: cl .\tools\chksum64.c
+        
+      - name: Build n64tool.exe
+        run: cl .\tools\n64tool.c
+        
+      - name: Build dumpdfs.exe
+        run: cl .\tools\dumpdfs\dumpdfs.c -I .\include\
+        
+      - name: Build mkdfs.exe
+        run: cl .\tools\mkdfs\mkdfs.c -I .\include\
+
+      - name: Build convtool.exe
+        run: cl .\tools\mksprite\convtool.c
+        
+      - name: Build mksprite.exe
+        run: cl /MD .\tools\mksprite\mksprite.c .\libpng\lib\libpng.lib /I .\libpng\include\libpng16\ /link
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: libdragon-tools-windows
+          path: |
+            ${{ github.workspace }}\**\*.exe
