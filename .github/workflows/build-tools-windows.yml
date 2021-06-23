@@ -56,6 +56,7 @@ jobs:
           call cl .\tools\mksprite\convtool.c
           call cl /MD .\tools\mksprite\mksprite.c .\libpng\lib\libpng.lib /I .\libpng\include\libpng16\ /link
           echo "Completed building mksprite..."
+        continue-on-error: true # should not be required, but allows generated artifacts for testing...
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v2
