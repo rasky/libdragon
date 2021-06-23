@@ -37,22 +37,22 @@ jobs:
         run: call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
 
       - name: Build chksum64.exe
-        run: cl .\tools\chksum64.c
+        run: call cl .\tools\chksum64.c
         
       - name: Build n64tool.exe
-        run: cl .\tools\n64tool.c
+        run: call cl .\tools\n64tool.c
         
       - name: Build dumpdfs.exe
-        run: cl .\tools\dumpdfs\dumpdfs.c -I .\include\
+        run: call cl .\tools\dumpdfs\dumpdfs.c -I .\include\
         
       - name: Build mkdfs.exe
-        run: cl .\tools\mkdfs\mkdfs.c -I .\include\
+        run: call cl .\tools\mkdfs\mkdfs.c -I .\include\
 
       - name: Build convtool.exe
-        run: cl .\tools\mksprite\convtool.c
+        run: call cl .\tools\mksprite\convtool.c
         
       - name: Build mksprite.exe
-        run: cl /MD .\tools\mksprite\mksprite.c .\libpng\lib\libpng.lib /I .\libpng\include\libpng16\ /link
+        run: call cl /MD .\tools\mksprite\mksprite.c .\libpng\lib\libpng.lib /I .\libpng\include\libpng16\ /link
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v2
