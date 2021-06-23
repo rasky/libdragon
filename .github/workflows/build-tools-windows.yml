@@ -35,18 +35,27 @@ jobs:
 
       - name: Build tools using MSVC
         run: |
-          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
-          echo "building chksum64..."
-          call cl .\tools\chksum64.c
-          echo "building n64tool..."
-          call cl .\tools\n64tool.c
-          echo "building dumpdfs..."
-          call cl .\tools\dumpdfs\dumpdfs.c -I .\include\
-          echo "building mkdfs..."
-          call cl .\tools\mkdfs\mkdfs.c -I .\include\
-          echo "building mksprite..."
-          call cl .\tools\mksprite\convtool.c
-          call cl /MD .\tools\mksprite\mksprite.c .\libpng\lib\libpng.lib /I .\libpng\include\libpng16\ /link
+          "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
+          echo "Building chksum64..."
+          cl .\tools\chksum64.c
+          echo "Completed building chksum64..."
+          
+          echo "Building n64tool..."
+          cl .\tools\n64tool.c
+          echo "Completed building n64tool..."
+          
+          echo "Building dumpdfs..."
+          cl .\tools\dumpdfs\dumpdfs.c -I .\include\
+          echo "Completed building dumpdfs..."
+          
+          echo "Building mkdfs..."
+          cl .\tools\mkdfs\mkdfs.c -I .\include\
+          echo "Completed building mkdfs..."
+          
+          echo "Building mksprite..."
+          cl .\tools\mksprite\convtool.c
+          cl /MD .\tools\mksprite\mksprite.c .\libpng\lib\libpng.lib /I .\libpng\include\libpng16\ /link
+          echo "Completed building mksprite..."
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v2
