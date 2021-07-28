@@ -31,6 +31,6 @@ jobs:
         with:
           name: Libdragon-Test-ROMs #-${{ matrix.releasetype }}
           path: |
-            ${{ github.workspace }}/bin/**/*.z64
-            ${{ github.workspace }}/bin/**/*.v64
-            ${{ github.workspace }}/bin/**/*.n64
+            ${{ github.workspace }}/**/*.z64
+            ${{ github.workspace }}/**/*.v64
+            ${{ github.workspace }}/**/*.n64
