@@ -1,3 +1,6 @@
+# Copyright (c) libdragon 2021
+# See LICENSE file in the project root for full license information.
+
 name: Build libdragon test ROM using Docker Container
  
 on: [push, pull_request]
