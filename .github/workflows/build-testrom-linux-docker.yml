@@ -17,16 +17,16 @@ jobs:
           sudo npm install -g libdragon
           libdragon download
 
-       - name: Setup Build environment
+      - name: Setup Build environment
          run: |
            cd ${{ github.workspace }}/tests/
            mkdir bin && mkdir bin/release && mkdir bin/debug && mkdir obj
            libdragon start
 
-       - name: Build test ROM
+      - name: Build test ROM
          run: cd ${{ github.workspace }}/tests/ && libdragon make ${{ matrix.releasetype }} #N64_BYTE_SWAP=${{ matrix.byteswap }}
 
-       - name: Upload Artifact
+      - name: Upload Artifact
          uses: actions/upload-artifact@v1.0.0
          with:
            name: LIBDRAGON_TEST_ROM-${{ matrix.releasetype }}
