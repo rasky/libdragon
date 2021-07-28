@@ -1,0 +1,33 @@
+name: Build libdragon test ROM using Docker Container
+ 
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        releasetype: [ 'debug', 'release' ]
+#        byteswap: [ '1', '0' ] #[ 'true', 'false' ]
+    steps:
+      - uses: actions/checkout@v2
+        name: Checkout Code
+
+      - name: Install libdragon container
+        run: |
+          sudo npm install -g libdragon
+          libdragon download
+
+       - name: Setup Build environment
+         run: |
+           cd ${{ github.workspace }}/tests/
+           mkdir bin && mkdir bin/release && mkdir bin/debug && mkdir obj
+           libdragon start
+
+       - name: Build test ROM
+         run: cd ${{ github.workspace }}/tests/ && libdragon make ${{ matrix.releasetype }} #N64_BYTE_SWAP=${{ matrix.byteswap }}
+
+       - name: Upload Artifact
+         uses: actions/upload-artifact@v1.0.0
+         with:
+           name: LIBDRAGON_TEST_ROM-${{ matrix.releasetype }}
+           path: ${{ github.workspace }}/tests/bin/${{ matrix.releasetype }}/testrom.z64
