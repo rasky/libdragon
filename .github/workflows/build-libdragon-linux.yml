@@ -1,0 +1,24 @@
+# Copyright (c) libdragon 2021
+# See LICENSE file in the project root for full license information.
+
+name: Build libdragon lib using Docker Container
+ 
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+#    strategy:
+#      matrix:
+#        releasetype: [ 'debug', 'release' ]
+    steps:
+      - uses: actions/checkout@v2
+        name: Checkout Code
+
+      - name: Download toolchain container
+        run: |
+          docker pull anacierdem/libdragon:toolchain
+          
+      - name: Build SDK against container
+        run: |
+          docker run --name=libdragon -d --mount type=bind,source=$(pwd),target=/libdragon -w=/libdragon anacierdem/libdragon:toolchain tail -f /dev/null
+          docker exec libdragon /bin/bash ./build.sh
