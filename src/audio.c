@@ -176,22 +176,15 @@ static void audio_callback()
 }
 
 /**
- * @brief Initialize the audio subsystem
- *
- * This function will set up the AI to play at a given frequency and
- * allocate a number of back buffers to write data to.
- *
- * @note Before re-initializing the audio subsystem to a new playback
- *       frequency, remember to call #audio_close.
+ * @brief Initialize the audio DAC.
+ * 
+ * This is an internal function used by audio.c and mixer.c.
+ * Not part of the public libdragon API.
  *
  * @param[in] frequency
  *            The frequency in Hz to play back samples at
- * @param[in] numbuffers
- *            The number of buffers to allocate internally
- * @param[in] fill_buffer_callback
- *            A function to be called when more sample data is needed
  */
-void audio_init(const int frequency, int numbuffers)
+void audio_dac_init(const int frequency)
 {
     int clockrate;
 
@@ -212,6 +205,36 @@ void audio_init(const int frequency, int numbuffers)
             break;
     }
 
+    /* Remember frequency */
+    AI_regs->dacrate = ((2 * clockrate / frequency) + 1) / 2 - 1;
+    AI_regs->samplesize = 15;
+
+    /* Real frequency */
+    _frequency = 2 * clockrate / ((2 * clockrate / frequency) + 1);
+}
+
+
+/**
+ * @brief Initialize the audio subsystem
+ *
+ * This function will set up the AI to play at a given frequency and
+ * allocate a number of back buffers to write data to.
+ *
+ * @note Before re-initializing the audio subsystem to a new playback
+ *       frequency, remember to call #audio_close.
+ *
+ * @param[in] frequency
+ *            The frequency in Hz to play back samples at
+ * @param[in] numbuffers
+ *            The number of buffers to allocate internally
+ * @param[in] fill_buffer_callback
+ *            A function to be called when more sample data is needed
+ */
+void audio_init(const int frequency, int numbuffers)
+{
+    /* Initialize the audio DAC */
+    audio_dac_init(frequency);
+
     /* Make sure we don't choose too many buffers */
     if( numbuffers > (sizeof(buf_full) * 8) )
     {
@@ -219,13 +242,6 @@ void audio_init(const int frequency, int numbuffers)
          * buffers as we have bits. */
         numbuffers = sizeof(buf_full) * 8;
     }
-
-    /* Remember frequency */
-    AI_regs->dacrate = ((2 * clockrate / frequency) + 1) / 2 - 1;
-    AI_regs->samplesize = 15;
-
-    /* Real frequency */
-    _frequency = 2 * clockrate / ((2 * clockrate / frequency) + 1);
 
     /* Set up hardware to notify us when it needs more data */
     register_AI_handler(audio_callback);
