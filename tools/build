@@ -31,17 +31,23 @@ export PATH=$PATH:$INSTALL_PATH/bin
 # Versions
 export BINUTILS_V=2.36.1
 export GCC_V=10.2.0
+export GDB_V=10.2.0
 export NEWLIB_V=4.1.0
+export MAKE_V=4.3
 
 # Download stage
 test -f binutils-$BINUTILS_V.tar.gz || wget -c https://ftp.gnu.org/gnu/binutils//binutils-$BINUTILS_V.tar.gz
 test -f gcc-$GCC_V.tar.gz || wget -c https://ftp.gnu.org/gnu/gcc/gcc-$GCC_V/gcc-$GCC_V.tar.gz
+test -f gdb-$GDB_V.tar.gz || wget -c https://ftp.gnu.org/gnu/gdb/gdb-$GDB_V.tar.gz
 test -f newlib-$NEWLIB_V.tar.gz || wget -c https://sourceware.org/pub/newlib/newlib-$NEWLIB_V.tar.gz
+test -f make-$MAKE_V.tar.gz || wget -c https://ftp.gnu.org/gnu/make/make--$MAKE_V.tar.gz
 
 # Extract stage
 test -d binutils-$BINUTILS_V || tar -xzf binutils-$BINUTILS_V.tar.gz
 test -d gcc-$GCC_V || tar -xzf gcc-$GCC_V.tar.gz
+test -d gdb-$GDB_V || tar -xzf gdb-$GDB_V.tar.gz
 test -d newlib-$NEWLIB_V || tar -xzf newlib-$NEWLIB_V.tar.gz
+test -d make-$MAKE_V || tar -xzf make-$MAKE_V.tar.gz
 
 # Use same native GCC
 
