@@ -57,7 +57,9 @@ if [ ! $(gcc --version | grep $GCC_V) ] && [ $FORCE_DEFAULT_GCC == 'false' ]; th
 
     # Compile binutils
     cd build_binutils
-    ../binutils-$BINUTILS_V/configure --prefix=${INSTALL_PATH}/gcc-$GCC_V --disable-werror
+    ../binutils-$BINUTILS_V/configure \
+      --prefix=${INSTALL_PATH}/gcc-$GCC_V \
+      --disable-werror
     make -j$JOBS
     make install || sudo make install || su -c "make install"
 
@@ -66,7 +68,10 @@ if [ ! $(gcc --version | grep $GCC_V) ] && [ $FORCE_DEFAULT_GCC == 'false' ]; th
     rm -rf build_gcc
     mkdir build_gcc
     cd build_gcc
-    ../gcc-$GCC_V/configure --prefix=${INSTALL_PATH}/gcc-$GCC_V --enable-languages=c,c++ --disable-nls
+    ../gcc-$GCC_V/configure \
+      --prefix=${INSTALL_PATH}/gcc-$GCC_V \
+      --enable-languages=c,c++ \
+      --disable-nls
     make -j$JOBS
     make install || sudo make install || su -c "make install"
 
@@ -82,7 +87,10 @@ mkdir gcc_compile
 
 # Compile binutils
 cd binutils-$BINUTILS_V
-./configure --prefix=${INSTALL_PATH} --target=mips64-elf --with-cpu=mips64vr4300 --disable-werror
+./configure --prefix=${INSTALL_PATH} \
+  --target=mips64-elf \
+  --with-cpu=mips64vr4300 \
+  --disable-werror
 make -j$JOBS
 make install || sudo make install || su -c "make install"
 
