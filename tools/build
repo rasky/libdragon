@@ -88,7 +88,23 @@ make install || sudo make install || su -c "make install"
 
 # Compile gcc (pass 1)
 cd ../gcc_compile
-../gcc-$GCC_V/configure --prefix=${INSTALL_PATH} --target=mips64-elf --with-arch=vr4300 --with-tune=vr4300 --enable-languages=c --without-headers --with-newlib --disable-libssp --enable-multilib --disable-shared --with-gcc --disable-threads --disable-win32-registry --disable-nls --disable-werror --with-system-zlib
+../gcc-$GCC_V/configure \
+  --prefix=${INSTALL_PATH} \
+  --target=mips64-elf \
+  --with-arch=vr4300 \
+  --with-tune=vr4300 \
+  --enable-languages=c \
+  --without-headers \
+  --with-newlib \
+  --disable-libssp \
+  --enable-multilib \
+  --disable-shared \
+  --with-gcc \
+  --disable-threads \
+  --disable-win32-registry \
+  --disable-nls \
+  --disable-werror \
+  --with-system-zlib
 make all-gcc -j$JOBS
 make all-target-libgcc -j$JOBS
 make install-gcc || sudo make install-gcc || su -c "make install-gcc"
@@ -96,7 +112,13 @@ make install-target-libgcc || sudo make install-target-libgcc || su -c "make ins
 
 # Compile newlib
 cd ../newlib-$NEWLIB_V
-CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC" ./configure --target=mips64-elf --prefix=${INSTALL_PATH} --with-cpu=mips64vr4300 --disable-threads --disable-libssp --disable-werror
+CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC" ./configure \
+  --target=mips64-elf \
+  --prefix=${INSTALL_PATH} \
+  --with-cpu=mips64vr4300 \
+  --disable-threads \
+  --disable-libssp \
+  --disable-werror
 make -j$JOBS
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=$PATH make install"
 
@@ -105,7 +127,21 @@ cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
 cd gcc_compile
-CFLAGS_FOR_TARGET="-G0 -O2" CXXFLAGS_FOR_TARGET="-G0 -O2" ../gcc-$GCC_V/configure --prefix=${INSTALL_PATH} --target=mips64-elf --with-arch=vr4300 --with-tune=vr4300 --enable-languages=c,c++ --with-newlib --disable-libssp --enable-multilib --disable-shared --with-gcc --disable-threads --disable-win32-registry --disable-nls --with-system-zlib
+CFLAGS_FOR_TARGET="-G0 -O2" CXXFLAGS_FOR_TARGET="-G0 -O2" ../gcc-$GCC_V/configure \
+  --prefix=${INSTALL_PATH} \
+  --target=mips64-elf \
+  --with-arch=vr4300 \
+  --with-tune=vr4300 \
+  --enable-languages=c,c++ \
+  --with-newlib \
+  --disable-libssp \
+  --enable-multilib \
+  --disable-shared \
+  --with-gcc \
+  --disable-threads \
+  --disable-win32-registry \
+  --disable-nls \
+  --with-system-zlib
 make -j$JOBS
 make install || sudo make install || su -c "make install"
 
