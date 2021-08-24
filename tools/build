@@ -1,8 +1,10 @@
 #! /bin/bash
-# N64 GCC toolchain install script for Unix distributions by libDragon Contributers.
-# See root folder for license information.
-# Last tested and working against Ubuntu 18.04.
+# N64 MIPS GCC toolchain build/install script for Unix distributions
+# (c) 2012-2021 Shaun Taylor and libDragon Contributors.
+# See the root folder for license information.
 
+
+### TODO: this info is probably incorrect and should be auto handled!
 # You may be prompted for your password during installation steps.
 ### If the script tells you that writing failed on chksum64 and n64tool,
 ### this does not mean it failed.  The script simply retried with sudo
@@ -96,7 +98,7 @@ cd binutils-$BINUTILS_V
 make -j$JOBS
 make install || sudo make install || su -c "make install"
 
-# Compile gcc (pass 1)
+# Compile GCC for MIPS N64 (pass 1)
 cd ../gcc_compile
 ../gcc-$GCC_V/configure \
   --prefix=${INSTALL_PATH} \
@@ -142,7 +144,7 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC" ./configure \
 make -j$JOBS
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=$PATH make install"
 
-# Compile gcc (pass 2)
+# Compile GCC for MIPS N64 (pass 2)
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
