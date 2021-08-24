@@ -1,6 +1,7 @@
 #! /bin/bash
-# N64 toolchain install script for Unix distributions by libDragon Contributers.
-# Tested working on Ubuntu 18.04.
+# N64 GCC toolchain install script for Unix distributions by libDragon Contributers.
+# See root folder for license information.
+# Last tested and working against Ubuntu 18.04.
 
 # You may be prompted for your password during installation steps.
 ### If the script tells you that writing failed on chksum64 and n64tool,
@@ -31,23 +32,23 @@ export PATH=$PATH:$INSTALL_PATH/bin
 # Versions
 export BINUTILS_V=2.36.1
 export GCC_V=10.2.0
-export GDB_V=10.2.0
+# export GDB_V=10.2.0
 export NEWLIB_V=4.1.0
-export MAKE_V=4.3
+# export MAKE_V=4.3
 
 # Download stage
 test -f binutils-$BINUTILS_V.tar.gz || wget -c https://ftp.gnu.org/gnu/binutils//binutils-$BINUTILS_V.tar.gz
 test -f gcc-$GCC_V.tar.gz || wget -c https://ftp.gnu.org/gnu/gcc/gcc-$GCC_V/gcc-$GCC_V.tar.gz
-test -f gdb-$GDB_V.tar.gz || wget -c https://ftp.gnu.org/gnu/gdb/gdb-$GDB_V.tar.gz
+# test -f gdb-$GDB_V.tar.gz || wget -c https://ftp.gnu.org/gnu/gdb/gdb-$GDB_V.tar.gz
 test -f newlib-$NEWLIB_V.tar.gz || wget -c https://sourceware.org/pub/newlib/newlib-$NEWLIB_V.tar.gz
-test -f make-$MAKE_V.tar.gz || wget -c https://ftp.gnu.org/gnu/make/make--$MAKE_V.tar.gz
+# test -f make-$MAKE_V.tar.gz || wget -c https://ftp.gnu.org/gnu/make/make--$MAKE_V.tar.gz
 
 # Extract stage
 test -d binutils-$BINUTILS_V || tar -xzf binutils-$BINUTILS_V.tar.gz
 test -d gcc-$GCC_V || tar -xzf gcc-$GCC_V.tar.gz
-test -d gdb-$GDB_V || tar -xzf gdb-$GDB_V.tar.gz
+# test -d gdb-$GDB_V || tar -xzf gdb-$GDB_V.tar.gz
 test -d newlib-$NEWLIB_V || tar -xzf newlib-$NEWLIB_V.tar.gz
-test -d make-$MAKE_V || tar -xzf make-$MAKE_V.tar.gz
+# test -d make-$MAKE_V || tar -xzf make-$MAKE_V.tar.gz
 
 # Use same native GCC
 
@@ -87,7 +88,8 @@ mkdir gcc_compile
 
 # Compile binutils
 cd binutils-$BINUTILS_V
-./configure --prefix=${INSTALL_PATH} \
+./configure \
+  --prefix=${INSTALL_PATH} \
   --target=mips64-elf \
   --with-cpu=mips64vr4300 \
   --disable-werror
@@ -101,7 +103,7 @@ cd ../gcc_compile
   --target=mips64-elf \
   --with-arch=vr4300 \
   --with-tune=vr4300 \
-  --enable-languages=c \
+  --enable-languages=c \ #surely should include c++?
   --without-headers \
   --with-newlib \
   --disable-libssp \
@@ -117,6 +119,16 @@ make all-gcc -j$JOBS
 make all-target-libgcc -j$JOBS
 make install-gcc || sudo make install-gcc || su -c "make install-gcc"
 make install-target-libgcc || sudo make install-target-libgcc || su -c "make install-target-libgcc"
+
+# # Compile makefile (TODO: might need more effort!)
+# cd ../make-$MAKE_V
+# ./configure \
+#   --prefix="${INSTALL_PATH}" \
+#   --disable-largefile \
+#   --disable-nls \
+#   --disable-rpath
+# make -j$JOBS
+# make install #|| sudo env PATH="$PATH" make install || su -c "env PATH=$PATH make install"
 
 # Compile newlib
 cd ../newlib-$NEWLIB_V
@@ -152,6 +164,17 @@ CFLAGS_FOR_TARGET="-G0 -O2" CXXFLAGS_FOR_TARGET="-G0 -O2" ../gcc-$GCC_V/configur
   --with-system-zlib
 make -j$JOBS
 make install || sudo make install || su -c "make install"
+
+# # Compile GDB (TODO: might need more effort!)
+# cd ../gdb-$GDB_V
+# CFLAGS="" LDFLAGS="" \
+# ./configure \
+#   --disable-werror \
+#   --prefix="${INSTALL_PATH}" \
+#   --target=mips64-elf \
+#   --with-arch=vr4300
+# make -j$JOBS
+# make install #|| sudo env PATH="$PATH" make install || su -c "env PATH=$PATH make install"
 
 if [ "$COMPILED_CUSTOM_NATIVE_GCC" == "true" ]; then
     rm -rf ${INSTALL_PATH}/gcc-$GCC_V
