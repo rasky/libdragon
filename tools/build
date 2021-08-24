@@ -52,8 +52,10 @@ test -d gcc-$GCC_V || tar -xzf gcc-$GCC_V.tar.gz
 test -d newlib-$NEWLIB_V || tar -xzf newlib-$NEWLIB_V.tar.gz
 # test -d make-$MAKE_V || tar -xzf make-$MAKE_V.tar.gz
 
-# Use the native system GCC to compile...
+# Check if the native system already has a pre-compiled compatible version of GCC installed.
 if [ ! $(gcc --version | grep $GCC_V) ] && [ $FORCE_DEFAULT_GCC == 'false' ]; then
+#TODO: have we tried installing it??? It might be faster!!
+#if not, build and install a compatible version of GCC for the native system.
     rm -rf build_binutils
     mkdir build_binutils
 
@@ -82,8 +84,7 @@ if [ ! $(gcc --version | grep $GCC_V) ] && [ $FORCE_DEFAULT_GCC == 'false' ]; th
     export COMPILED_CUSTOM_NATIVE_GCC="true"
     cd ..
 fi
-# TODO: (but surely this will fail if the native system version is not installed!, since there is no else statement!!)
-# seems to continue regardless!!!
+
 # Binutils and newlib support compiling in source directory, GCC does not
 rm -rf gcc_compile
 mkdir gcc_compile
