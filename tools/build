@@ -19,8 +19,8 @@
 # Exit on error
 set -e
 
-# EDIT THIS LINE TO CHANGE YOUR INSTALL PATH!
-export INSTALL_PATH=${N64_INST:-/usr/local}
+# EDIT THIS LINE TO CHANGE YOUR INSTALL PATH! (TODO: !! Users should not be expected to do this !!)
+export INSTALL_PATH=${N64_INST:-/usr/local} #Perhaps this should be something like: "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 export JOBS=${JOBS:-`getconf _NPROCESSORS_ONLN`}
 export JOBS=${JOBS:-1} # If getconf returned nothing, default to 1
