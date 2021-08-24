@@ -31,29 +31,28 @@ export FORCE_DEFAULT_GCC=${FORCE_DEFAULT_GCC:-false}
 # Set up path for newlib to compile later
 export PATH=$PATH:$INSTALL_PATH/bin
 
-# Versions
+# Dependency source libs (Versions)
 export BINUTILS_V=2.36.1
 export GCC_V=10.2.0
 # export GDB_V=10.2.0
 export NEWLIB_V=4.1.0
 # export MAKE_V=4.3
 
-# Download stage
+# Dependency source: Download stage
 test -f binutils-$BINUTILS_V.tar.gz || wget -c https://ftp.gnu.org/gnu/binutils//binutils-$BINUTILS_V.tar.gz
 test -f gcc-$GCC_V.tar.gz || wget -c https://ftp.gnu.org/gnu/gcc/gcc-$GCC_V/gcc-$GCC_V.tar.gz
 # test -f gdb-$GDB_V.tar.gz || wget -c https://ftp.gnu.org/gnu/gdb/gdb-$GDB_V.tar.gz
 test -f newlib-$NEWLIB_V.tar.gz || wget -c https://sourceware.org/pub/newlib/newlib-$NEWLIB_V.tar.gz
 # test -f make-$MAKE_V.tar.gz || wget -c https://ftp.gnu.org/gnu/make/make--$MAKE_V.tar.gz
 
-# Extract stage
+# Dependency source: Extract stage
 test -d binutils-$BINUTILS_V || tar -xzf binutils-$BINUTILS_V.tar.gz
 test -d gcc-$GCC_V || tar -xzf gcc-$GCC_V.tar.gz
 # test -d gdb-$GDB_V || tar -xzf gdb-$GDB_V.tar.gz
 test -d newlib-$NEWLIB_V || tar -xzf newlib-$NEWLIB_V.tar.gz
 # test -d make-$MAKE_V || tar -xzf make-$MAKE_V.tar.gz
 
-# Use same native GCC
-
+# Use the native system GCC to compile...
 if [ ! $(gcc --version | grep $GCC_V) ] && [ $FORCE_DEFAULT_GCC == 'false' ]; then
     rm -rf build_binutils
     mkdir build_binutils
@@ -66,7 +65,7 @@ if [ ! $(gcc --version | grep $GCC_V) ] && [ $FORCE_DEFAULT_GCC == 'false' ]; th
     make -j$JOBS
     make install || sudo make install || su -c "make install"
 
-    # Compile gcc (native)
+    # Compile gcc (native) system
     cd ..
     rm -rf build_gcc
     mkdir build_gcc
@@ -83,7 +82,8 @@ if [ ! $(gcc --version | grep $GCC_V) ] && [ $FORCE_DEFAULT_GCC == 'false' ]; th
     export COMPILED_CUSTOM_NATIVE_GCC="true"
     cd ..
 fi
-
+# TODO: (but surely this will fail if the native system version is not installed!, since there is no else statement!!)
+# seems to continue regardless!!!
 # Binutils and newlib support compiling in source directory, GCC does not
 rm -rf gcc_compile
 mkdir gcc_compile
@@ -105,7 +105,7 @@ cd ../gcc_compile
   --target=mips64-elf \
   --with-arch=vr4300 \
   --with-tune=vr4300 \
-  --enable-languages=c \ #surely should include c++?
+  --enable-languages=c \ #surely should include c++? If not, comment why!
   --without-headers \
   --with-newlib \
   --disable-libssp \
