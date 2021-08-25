@@ -126,38 +126,6 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC" ./configure \
   --disable-threads \
   --disable-libssp \
   --disable-werror
-  ### TODO: further options for consideration...
-# --disable-bootstrap \
-# --disable-build-poststage1-with-cxx \
-# --disable-build-with-cxx \
-# --disable-cloog-version-check \
-# --disable-dependency-tracking \
-# --disable-libada \
-# --disable-libquadmath \
-# --disable-libquadmath-support \
-# --disable-maintainer-mode \
-# --disable-malloc-debugging \
-# --disable-multilib \
-# --disable-newlib-atexit-alloc \
-# --disable-newlib-hw-fp \
-# --disable-newlib-iconv \
-# --disable-newlib-io-float \
-# --disable-newlib-io-long-double \
-# --disable-newlib-io-long-long \
-# --disable-newlib-mb \
-# --disable-newlib-multithread \
-# --disable-newlib-register-fini \
-# --disable-newlib-supplied-syscalls \
-# --disable-objc-gc \
-# --enable-newlib-io-c99-formats \
-# --enable-newlib-io-pos-args \
-# --enable-newlib-reent-small \
-# --target=mips64-elf --with-arch=vr4300 \
-# --with-endian=little \
-# --without-cloog \
-# --without-gmp \
-# --without-mpc \
-# --without-mpfr
 make -j$JOBS
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=$PATH make install"
 
@@ -181,22 +149,6 @@ CFLAGS_FOR_TARGET="-G0 -O2" CXXFLAGS_FOR_TARGET="-G0 -O2" ../gcc-$GCC_V/configur
   --disable-win32-registry \
   --disable-nls \
   --with-system-zlib
-  ### TODO: further options for consideration...
-# --enable-checking=release \
-# --disable-decimal-float \
-# --disable-gold \
-# --disable-libatomic \
-# --disable-libgomp \
-# --disable-libitm \
-# --disable-libquadmath \
-# --disable-libquadmath-support \
-# --disable-libsanitizer \
-# --disable-libunwind-exceptions \
-# --disable-libvtv \
-# --disable-rpath \
-# --enable-lto \
-# --enable-plugin \
-# --without-included-gettext
 make -j$JOBS
 make install || sudo make install || su -c "make install"
 
