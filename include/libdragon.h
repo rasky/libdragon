@@ -66,5 +66,6 @@
 #include "dir.h"
 #include "mixer.h"
 #include "sfx64.h"
+#include "xm64.h"
 
 #endif
