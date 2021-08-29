@@ -14,7 +14,7 @@
 
 /** @brief Read the COP0 Count register (see also TICKS_READ). */
 #define C0_COUNT() ({ \
-    uint32_t x; \
+    volatile uint32_t x; \
     asm volatile("mfc0 %0,$9":"=r"(x)); \
     x; \
 })
@@ -27,7 +27,7 @@
 
 /** @brief Read the COP0 Compare register. */
 #define C0_COMPARE() ({ \
-    uint32_t x; \
+    volatile uint32_t x; \
     asm volatile("mfc0 %0,$11":"=r"(x)); \
     x; \
 })
@@ -40,7 +40,7 @@
 
 /** @brief Read the COP0 Status register. */
 #define C0_STATUS() ({ \
-    uint32_t x; \
+    volatile uint32_t x; \
     asm volatile("mfc0 %0,$12":"=r"(x)); \
     x; \
 })
@@ -60,7 +60,7 @@
  * @see #C0_GET_CAUSE_EXC_CODE, #C0_GET_CAUSE_CE and #C0_CAUSE_BD
  */
 #define C0_READ_CR() ({ \
-	uint32_t x; \
+	volatile uint32_t x; \
 	asm volatile("mfc0 %0,$13" : "=r" (x) : ); \
 	x; \
 })
@@ -82,7 +82,7 @@
  * invalid, or a virtual address for which an addressing error occurred.
  */
 #define C0_READ_BADVADDR() ({ \
-	uint32_t x; \
+	volatile uint32_t x; \
 	asm volatile("mfc0 %0,$8" : "=r" (x) : ); \
 	x; \
 })
@@ -98,7 +98,7 @@
  * value.
  */
 #define C0_READ_EPC() ({ \
-	uint32_t x; \
+	volatile uint32_t x; \
 	asm volatile("mfc0 %0,$14" : "=r" (x) : ); \
 	x; \
 })
