@@ -14,7 +14,7 @@ defaults:
 
 jobs:
   build-windows-tools:
-    name: Build Windows tools.
+    name: Build Windows tools using MSVC.
     timeout-minutes: 15
     runs-on: windows-latest
 

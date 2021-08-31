@@ -1,0 +1,28 @@
+jobs:
+  build-mingw-windows-tools:
+    name: Build Windows tools using MinGW.
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Set up MinGW
+        uses: egor-tensin/setup-mingw@v2
+        with:
+          platform: x64 #TODO: make this a matrix so it also builds for win32?
+
+      - name: Build Tools
+        shell: bash
+        run: |
+          make tools
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: libdragon-tools-mingw
+          path: |
+            ${{ github.workspace }}\**\*.exe
