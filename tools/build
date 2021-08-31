@@ -4,11 +4,6 @@
 # See the root folder for license information.
 
 
-### TODO: this info is probably incorrect and should be auto handled!
-# You may be prompted for your password during installation steps.
-### If the script tells you that writing failed on chksum64 and n64tool,
-### this does not mean it failed.  The script simply retried with sudo
-### and your password was cached.
 
 # Before calling this script, make sure you have GMP, MPFR and TexInfo
 # packages installed in your system.  On a Debian-based system this is
@@ -21,8 +16,8 @@
 # Exit on error
 set -e
 
-# EDIT THIS LINE TO CHANGE YOUR INSTALL PATH! (TODO: !! Users should not be expected to do this !!)
-export INSTALL_PATH=${N64_INST:-/usr/local} #Perhaps this should be something like: "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Set N64_INST before calling the script to change the default installation directory path
+export INSTALL_PATH=${N64_INST:-/usr/local}
 
 export JOBS=${JOBS:-`getconf _NPROCESSORS_ONLN`}
 export JOBS=${JOBS:-1} # If getconf returned nothing, default to 1
@@ -48,7 +43,6 @@ test -d newlib-$NEWLIB_V || tar -xzf newlib-$NEWLIB_V.tar.gz
 
 # Check if the native system already has a pre-compiled compatible version of GCC installed.
 if [ ! $(gcc --version | grep $GCC_V) ] && [ $FORCE_DEFAULT_GCC == 'false' ]; then
-#TODO: have we tried installing it??? It might be faster!!
 #if not, build and install a compatible version of GCC for the native system.
     rm -rf build_binutils
     mkdir build_binutils
@@ -61,7 +55,7 @@ if [ ! $(gcc --version | grep $GCC_V) ] && [ $FORCE_DEFAULT_GCC == 'false' ]; th
     make -j$JOBS
     make install || sudo make install || su -c "make install"
 
-    # Compile gcc (native) system
+    # Compile gcc (native system)
     cd ..
     rm -rf build_gcc
     mkdir build_gcc
@@ -100,7 +94,7 @@ cd ../gcc_compile
   --target=mips64-elf \
   --with-arch=vr4300 \
   --with-tune=vr4300 \
-  --enable-languages=c \ #surely should include c++? If not, comment why!
+  --enable-languages=c \ # c++ language support is added in the second pass.
   --without-headers \
   --with-newlib \
   --disable-libssp \
