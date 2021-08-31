@@ -1,9 +1,9 @@
 # Copyright (c) libdragon 2021
 # See LICENSE file in the project root for full license information.
 
-name: Build libdragon lib using Docker Container
- 
+name: Build lib using Docker Container
 on: [push, pull_request]
+
 jobs:
   build:
     runs-on: ubuntu-latest

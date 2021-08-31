@@ -1,8 +1,17 @@
+# Copyright (c) libdragon 2021
+# See LICENSE file in the project root for full license information.
+
+name: Build tools using MinGW.
+on: [push, pull_request]
+
 jobs:
-  build-mingw-windows-tools:
-    name: Build Windows tools using MinGW.
+  build:
     timeout-minutes: 15
     runs-on: ubuntu-latest
+#    strategy:
+#      matrix:
+#        platform: [ 'x64', 'i386' ]
+
 
     steps:
       - name: Checkout

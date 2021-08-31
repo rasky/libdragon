@@ -4,8 +4,7 @@
 # This workflow will build the tools using MSVC Build and upload the artifacts.
 # It currently uses external dependencies for dirent.h and libpng.
 
-name: Build libdragon for Windows.
-
+name: Build libdragon tools MSVC.
 on: [push, pull_request]
 
 defaults:
@@ -13,8 +12,7 @@ defaults:
     shell: cmd
 
 jobs:
-  build-windows-tools:
-    name: Build Windows tools using MSVC.
+  build:
     timeout-minutes: 15
     runs-on: windows-latest
 
