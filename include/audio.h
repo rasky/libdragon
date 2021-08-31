@@ -29,11 +29,16 @@ void audio_init(const int frequency, int numbuffers);
 void audio_set_buffer_callback(audio_fill_buffer_callback fill_buffer_callback);
 void audio_pause(bool pause);
 void audio_write(const short * const buffer);
-volatile int audio_can_write();
-void audio_write_silence();
-void audio_close();
-int audio_get_frequency();
-int audio_get_buffer_length();
+
+short* audio_write_begin(int num_samples);
+void audio_write_end(int num_samples);
+
+volatile bool audio_can_write_n(int num_samples);
+volatile int audio_can_write(void);
+void audio_write_silence(void);
+void audio_close(void);
+int audio_get_frequency(void);
+int audio_get_buffer_length(void);
 
 #ifdef __cplusplus
 }

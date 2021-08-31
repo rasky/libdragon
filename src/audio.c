@@ -10,6 +10,14 @@
 #include "regsinternal.h"
 #include "n64sys.h"
 
+#define AUDIO_TRACE   0
+
+#if AUDIO_TRACE
+#define tracef(fmt, ...)  debugf(fmt, ##__VA_ARGS__)
+#else
+#define tracef(fmt, ...)  ({ })
+#endif
+
 /**
  * @defgroup audio Audio Subsystem
  * @ingroup libdragon
@@ -82,24 +90,25 @@
 
 /** @brief The actual frequency the AI will run at */
 static int _frequency = 0;
-/** @brief The number of buffers currently allocated */
-static int _num_buf = NUM_BUFFERS;
-/** @brief The buffer size in bytes for each buffer allocated */
-static int _buf_size = 0;
-/** @brief Array of pointers to the allocated buffers */
-static short **buffers = NULL;
+/** @brief Circular buffer of samples */
+static int32_t *buffer = NULL;
+/** @brief Size of the circular buffer */
+static int buf_size;
+/** @brief Read index of the buffer */
+static volatile int buf_ridx;
+/** @brief Write index of the buffer */
+static volatile int buf_widx;
+/** @brief Second write index (used to wrap around) */
+static volatile int buf_widx2;
+/** @brief Buffer is full. */
+static volatile bool buf_full;
+/** @brief Suggested size of a chunk of audio to be written */
+static int suggested_write_size;
 
 static audio_fill_buffer_callback _fill_buffer_callback = NULL;
 static audio_fill_buffer_callback _orig_fill_buffer_callback = NULL;
 
 static volatile bool _paused = false;
-
-/** @brief Index of the current playing buffer */
-static volatile int now_playing = 0;
-/** @brief Index pf the currently being written buffer */
-static volatile int now_writing = 0;
-/** @brief Bitmask of buffers indicating which buffers are full */
-static volatile int buf_full = 0;
 
 /** @brief Structure used to interact with the AI registers */
 static volatile struct AI_regs_s * const AI_regs = (struct AI_regs_s *)0xa4500000;
@@ -130,10 +139,10 @@ static volatile inline int __full()
  * This function is called whenever internal buffers are running low.  It will
  * send as many buffers as possible to the AI until the AI is full.
  */
-static void audio_callback()
+void audio_callback(void)
 {
     /* Do not copy more data if we've freed the audio system */
-    if(!buffers)
+    if(!buffer)
     {
         return;
     }
@@ -144,31 +153,39 @@ static void audio_callback()
     /* Copy in as many buffers as can fit (up to 2) */
     while(!__full())
     {
-        /* check if next buffer is full */
-        int next = (now_playing + 1) % _num_buf;
-        if ((!(buf_full & (1<<next))) && !_fill_buffer_callback)
+        tracef("callback: ridx:%x widx:%x widx2:%x\n", buf_ridx, buf_widx, buf_widx2);
+        if (buf_widx == buf_ridx)
         {
-            break;
+            if (buf_widx2 == 0)
+                break;
+            buf_ridx = 0;
+            buf_widx = buf_widx2;
+            buf_widx2 = 0;
         }
+        assert(buf_widx > buf_ridx);
 
-        /* clear buffer full flag */
-        buf_full &= ~(1<<next);
+        int nsamples = (buf_widx - buf_ridx);
+        assert((nsamples & 1) == 0);
 
-        /* Set up DMA */
-        now_playing = next;
+        if (nsamples > buf_size/4)
+            nsamples = buf_size/4;
 
-        if (_fill_buffer_callback) {
-            _fill_buffer_callback(UncachedAddr( buffers[now_playing] ), _buf_size);
-        }
-
-        AI_regs->address = UncachedAddr( buffers[now_playing] );
+        /* Start the DMA transfer */
+        tracef("DMA: %x->%x\n", buf_ridx, buf_ridx+nsamples);
+        AI_regs->address = UncachedAddr(buffer + buf_ridx);
+        AI_regs->length = nsamples * sizeof(int32_t);
         MEMORY_BARRIER();
-        AI_regs->length = (_buf_size * 2 * 2 ) & ( ~7 );
-        MEMORY_BARRIER();
-
-         /* Start DMA */
         AI_regs->control = 1;
-        MEMORY_BARRIER();
+
+        buf_ridx += nsamples;
+        buf_full = false;
+
+        if (_fill_buffer_callback)
+        {
+            short *out = audio_write_begin(suggested_write_size);
+            _fill_buffer_callback((short*)out, suggested_write_size);
+            audio_write_end(suggested_write_size);
+        }
     }
 
     /* Safe to enable interrupts here */
@@ -230,39 +247,31 @@ void audio_dac_init(const int frequency)
  * @param[in] fill_buffer_callback
  *            A function to be called when more sample data is needed
  */
-void audio_init(const int frequency, int numbuffers)
+void audio_init(int frequency, int num_buffers)
 {
     /* Initialize the audio DAC */
     audio_dac_init(frequency);
-
-    /* Make sure we don't choose too many buffers */
-    if( numbuffers > (sizeof(buf_full) * 8) )
-    {
-        /* This is a bit mask, so we can only have as many
-         * buffers as we have bits. */
-        numbuffers = sizeof(buf_full) * 8;
-    }
 
     /* Set up hardware to notify us when it needs more data */
     register_AI_handler(audio_callback);
     set_AI_interrupt(1);
 
     /* Set up buffers */
-    _buf_size = CALC_BUFFER(_frequency);
-    _num_buf = (numbuffers > 1) ? numbuffers : NUM_BUFFERS;
-    buffers = malloc(_num_buf * sizeof(short *));
+    suggested_write_size = CALC_BUFFER(_frequency);
+    
+    if (num_buffers < 1)
+        num_buffers = NUM_BUFFERS;
 
-    for(int i = 0; i < _num_buf; i++)
-    {
-        /* Stereo buffers, interleaved */
-        buffers[i] = malloc(sizeof(short) * 2 * _buf_size);
-        memset(buffers[i], 0, sizeof(short) * 2 * _buf_size);
-    }
+    buf_size = num_buffers * suggested_write_size + 1;
+
+    buffer = malloc(buf_size * sizeof(int32_t));
+    memset(buffer, 0, buf_size * sizeof(int32_t));
+    data_cache_hit_writeback_invalidate(buffer, buf_size * sizeof(int32_t));
 
     /* Set up ring buffer pointers */
-    now_playing = 0;
-    now_writing = 0;
-    buf_full = 0;
+    buf_widx = 0;
+    buf_widx2 = 0;
+    buf_ridx = 0;
     _paused = false;
 }
 
@@ -287,25 +296,11 @@ void audio_close()
     set_AI_interrupt(0);
     unregister_AI_handler(audio_callback);
 
-    if(buffers)
+    if(buffer)
     {
-        for(int i = 0; i < _num_buf; i++)
-        {
-            /* Nuke anything that isn't freed */
-            if(buffers[i])
-            {
-                free(buffers[i]);
-                buffers[i] = 0;
-            }
-        }
-
-        /* Nuke array of buffers we init'd earlier */
-        free(buffers);
-        buffers = 0;
+        free(buffer);
+        buffer = 0;
     }
-
-    _frequency = 0;
-    _buf_size = 0;
 }
 
 static void audio_paused_callback(short *buffer, size_t numsamples)
@@ -336,6 +331,37 @@ void audio_pause(bool pause) {
 	}
 }
 
+short* audio_write_begin(int nsamples)
+{
+    int32_t *out;
+    disable_interrupts();
+    if (buf_widx2 == 0 && buf_widx + nsamples <= buf_size)
+    {
+        out = buffer + buf_widx;
+        buf_widx += nsamples;
+        buf_full = false;
+    }
+    else
+    {
+        out = buffer + buf_widx2;
+        if (buf_widx2+nsamples > buf_ridx)
+            debugf("[audio] buffer is full: ridx:%x widx:%x widx2:%x\n", buf_ridx, buf_widx, buf_widx2);
+        else {
+            buf_widx2 += nsamples;
+            buf_full = buf_widx2 == buf_ridx;
+        }
+    }
+    tracef("audio_write_begin: ridx:%x widx:%x widx2:%x AI:%lx\n", buf_ridx, buf_widx, buf_widx2, ((uint32_t)AI_regs->address - ((uint32_t)buffer & 0x0FFFFFFF)) / 4);
+    enable_interrupts();
+    return (short*)out;
+}
+
+void audio_write_end(int nsamples)
+{
+    audio_callback();
+}
+
+
 /**
  * @brief Write a chunk of audio data
  *
@@ -351,31 +377,15 @@ void audio_pause(bool pause) {
  * @param[in] buffer
  *            Buffer containing stereo samples to be played
  */
-void audio_write(const short * const buffer)
+void audio_write(const short* buffer)
 {
-    if(!buffers)
-    {
+    if(!buffer)
         return;
-    }
 
-    disable_interrupts();
-
-    /* check for empty buffer */
-    int next = (now_writing + 1) % _num_buf;
-    while (buf_full & (1<<next))
-    {
-        // buffers full
-        audio_callback();
-        enable_interrupts();
-        disable_interrupts();
-    }
-
-    /* Copy buffer into local buffers */
-    buf_full |= (1<<next);
-    now_writing = next;
-    memcpy(UncachedShortAddr(buffers[now_writing]), buffer, _buf_size * 2 * sizeof(short));
-    audio_callback();
-    enable_interrupts();
+    while(!audio_can_write()) {}
+    short *out = audio_write_begin(suggested_write_size);
+    memcpy(UncachedShortAddr(out), buffer, suggested_write_size * sizeof(int32_t));
+    audio_write_end(suggested_write_size);
 }
 
 /**
@@ -388,31 +398,15 @@ void audio_write(const short * const buffer)
  *       If you do not want to block, check to see if there is room by calling
  *       #audio_can_write.
  */
-void audio_write_silence()
+void audio_write_silence(void)
 {
-    if(!buffers)
-    {
+    if(!buffer)
         return;
-    }
 
-    disable_interrupts();
-
-    /* check for empty buffer */
-    int next = (now_writing + 1) % _num_buf;
-    while (buf_full & (1<<next))
-    {
-        // buffers full
-        audio_callback();
-        enable_interrupts();
-        disable_interrupts();
-    }
-
-    /* Copy silence into local buffers */
-    buf_full |= (1<<next);
-    now_writing = next;
-    memset(UncachedShortAddr(buffers[now_writing]), 0, _buf_size * 2 * sizeof(short));
-    audio_callback();
-    enable_interrupts();
+    while(!audio_can_write()) {}
+    short* out = audio_write_begin(suggested_write_size);
+    memset(UncachedShortAddr(out), 0, suggested_write_size * sizeof(int32_t));
+    audio_write_end(suggested_write_size);
 }
 
 /**
@@ -422,16 +416,14 @@ void audio_write_silence()
  * write data to.  If all buffers are full, wait until the AI has played back
  * the next buffer in its queue and try writing again.
  */
-volatile int audio_can_write()
+volatile int audio_can_write(void)
 {
-    if(!buffers)
-    {
-        return 0;
-    }
+    return audio_can_write_n(suggested_write_size);
+}
 
-    /* check for empty buffer */
-    int next = (now_writing + 1) % _num_buf;
-    return (buf_full & (1<<next)) ? 0 : 1;
+volatile bool audio_can_write_n(int nsamples)
+{
+    return (buf_widx2 == 0 || buf_widx2 + nsamples <= buf_ridx);
 }
 
 /**
@@ -439,7 +431,7 @@ volatile int audio_can_write()
  *
  * @return Frequency in Hz of the audio playback
  */
-int audio_get_frequency()
+int audio_get_frequency(void)
 {
     return _frequency;
 }
@@ -452,9 +444,9 @@ int audio_get_frequency()
  *
  * @return The number of stereo samples in an allocated buffer
  */
-int audio_get_buffer_length()
+int audio_get_buffer_length(void)
 {
-    return _buf_size;
+    return suggested_write_size;
 }
 
 /** @} */ /* audio */
