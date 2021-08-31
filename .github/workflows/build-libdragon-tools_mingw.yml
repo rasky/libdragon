@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           # TODO: this dependency is not helpful. It might still need the same workaround as used in the MSVC build!... 
-          sudo apt-get install libpng-dev
+          sudo apt-get install libxtst-dev libpng++-dev
 
       - name: Build Tools
         shell: bash
