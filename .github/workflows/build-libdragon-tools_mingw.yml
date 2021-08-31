@@ -27,13 +27,15 @@ jobs:
       - name: Install Dependencies
         shell: bash
         run: |
-          # TODO: this dependency is not helpful. It might still need the same workaround as used in the MSVC build!... 
-          sudo apt-get install libxtst-dev libpng++-dev
+          # TODO: this dependency is not helpful. It still (seems) to need the same workaround as used in the MSVC build!...
+          # But if so, how would you parse the header in from this script. 
+          sudo apt-get install libpng-dev libpng++-dev
 
       - name: Build Tools
         shell: bash
         run: |
           make tools
+          # TODO: as well as `png.h` there are also issues with `dumpdfs.c` `malloc` warnings.
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v2

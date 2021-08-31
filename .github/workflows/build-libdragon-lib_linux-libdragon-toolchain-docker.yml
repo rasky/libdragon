@@ -20,5 +20,6 @@ jobs:
           
       - name: Build SDK against container
         run: |
+          # TODO: currently there is a warning with cpptest. See https://github.com/networkfusion/libdragon/runs/3477085761?check_suite_focus=true for example. 
           docker run --name=libdragon -d --mount type=bind,source=$(pwd),target=/libdragon -w=/libdragon anacierdem/libdragon:toolchain tail -f /dev/null
           docker exec libdragon /bin/bash ./build.sh
