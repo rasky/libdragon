@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
    strategy:
      matrix:
-       platform: [ 'any', 'x64' ]
+       platform: [ 'x86', 'x64' ]
 
 
     steps:
