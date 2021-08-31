@@ -64,5 +64,7 @@
 #include "timer.h"
 #include "exception.h"
 #include "dir.h"
+#include "mixer.h"
+#include "sfx64.h"
 
 #endif
