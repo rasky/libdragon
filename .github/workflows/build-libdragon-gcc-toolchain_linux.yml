@@ -1,0 +1,49 @@
+# Copyright (c) libdragon 2021
+# See LICENSE file in the project root for full license information.
+
+# This workflow will periodically build the libdragon N64 GCC toolchain to keep it up-to-date.
+name: Monthly Build gcc toolchain on linux
+
+on:
+  # This action will take about 40 minutes to run! It is not recommended to enable it for push or pull requests!
+  #push:
+  #pull_request:
+  schedule:
+  # At 00:00 UTC every month. But actually should only happen on tag/release?!
+  - cron:  '0 0 1 * *'
+  # repository_dispatch:
+  #   types: update-dependencies
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Build latest libdragon N64 MIPS GCC toolchain
+        run: |
+          sudo apt-get install libmpfr-dev
+          sudo apt-get install texinfo
+          sudo apt-get install libmpc-dev
+
+      - uses: actions/checkout@v2
+        name: Checkout Code
+
+      - name: Build N64 MIPS GCC toolchain
+        run: |
+          make build
+
+      - name: Upload Docker Container
+        run: |
+          echo "TODO: Create/Upload the docker container."
+
+      - name: Upload dep package.
+        run: |
+          echo "TODO: Create upload the debian package."
+
+      - name: Upload Github .deb Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: linux-libdragon-toolchain-debian
+          path: |
+            ${{ github.workspace }}/**/*.deb

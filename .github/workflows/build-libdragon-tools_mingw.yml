@@ -27,9 +27,11 @@ jobs:
       - name: Install Dependencies
         shell: bash
         run: |
-          # TODO: this dependency is not helpful. It still (seems) to need the same workaround as used in the MSVC build!...
-          # But if so, how would you parse the header in from this script. 
-          sudo apt-get install libpng-dev libpng++-dev
+          # TODO: this dependency is not helpful. It still (seems) to need the same workaround as used in the MSVC build!..
+          # (i.e.   curl -L https://windows.php.net/downloads/php-sdk/deps/vs16/x86/libpng-1.6.34-6-vs16-x86.zip --output libpng.zip)
+          # But if so, how would you parse the header in from this compressed dir...
+          # Unfortunately using the following does not work!
+          # sudo apt-get install libpng-dev libpng++-dev
 
       - name: Build Tools
         shell: bash
