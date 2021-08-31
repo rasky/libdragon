@@ -43,7 +43,7 @@ test -d newlib-$NEWLIB_V || tar -xzf newlib-$NEWLIB_V.tar.gz
 
 # Check if the native system already has a pre-compiled compatible version of GCC installed.
 if [ ! $(gcc --version | grep $GCC_V) ] && [ $FORCE_DEFAULT_GCC == 'false' ]; then
-#if not, build and install a compatible version of GCC for the native system.
+    #if not, build and install a compatible version of GCC for the native system.
     rm -rf build_binutils
     mkdir build_binutils
 
