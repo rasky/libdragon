@@ -8,9 +8,9 @@ jobs:
   build:
     timeout-minutes: 15
     runs-on: ubuntu-latest
-#    strategy:
-#      matrix:
-#        platform: [ 'x64', 'i386' ]
+   strategy:
+     matrix:
+       platform: [ 'any', 'x64' ]
 
 
     steps:
@@ -22,7 +22,7 @@ jobs:
       - name: Set up MinGW
         uses: egor-tensin/setup-mingw@v2
         with:
-          platform: x64 #TODO: make this a matrix so it also builds for win32?
+          platform: ${{ matrix.platform }}
 
       - name: Build Tools
         shell: bash
@@ -32,6 +32,6 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v2
         with:
-          name: libdragon-tools-mingw
+          name: libdragon-tools-mingw-${{ matrix.platform }}
           path: |
             ${{ github.workspace }}\**\*.exe
