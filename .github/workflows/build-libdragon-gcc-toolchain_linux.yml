@@ -2,7 +2,7 @@
 # See LICENSE file in the project root for full license information.
 
 # This workflow will periodically build the libdragon N64 GCC toolchain to keep it up-to-date.
-name: Monthly Build gcc toolchain on linux
+name: Monthly Build latest libdragon N64 MIPS GCC toolchain
 
 on:
   # This action will take about 40 minutes to run! It is not recommended to enable it for push or pull requests!
@@ -20,7 +20,7 @@ jobs:
 
     steps:
 
-      - name: Build latest libdragon N64 MIPS GCC toolchain
+      - name: Install linux dependencies
         run: |
           sudo apt-get install libmpfr-dev
           sudo apt-get install texinfo
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v2
         name: Checkout Code
 
-      - name: Build N64 MIPS GCC toolchain
+      - name: Build N64 MIPS GCC toolchain script
         run: |
           make build
 
