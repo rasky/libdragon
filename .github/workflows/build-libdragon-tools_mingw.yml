@@ -24,6 +24,12 @@ jobs:
         with:
           platform: x86 #${{ matrix.platform }}
 
+      - name: Install Dependencies
+        shell: bash
+        run: |
+# TODO: this dependency is not helpful. It might still need the same workaround as used in the MSVC build!... 
+          sudo apt-install libpng-dev
+
       - name: Build Tools
         shell: bash
         run: |
