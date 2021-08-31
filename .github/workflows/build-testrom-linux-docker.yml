@@ -10,7 +10,7 @@ jobs:
 #    strategy:
 #      matrix:
 #        releasetype: [ 'debug', 'release' ]
-#        byteswap: [ '1', '0' ] #[ 'true', 'false' ]
+
     steps:
       - uses: actions/checkout@v2
         name: Checkout Code
@@ -27,7 +27,7 @@ jobs:
           libdragon start
 
       - name: Build test ROM
-        run: cd ${{ github.workspace }}/tests/ && libdragon make #${{ matrix.releasetype }} #N64_BYTE_SWAP=${{ matrix.byteswap }}
+        run: cd ${{ github.workspace }}/tests/ && libdragon make #${{ matrix.releasetype }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v2
@@ -35,5 +35,3 @@ jobs:
           name: Libdragon-Test-ROMs #-${{ matrix.releasetype }}
           path: |
             ${{ github.workspace }}/**/*.z64
-            ${{ github.workspace }}/**/*.v64
-            ${{ github.workspace }}/**/*.n64
