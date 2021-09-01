@@ -31,7 +31,8 @@ jobs:
           # Unfortunately using the following does not work!
           # sudo apt-get install libpng-dev libpng++-dev
           # So lets try building and installing the mingw version.
-          curl -SL http://downloads.sourceforge.net/project/libpng/01-libpng-master/1.4.1/libpng-1.4.1.tar.gz | tar -xz -C .
+          curl -SL http://downloads.sourceforge.net/project/libpng/01-libpng-master/1.4.1/libpng-1.4.1.tar.gz
+          tar -zxvf libpng-1.4.1.tar.gz
           cd libpng-1.4.1
           ./configure –prefix=/mingw
           make
