@@ -31,12 +31,12 @@ jobs:
           # Unfortunately using the following does not work!
           # sudo apt-get install libpng-dev libpng++-dev
           # So lets try building and installing the mingw version.
-          curl -SL https://downloads.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.gz | tar -xz -C .
-          cd libpng-1.6.37
-          ./configure --help #-–prefix=/mingw
-          make
-          make install
-          cd ..
+          #curl -SL https://downloads.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.gz | tar -xz -C .
+          #cd libpng-1.6.37
+          #./configure --prefix=/usr/x86_64-w64-mingw32/usr/lib/
+          #make
+          #make install
+          #cd ..
 
       - name: Build Tools
         shell: bash
