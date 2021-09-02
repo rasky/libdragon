@@ -24,13 +24,8 @@ jobs:
         with:
           msystem: ${{matrix.sys}}
           install: >-
-            # curl
-            # p7zip
-            # git
-            # sed
             mingw-w64-libpng
             base-devel
-            # mingw-w64-${{ matrix.arch }}-cmake
             mingw-w64-${{ matrix.arch }}-toolchain
           update: true
 
