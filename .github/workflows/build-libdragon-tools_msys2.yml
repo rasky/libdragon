@@ -1,0 +1,68 @@
+name: msys2-windows
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: [
+          { msystem: MINGW64, arch: x86_64 },
+          { msystem: MINGW64, arch: x86_64 }
+        ]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          path: temp
+          fetch-depth: 0
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: >-
+            curl
+            p7zip
+            git
+            sed
+            base-devel
+            mingw-w64-${{ matrix.arch }}-cmake
+            mingw-w64-${{ matrix.arch }}-toolchain
+          update: true
+
+      - name: Move Checkout
+        run: |
+          Copy-Item -Path ".\temp" -Destination "C:\_" -Recurse
+          # New-Item -Path "C:\_" -Name "build" -ItemType "directory"
+
+      - name: Correct pthread to allow static
+        shell: msys2 {0}
+        run: |
+          sed -z 's/#else\n#define WINPTHREAD_API __declspec(dllimport)/#else\n#define WINPTHREAD_API/' /mingw64/x86_64-w64-mingw32/include/pthread.h
+
+      - name: Build libpng static lib
+        shell: msys2 {0}
+        run: |
+          curl -SL https://downloads.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.gz | tar -xz -C .
+          cd libpng-1.6.37
+          ./configure --prefix=/mingw64/local --disable-shared --enable-static
+          make
+          make install
+          cd ..
+
+      - name: Build Tools
+        shell: msys2 {0}
+        run: |
+          cd /C/_
+          # cd build
+          # cmake -DCMAKE_FIND_LIBRARY_SUFFIXES='.a' -DICONV_INCLUDE_DIR:PATH=/mingw64/local/include -DICONV_LIBRARIES:FILEPATH=/mingw64/local/lib/libiconv.a -DOPENAL_INCLUDE_DIR:PATH=/C/_/openal/include -DOPENAL_LIBRARY:FILEPATH=/C/_/openal/lib/libOpenAL32.dll.a -DCMAKE_TOOLCHAIN_FILE=cmake/Toolchains/mingw64-${{ matrix.arch }}.cmake -DCEN64_ARCH_SUPPORT:STRING=${{ matrix.extensions }} -DCMAKE_BUILD_TYPE=Release -G 'Unix Makefiles' ..
+          make tools
+
+      - name: "Upload executable"
+        uses: actions/upload-artifact@v2
+        with:
+          name: windows-${{ matrix.arch }}
+          path: C:/_/*.exe
