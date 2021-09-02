@@ -3,7 +3,7 @@
 
 # This workflow will build the tools for Windows using MSYS2 and upload the artifacts.
 
-name: Build Windows tools using MSYS2. 
+name: Build libdragon tools for Windows using MSYS2. 
 
 on:
   push:
@@ -16,8 +16,10 @@ jobs:
       fail-fast: false
       matrix:
         include: [
-          { sys: mingw64, arch: x86_64 },
-          { sys: mingw32, arch: i686 } # Probably useful for those on Windows XP or below!
+          { sys: mingw64, arch: x86_64 build: tools},
+          { sys: mingw32, arch: i686 build: tools} # Probably useful for those on Windows XP or below!
+          # { sys: mingw64, arch: x86_64 build: libdragon} # builds the dragon lib
+          # { sys: mingw32, arch: i686 build: libdragon} # Probably useful for those on Windows XP or below!
         ]
     steps:
       - uses: msys2/setup-msys2@v2
@@ -32,10 +34,10 @@ jobs:
 
       - uses: actions/checkout@v2
         with:
-          path: ./libdragon
+          path: ${{ github.workspace }}/libdragon
           fetch-depth: 0
 
-      - name: Correct pthread to allow static
+      - name: Correct pthread to allow static libraries
         shell: msys2 {0}
         run: |
           sed -z 's/#else\n#define WINPTHREAD_API __declspec(dllimport)/#else\n#define WINPTHREAD_API/' /${{matrix.sys}}/${{ matrix.arch }}-w64-mingw32/include/pthread.h
@@ -43,11 +45,11 @@ jobs:
       - name: Build Tools
         shell: msys2 {0}
         run: |
-          cd ./libdragon
-          make tools
+          cd ${{ github.workspace }}/libdragon
+          make {{ matrix.build }}
 
       - name: "Upload libdragon tool executables"
         uses: actions/upload-artifact@v2
         with:
           name: windows-${{ matrix.arch }}
-          path: ./libdragon/tools/*.exe
+          path: ${{ github.workspace }}/**/tools/*.exe
