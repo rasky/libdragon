@@ -1,65 +1,65 @@
-# Copyright (c) libdragon 2021
-# See LICENSE file in the project root for full license information.
+# # Copyright (c) libdragon 2021
+# # See LICENSE file in the project root for full license information.
 
-# This workflow will build the tools using MSVC Build and upload the artifacts.
-# It currently uses external dependencies for dirent.h and libpng.
+# # This workflow will build the tools using MSVC Build and upload the artifacts.
+# # It currently uses external dependencies for dirent.h and libpng.
 
-name: Build libdragon tools MSVC.
-on: [push, pull_request]
+# name: Build libdragon tools MSVC.
+# on: [push, pull_request]
 
-defaults:
-  run:
-    shell: cmd
+# defaults:
+#   run:
+#     shell: cmd
 
-jobs:
-  build:
-    timeout-minutes: 15
-    runs-on: windows-latest
+# jobs:
+#   build:
+#     timeout-minutes: 15
+#     runs-on: windows-latest
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v2
+#         with:
+#           fetch-depth: 0
 
-      - name: Install required dependencies
-        shell: bash
-        run: |
-          curl -L https://raw.githubusercontent.com/tronkko/dirent/master/include/dirent.h --output ./include/dirent.h
-          curl -L https://windows.php.net/downloads/php-sdk/deps/vs16/x86/libpng-1.6.34-6-vs16-x86.zip --output libpng.zip
+#       - name: Install required dependencies
+#         shell: bash
+#         run: |
+#           curl -L https://raw.githubusercontent.com/tronkko/dirent/master/include/dirent.h --output ./include/dirent.h
+#           curl -L https://windows.php.net/downloads/php-sdk/deps/vs16/x86/libpng-1.6.34-6-vs16-x86.zip --output libpng.zip
 
-      - name: Extract required dependencies
-        shell: pwsh
-        run: Expand-Archive -Path 'libpng.zip' -DestinationPath "libpng"
+#       - name: Extract required dependencies
+#         shell: pwsh
+#         run: Expand-Archive -Path 'libpng.zip' -DestinationPath "libpng"
 
-      - name: Build tools using MSVC
-        run: |
-          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
-          echo "Building chksum64..."
-          call cl .\tools\chksum64.c
-          echo "Completed building chksum64..."
+#       - name: Build tools using MSVC
+#         run: |
+#           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
+#           echo "Building chksum64..."
+#           call cl .\tools\chksum64.c
+#           echo "Completed building chksum64..."
           
-          echo "Building n64tool..."
-          call cl .\tools\n64tool.c
-          echo "Completed building n64tool..."
+#           echo "Building n64tool..."
+#           call cl .\tools\n64tool.c
+#           echo "Completed building n64tool..."
           
-          echo "Building dumpdfs..."
-          call cl .\tools\dumpdfs\dumpdfs.c -I .\include\
-          echo "Completed building dumpdfs..."
+#           echo "Building dumpdfs..."
+#           call cl .\tools\dumpdfs\dumpdfs.c -I .\include\
+#           echo "Completed building dumpdfs..."
           
-          echo "Building mkdfs..."
-          call cl .\tools\mkdfs\mkdfs.c -I .\include\
-          echo "Completed building mkdfs..."
+#           echo "Building mkdfs..."
+#           call cl .\tools\mkdfs\mkdfs.c -I .\include\
+#           echo "Completed building mkdfs..."
           
-          echo "Building mksprite..."
-          call cl .\tools\mksprite\convtool.c
-          call cl /MD .\tools\mksprite\mksprite.c .\libpng\lib\libpng.lib /I .\libpng\include\libpng16\ /link
-          echo "Completed building mksprite..."
-        continue-on-error: true # should not be required, but allows generated artifacts for testing...
+#           echo "Building mksprite..."
+#           call cl .\tools\mksprite\convtool.c
+#           call cl /MD .\tools\mksprite\mksprite.c .\libpng\lib\libpng.lib /I .\libpng\include\libpng16\ /link
+#           echo "Completed building mksprite..."
+#         continue-on-error: true # should not be required, but allows generated artifacts for testing...
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: libdragon-tools-windows
-          path: |
-            ${{ github.workspace }}\**\*.exe
+#       - name: Upload Artifact
+#         uses: actions/upload-artifact@v2
+#         with:
+#           name: libdragon-tools-windows
+#           path: |
+#             ${{ github.workspace }}\**\*.exe
