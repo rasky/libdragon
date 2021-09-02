@@ -11,8 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include: [
-          { msystem: MINGW64, arch: x86_64 },
-          { msystem: MINGW64, arch: x86_64 }
+          { sys: mingw64, arch: x86_64 },
+          { sys: mingw32, arch: i686 }
         ]
     steps:
       - uses: actions/checkout@v2
@@ -22,14 +22,15 @@ jobs:
 
       - uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: ${{matrix.sys}}
           install: >-
-            curl
-            p7zip
-            git
-            sed
+            # curl
+            # p7zip
+            # git
+            # sed
+            mingw-w64-libpng
             base-devel
-            mingw-w64-${{ matrix.arch }}-cmake
+            # mingw-w64-${{ matrix.arch }}-cmake
             mingw-w64-${{ matrix.arch }}-toolchain
           update: true
 
@@ -43,15 +44,15 @@ jobs:
         run: |
           sed -z 's/#else\n#define WINPTHREAD_API __declspec(dllimport)/#else\n#define WINPTHREAD_API/' /mingw64/x86_64-w64-mingw32/include/pthread.h
 
-      - name: Build libpng static lib
-        shell: msys2 {0}
-        run: |
-          curl -SL https://downloads.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.gz | tar -xz -C .
-          cd libpng-1.6.37
-          ./configure --prefix=/mingw64/local --disable-shared --enable-static
-          make
-          make install
-          cd ..
+      # - name: Build libpng static lib
+      #   shell: msys2 {0}
+      #   run: |
+      #     curl -SL https://downloads.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.gz | tar -xz -C .
+      #     cd libpng-1.6.37
+      #     ./configure --prefix=/mingw64/local --disable-shared --enable-static
+      #     make
+      #     make install
+      #     cd ..
 
       - name: Build Tools
         shell: msys2 {0}
