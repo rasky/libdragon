@@ -16,10 +16,10 @@ jobs:
       fail-fast: false
       matrix:
         include: [
-          { sys: mingw64, arch: x86_64 build: tools},
-          { sys: mingw32, arch: i686 build: tools} # Probably useful for those on Windows XP or below!
-#         { sys: mingw64, arch: x86_64 build: libdragon} # builds the dragon lib
-#         { sys: mingw32, arch: i686 build: libdragon} # Probably useful for those on Windows XP or below!
+          { sys: mingw64, arch: x86_64, build: tools},
+          { sys: mingw32, arch: i686, build: tools} #, # Probably useful for those on Windows XP or below!
+          # { sys: mingw64, arch: x86_64 build: libdragon}, # builds the dragon lib
+          # { sys: mingw32, arch: i686 build: libdragon} # Probably useful for those on Windows XP or below!
         ]
     steps:
       - uses: msys2/setup-msys2@v2
@@ -42,14 +42,14 @@ jobs:
         run: |
           sed -z 's/#else\n#define WINPTHREAD_API __declspec(dllimport)/#else\n#define WINPTHREAD_API/' /${{matrix.sys}}/${{ matrix.arch }}-w64-mingw32/include/pthread.h
 
-      - name: Build Tools
+      - name: Build ${{ matrix.build }}
         shell: msys2 {0}
         run: |
           cd ${{ github.workspace }}/libdragon
           make {{ matrix.build }}
 
-      - name: "Upload libdragon tool executables"
+      - name: "Upload ${{ matrix.build }} executables"
         uses: actions/upload-artifact@v2
         with:
-          name: windows-${{ matrix.arch }}
+          name: windows-${{ matrix.arch }}-${{ matrix.build }}
           path: ${{ github.workspace }}/**/tools/*.exe
