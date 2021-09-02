@@ -1,3 +1,8 @@
+# Copyright (c) libdragon 2021
+# See LICENSE file in the project root for full license information.
+
+# This workflow will build the tools using MSyS2 and upload the artifacts.
+
 name: Build Windows tools using MYS2. 
 
 on:
@@ -37,7 +42,7 @@ jobs:
       - name: Correct pthread to allow static
         shell: msys2 {0}
         run: |
-          sed -z 's/#else\n#define WINPTHREAD_API __declspec(dllimport)/#else\n#define WINPTHREAD_API/' /mingw64/${{ matrix.arch }}-w64-mingw32/include/pthread.h
+          sed -z 's/#else\n#define WINPTHREAD_API __declspec(dllimport)/#else\n#define WINPTHREAD_API/' /${{matrix.sys}}/${{ matrix.arch }}-w64-mingw32/include/pthread.h
 
       - name: Build Tools
         shell: msys2 {0}

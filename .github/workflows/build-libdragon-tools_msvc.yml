@@ -6,7 +6,7 @@
 
 name: Build libdragon tools MSVC.
 on:
-  # This action will take about 40 minutes to run! It is not recommended to enable it for push or pull requests!
+  # This action is not supported, but worth keeping for those that want to use it!
   #push:
   #pull_request:
   schedule:

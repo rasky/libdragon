@@ -3,7 +3,7 @@
 
 name: Build tools using MinGW.
 on:
-  # This action will take about 40 minutes to run! It is not recommended to enable it for push or pull requests!
+  # This action should work but does not. Use MSyS2 workflow instead!
   #push:
   #pull_request:
   schedule:
