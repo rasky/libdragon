@@ -1,9 +1,9 @@
 # Copyright (c) libdragon 2021
 # See LICENSE file in the project root for full license information.
 
-# This workflow will build the tools using MSyS2 and upload the artifacts.
+# This workflow will build the tools for Windows using MSYS2 and upload the artifacts.
 
-name: Build Windows tools using MYS2. 
+name: Build Windows tools using MSYS2. 
 
 on:
   push:
@@ -17,14 +17,9 @@ jobs:
       matrix:
         include: [
           { sys: mingw64, arch: x86_64 },
-          { sys: mingw32, arch: i686 }
+          { sys: mingw32, arch: i686 } # Probably useful for those on Windows XP or below!
         ]
     steps:
-      - uses: actions/checkout@v2
-        with:
-          path: temp
-          fetch-depth: 0
-
       - uses: msys2/setup-msys2@v2
         with:
           msystem: ${{matrix.sys}}
@@ -35,9 +30,10 @@ jobs:
             mingw-w64-${{ matrix.arch }}-toolchain
           update: true
 
-      - name: Move Checkout
-        run: |
-          Copy-Item -Path ".\temp" -Destination "C:\libdragon" -Recurse
+      - uses: actions/checkout@v2
+        with:
+          path: ./libdragon
+          fetch-depth: 0
 
       - name: Correct pthread to allow static
         shell: msys2 {0}
@@ -47,11 +43,11 @@ jobs:
       - name: Build Tools
         shell: msys2 {0}
         run: |
-          cd /C/libdragon
+          cd ./libdragon
           make tools
 
-      - name: "Upload executable"
+      - name: "Upload libdragon tool executables"
         uses: actions/upload-artifact@v2
         with:
           name: windows-${{ matrix.arch }}
-          path: C:/libdragon/tools/*.exe
+          path: ./libdragon/tools/*.exe
