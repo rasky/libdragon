@@ -1,13 +1,16 @@
 # Copyright (c) libdragon 2021
 # See LICENSE file in the project root for full license information.
 
-# This workflow will build the tools for Windows using MSYS2 and upload the artifacts.
+# This workflow will build the libdragon (future: lib and) tools for Windows using MSYS2 and upload the artifacts.
 
-name: Build libdragon tools for Windows using MSYS2. 
+name: Windows MSYS2 Build. 
 
 on:
   push:
   pull_request:
+  # schedule:
+  # # At 00:00 UTC every month. But actually should only happen on tag/release?!
+  # - cron:  '0 0 1 * *'
 
 jobs:
   build:
@@ -18,6 +21,7 @@ jobs:
         include: [
           { sys: mingw64, arch: x86_64, build: tools},
           { sys: mingw32, arch: i686, build: tools} #, # Probably useful for those on Windows XP or below!
+          # Probably requires the GCC toolchain to build before?!
           # { sys: mingw64, arch: x86_64 build: libdragon}, # builds the dragon lib
           # { sys: mingw32, arch: i686 build: libdragon} # Probably useful for those on Windows XP or below!
         ]
@@ -33,10 +37,9 @@ jobs:
 
       - uses: actions/checkout@v2
         with:
-          path: ${{ github.workspace }}/libdragon
           fetch-depth: 0
 
-      - name: Correct pthread to allow static libraries
+      - name: Correct MSYS2 pthread.h to allow static libraries (otherwise you would need to use a lib DLL, rather than it being built into the EXE.)
         shell: msys2 {0}
         run: |
           sed -z 's/#else\n#define WINPTHREAD_API __declspec(dllimport)/#else\n#define WINPTHREAD_API/' /${{matrix.sys}}/${{ matrix.arch }}-w64-mingw32/include/pthread.h
@@ -44,7 +47,6 @@ jobs:
       - name: Build ${{ matrix.build }}
         shell: msys2 {0}
         run: |
-          cd ./libdragon # ${{ github.workspace }} does not seem to work!
           make ${{ matrix.build }}
 
       - name: "Upload ${{ matrix.build }} executables"

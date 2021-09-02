@@ -1,7 +1,7 @@
 # Copyright (c) libdragon 2021
 # See LICENSE file in the project root for full license information.
 
-name: Build tools using MinGW.
+name: Windows MinGW Build (using Linux).
 on:
   # This action should work but does not. Use MSyS2 workflow instead!
   #push:
@@ -16,7 +16,12 @@ jobs:
     runs-on: ubuntu-latest
   #  strategy:
   #    matrix:
-  #      platform: [ 'x86', 'x64' ]
+        # include: [
+        #   { sys: mingw64, arch: x86_64, build: tools},
+        #   { sys: mingw32, arch: i686, build: tools} #, # Probably useful for those on Windows XP or below!
+        #   # { sys: mingw64, arch: x86_64 build: libdragon}, # builds the dragon lib
+        #   # { sys: mingw32, arch: i686 build: libdragon} # Probably useful for those on Windows XP or below!
+        # ]
 
 
     steps:
@@ -25,34 +30,34 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up MinGW
-        uses: egor-tensin/setup-mingw@v2
-        with:
-          platform: x86 #${{ matrix.platform }}
+      # - name: Set up MinGW
+      #   uses: egor-tensin/setup-mingw@v2
+      #   with:
+      #     platform: ${{ matrix.arch }}
 
-      - name: Install Dependencies
-        shell: bash
-        run: |
-          # TODO: this dependency is not helpful.
-          # Unfortunately using the following does not work!
-          # sudo apt-get install libpng-dev libpng++-dev
-          # So lets try building and installing the mingw version.
-          #curl -SL https://downloads.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.gz | tar -xz -C .
-          #cd libpng-1.6.37
-          #./configure --prefix=/usr/x86_64-w64-mingw32/usr/lib/
-          #make
-          #make install
-          #cd ..
+      # - name: Install Dependencies
+      #   shell: bash
+      #   run: |
+      #     # TODO: this dependency is not helpful.
+      #     # Unfortunately using the following does not work!
+      #     # sudo apt-get install libpng-dev libpng++-dev
+      #     # So lets try building and installing the mingw version.
+      #     # curl -SL https://downloads.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.gz | tar -xz -C .
+      #     # cd libpng-1.6.37
+      #     # ./configure --prefix=/usr/x86_64-w64-mingw32/usr/lib/
+      #     # make
+      #     # make install
+      #     # cd ..
 
-      - name: Build Tools
-        shell: bash
-        run: |
-          make tools
-          # TODO: as well as `png.h` there are also issues with `dumpdfs.c` `malloc` warnings.
+      # - name: Build Tools
+      #   shell: bash
+      #   run: |
+      #     make ${{ matrix.build }}
+      #     # TODO: as well as `png.h` there are also issues with `dumpdfs.c` `malloc` warnings.
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: libdragon-tools-mingw #-${{ matrix.platform }}
-          path: |
-            ${{ github.workspace }}\**\*.exe
+      # - name: Upload Artifact
+      #   uses: actions/upload-artifact@v2
+      #   with:
+      #     name: libdragon-${{ matrix.arch }}-${{ matrix.build }}
+      #     path: |
+      #       ${{ github.workspace }}\**\*.exe
