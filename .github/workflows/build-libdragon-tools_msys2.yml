@@ -26,7 +26,6 @@ jobs:
         with:
           msystem: ${{matrix.sys}}
           install: >-
-            sed
             mingw-w64-${{ matrix.arch }}-libpng
             base-devel
             mingw-w64-${{ matrix.arch }}-toolchain
@@ -45,7 +44,7 @@ jobs:
       - name: Build ${{ matrix.build }}
         shell: msys2 {0}
         run: |
-          cd ${{ github.workspace }}/libdragon
+          cd ./libdragon # ${{ github.workspace }} does not seem to work!
           make ${{ matrix.build }}
 
       - name: "Upload ${{ matrix.build }} executables"
