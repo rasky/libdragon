@@ -1,18 +1,18 @@
 # Copyright (c) libdragon 2021
 # See LICENSE file in the project root for full license information.
 
-# This workflow will periodically build the libdragon N64 GCC toolchain to keep it up-to-date.
-name: Monthly Build latest libdragon N64 MIPS GCC toolchain
+# This workflow will build the libdragon N64 GCC toolchain to keep it up-to-date.
+name: Build latest libdragon N64 MIPS GCC toolchain
 
 on:
-  # This action will take about 40 minutes to run! It is not recommended to enable it for push or pull requests!
-  #push:
-  #pull_request:
-  schedule:
-  # At 00:00 UTC every month. But actually should only happen on tag/release?!
-  - cron:  '0 0 1 * *'
-  # repository_dispatch:
-  #   types: update-dependencies
+  # This action will take about 40 minutes to run! It is designed to only fire if the build file changes.
+  push:
+   paths:
+     - 'tools/build'
+  pull_request:
+   paths:
+     - 'tools/build'
+
 
 jobs:
   build:
@@ -31,7 +31,10 @@ jobs:
 
       - name: Build N64 MIPS GCC toolchain script
         run: |
-          make build
+          mkdir toolchain
+          cp tools/build /toolchain
+          cd ./toolchain
+          ./build
 
       - name: Upload Docker Container
         run: |
