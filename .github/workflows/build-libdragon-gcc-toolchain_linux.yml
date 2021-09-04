@@ -5,13 +5,14 @@
 name: Build latest libdragon N64 MIPS GCC toolchain
 
 on:
-  # This action will take about 40 minutes to run! It is designed to only fire if the build file changes.
+  # This action will take about 40 minutes to run! It is designed to only fire if the GCC toolchain build file changes.
   push:
    paths:
      - 'tools/build'
   pull_request:
    paths:
      - 'tools/build'
+  # gcc_workflow_dispatch #This should tell child builds to execute (e.g. on: gcc_workflow_dispatch:) https://ospfranco.com/post/2021/05/10/how-to-trigger-a-github-actions-workflow-from-another-workflow/
 
 
 jobs:
@@ -20,33 +21,39 @@ jobs:
 
     steps:
 
-      - name: Install linux dependencies
+      - name: Install native system build dependencies
         run: |
           sudo apt-get install libmpfr-dev
           sudo apt-get install texinfo
           sudo apt-get install libmpc-dev
+          # If there are other dependencies, we should add them here and make sure the documentation is updated!
 
       - uses: actions/checkout@v2
         name: Checkout Code
 
-      - name: Build N64 MIPS GCC toolchain script
+      - name: Build N64 MIPS GCC toolchain
         run: |
           mkdir toolchain
           cp tools/build /toolchain
           cd ./toolchain
           ./build
 
-      - name: Upload Docker Container
-        run: |
-          echo "TODO: Create/Upload the docker container."
 
-      - name: Upload dep package.
+      - name: Build debian package.
         run: |
-          echo "TODO: Create upload the debian package."
+          echo "TODO: Create/Upload the debian package."
+          echo "possibily refer to https://linuxconfig.org/easy-way-to-create-a-debian-package-and-local-package-repository"
+          echo "and also https://github.com/CrashOveride95/n64sdkmod"
 
-      - name: Upload Github .deb Artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: linux-libdragon-toolchain-debian
-          path: |
-            ${{ github.workspace }}/**/*.deb
+      #TODO: should be separated and use gccworkflow_dispatch!
+      # - name: Build / Upload Docker Container
+      #   run: |
+      #     echo "TODO: Create/Upload the docker container."
+      #     echo "possibily refer to https://github.com/anacierdem/libdragon-docker/blob/master/Dockerfile"
+
+      # - name: Upload Github useable Artifact
+      #   uses: actions/upload-artifact@v2
+      #   with:
+      #     name: linux-libdragon-toolchain-debian
+      #     path: |
+      #       ${{ github.workspace }}/**/*.deb
