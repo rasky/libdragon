@@ -2,8 +2,10 @@ BUILD_DIR=build
 include $(N64_INST)/include/n64.mk
 
 src = audioplayer.c
-assets = $(wildcard assets/*.xm)
-assets_conv = $(addprefix filesystem/,$(notdir $(assets:%.xm=%.xm64)))
+assets_xm = $(wildcard assets/*.xm)
+assets_ym = $(wildcard assets/*.ym)
+assets_conv = $(addprefix filesystem/,$(notdir $(assets_xm:%.xm=%.xm64))) \
+              $(addprefix filesystem/,$(notdir $(assets_ym:%.ym=%.ym64)))
 
 all: audioplayer.z64
 
@@ -13,7 +15,12 @@ all: audioplayer.z64
 filesystem/%.xm64: assets/%.xm
 	@mkdir -p $(dir $@)
 	@echo "    [AUDIO] $@"
-	@$(N64_AUDIOCONV) -o filesystem $<
+	$(N64_AUDIOCONV) -o filesystem $<
+
+filesystem/%.ym64: assets/%.ym
+	@mkdir -p $(dir $@)
+	@echo "    [AUDIO] $@"
+	$(N64_AUDIOCONV) -o filesystem $<
 
 $(BUILD_DIR)/audioplayer.dfs: $(assets_conv)
 $(BUILD_DIR)/audioplayer.elf: $(src:%.c=$(BUILD_DIR)/%.o)
