@@ -1,9 +1,69 @@
 #include <libdragon.h>
+#include <string.h>
 
 // Mixer channel allocation
 #define CHANNEL_SFX1    0
 #define CHANNEL_SFX2    1
 #define CHANNEL_MUSIC   2
+
+#define MIN(a,b) ((a)<(b)?(a):(b))
+
+DEFINE_RSP_UCODE(rsp_vadpcm);
+
+typedef struct vadpcm_s {
+	waveform_t wave;
+	int fh;
+} vadpcm_t;
+
+void vadpcm_decode(void *ctx, samplebuffer_t *sbuf, int wpos, int wlen, bool seeking) {
+	vadpcm_t *va = ctx;
+
+	#define MAX_CHUNKS 128
+	static uint8_t vadpcm_in[MAX_CHUNKS*9] __attribute__((aligned(8)));
+
+	debugf("vadpcm_decode: wpos=%x wlen=%x seeking=%d\n", wpos, wlen, seeking);
+
+	assertf(!seeking || wpos==0, "seeking not supported (wpos:%x)", wpos);
+	assert((wpos % 16) == 0);  // Forward playback wpos should be multiple of 16
+
+	// Round up wlen to 16, and read compressed chunks
+	wlen = ((wlen + 15) >> 4) << 4;
+
+	int numbytes = wlen/16*9;
+	assert(numbytes <= sizeof(vadpcm_in));     // TODO: add a loop here invoking RSP N times
+	dfs_read(vadpcm_in, 1, numbytes, va->fh);  // TODO: use dma_read() here to avoid memcpy
+
+	uint16_t *out = samplebuffer_append(sbuf, wlen);
+
+	rsp_wait();
+	rsp_load(&rsp_vadpcm);
+
+	SP_DMEM[0] = (uint32_t)vadpcm_in;
+	SP_DMEM[1] = (uint32_t)out;
+	SP_DMEM[2] = (uint32_t)MIN(64, wlen >> 4);  // TODO: loop here to avoid the 64 chunk limit on RSP
+	rsp_run();
+}
+
+void vadpcm_open(vadpcm_t *va, const char *fn) {
+	memset(va, 0, sizeof(vadpcm_t));
+
+	va->fh = dfs_open(fn);
+	assertf(va->fh >= 0, "file not found: %s", fn);
+
+	int size = dfs_size(va->fh);
+	assertf(size%9 == 0, "invalid VADPCM size: %d", size);
+
+	va->wave = (waveform_t){
+		.name = fn,
+		.bits = 16,
+		.channels = 1,
+		.frequency = 44100,
+		.len = size/9*16,
+		.loop_len = 0,
+		.read = vadpcm_decode,
+		.ctx = va,
+	};
+}
 
 int main(void) {
 	init_interrupts();
@@ -32,6 +92,15 @@ int main(void) {
 
 	wav64_open(&sfx_monosample, "monosample8.wav64");
 	wav64_set_loop(&sfx_monosample, true);
+
+
+	// VADPCM TEST *****************************************
+	#define CHANNEL_VADPCM   8
+	vadpcm_t va;
+	vadpcm_open(&va, "raw.dat");
+	mixer_ch_play(CHANNEL_VADPCM, &va.wave);
+	// VADPCM TEST *****************************************
+
 
 	bool music = false;
 	int music_frequency = sfx_monosample.wave.frequency;

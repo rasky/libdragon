@@ -16,7 +16,7 @@ filesystem/%.wav64: assets/%.wav
 	@$(N64_AUDIOCONV) -o filesystem $<
 
 $(BUILD_DIR)/mixertest.dfs: $(assets_conv)
-$(BUILD_DIR)/mixertest.elf: $(src:%.c=$(BUILD_DIR)/%.o)
+$(BUILD_DIR)/mixertest.elf: $(src:%.c=$(BUILD_DIR)/%.o) $(BUILD_DIR)/rsp_vadpcm.o
 
 mixertest.z64: N64_ROM_TITLE="Mixer Test"
 mixertest.z64: $(BUILD_DIR)/mixertest.dfs 
