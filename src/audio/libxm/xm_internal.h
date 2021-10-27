@@ -17,7 +17,7 @@
 #define XM_WAVEFORM_OVERREAD      64
 
 #if XM_STREAM_WAVEFORMS
-typedef struct waveform_s waveform_t;
+typedef struct waveform_t waveform_t;
 #endif
 
 #if XM_DEBUG

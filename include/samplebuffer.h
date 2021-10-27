@@ -79,7 +79,7 @@ typedef uint32_t sample_ptr_t;
  * to flush DMA cache (via data_cache_writeback) if samples are written
  * via CPU.
  */
-typedef struct samplebuffer_s {
+typedef struct samplebuffer_t {
     /**
      * Tagged pointer to the actual buffer. Lower bits contain bit-per-shift.
      */
@@ -112,9 +112,9 @@ typedef struct samplebuffer_s {
      */
     int ridx;
 
-    /*/
+    /**
      * wv_read is invoked by samplebuffer_get whenever more samples are
-     * requested by the mixer. See WaveformRead for more information.
+     * requested by the mixer. See #WaveformRead for more information.
      */
     WaveformRead wv_read;
 

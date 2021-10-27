@@ -1,7 +1,6 @@
 /**
  * @file debug.h
  * @brief Debugging Support
- * @ingroup debug
  */
 
 #ifndef __LIBDRAGON_DEBUG_H
@@ -198,7 +197,7 @@ extern "C" {
 	#define assertf(expr, msg, ...)    ({ })
 #endif
 
-// Underlying assertion function for assert() and assertf().
+/** @brief Underlying implementation function for assert() and #assertf. */ 
 void debug_assert_func_f(const char *file, int line, const char *func, const char *failedexpr, const char *msg, ...)
    __attribute__((noreturn, format(printf, 5, 6)));
 
