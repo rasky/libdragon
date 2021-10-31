@@ -126,6 +126,16 @@ justaninterrupt:
 	jal __onResetException
 	nop
 
+	/* there is no known way to ack the pre-NMI interrupt, so it will
+	   stay pending in CR. Let's disable it in SR to avoid
+	   looping here. If another unrelated interrupt triggers, 
+	   CR will still have 0x1000 set, but __onResetException will
+	   do nothing after the first call. */
+	li t0, ~0x1000
+	lw k0,saveSR
+	and k0,t0
+	sw k0,saveSR
+
 notprenmi:
 
 	/* check for count=compare */
