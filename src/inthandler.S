@@ -126,8 +126,6 @@ justaninterrupt:
 	jal __onResetException
 	nop
 
-	j endint
-	nop
 notprenmi:
 
 	/* check for count=compare */
@@ -144,9 +142,10 @@ notprenmi:
 	jal __TI_handler
 	nop
 
-	j endint
-	nop
 notcount:
+	and $30,k1,0x400
+	beqz $30,endint
+	nop
 
 	/* pass anything else along to handler */
 	jal __MI_handler
