@@ -596,7 +596,7 @@ __attribute__((constructor)) void __init_interrupts()
         /* Enable interrupts systemwide. We set the global interrupt enable,
            and then specifically enable RCP interrupts. */
         uint32_t sr = C0_STATUS();
-        C0_WRITE_STATUS(sr | C0_STATUS_IE | C0_INTERRUPT_RCP);
+        C0_WRITE_STATUS(sr | C0_STATUS_IE | C0_INTERRUPT_RCP | C0_INTERRUPT_PRENMI);
     }
 }
 

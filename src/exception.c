@@ -6,7 +6,8 @@
 #include "exception.h"
 #include "console.h"
 #include "n64sys.h"
-
+#include "debug.h"
+#include "regsinternal.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -26,10 +27,17 @@
  * @{
  */
 
+/** @brief Maximum number of reset handlers that can be registered. */
+#define MAX_RESET_HANDLERS 4
+
 /** @brief Exception handler currently registered with exception system */
 static void (*__exception_handler)(exception_t*) = exception_default_handler;
 /** @brief Base register offset as defined by the interrupt controller */
 extern const void* __baseRegAddr;
+/** @brief Pre-NMI exception handlers */
+static void (*__prenmi_handlers[MAX_RESET_HANDLERS])(void);
+/** @brief Tick at which the pre-NMI was triggered */
+static uint32_t __prenmi_tick;
 
 /**
  * @brief Register an exception handler to handle exceptions
@@ -290,16 +298,84 @@ void __onCriticalException()
 }
 
 /**
- * @brief Respond to a reset exception
+ * @brief Register a handler that will be called when the user
+ *        presses the RESET button. 
+ * 
+ * The N64 sends an interrupt when the RESET button is pressed,
+ * and then actually resets the console after about ~200ms.
+ * 
+ * Registering a handler can be used to perform a clean reset.
+ * Technically, at the hardware level, it is important that the PI
+ * bus is not active when the reset happens, or the PI might freeze
+ * and require a power-cycle to unfreeze.
+ * 
+ * This entry point can be used by the game code to basically
+ * halts itself and stops issuing commands. Libdragon itself will
+ * register handlers to halt internal modules so to provide a basic
+ * good reset experience.
+ * 
+ * Handlers can use #exception_reset_time to read how much has passed
+ * since the RESET button was pressed.
+ * 
+ * Note that these are handlers are called under interrupt.
  */
-void __onResetException()
+void register_reset_handler( void (*cb)(void) )
 {
-	exception_t e;
-	
-	if(!__exception_handler) { return; }
-
-	__fetch_regs(&e,EXCEPTION_TYPE_RESET);
-	__exception_handler(&e);
+	for (int i=0;i<MAX_RESET_HANDLERS;i++)
+	{		
+		if (!__prenmi_handlers[i])
+		{
+			__prenmi_handlers[i] = cb;
+			return;
+		}
+	}
+	assertf(0, "Too many pre-NMI handlers\n");
 }
+
+/** 
+ * @brief Check whether the RESET button was pressed and how long we are into
+ *        the reset process.
+ * 
+ * This function returns how many ticks have elapsed since the user has pressed
+ * the RESET button, or 0 if the user has not pressed it.
+ * 
+ * It can be used by user code to perform actions during the RESET
+ * process (see #register_reset_handler). It is also possible to simply
+ * poll this value to check at any time if the button has been pressed or not.
+ * 
+ * The reset process takes about 200 ms between the user pressing the
+ * RESET button and the CPU being actually reset.
+ * 
+ */
+uint32_t exception_reset_time( void )
+{
+	if (!__prenmi_tick) return 0;
+	return TICKS_SINCE(__prenmi_tick);
+}
+
+
+/**
+ * @brief Respond to a reset exception.
+ * 
+ * Calls the handlers registered by #register_reset_handler.
+ */
+void __onResetException( void )
+{
+	/* This function will be called many times becuase there is no way
+	   to acknowledge the pre-NMI interrupt. So make sure it does nothing
+	   after the first call. */
+	if (__prenmi_tick) return;
+
+	/* Store the tick at which we saw the exception. */
+	__prenmi_tick = TICKS_READ();
+
+	/* Call the registered handlers. */
+	for (int i=0;i<MAX_RESET_HANDLERS;i++)
+	{
+		if (__prenmi_handlers[i])
+			__prenmi_handlers[i]();
+	}
+}
+
 
 /** @} */
