@@ -142,6 +142,14 @@ static void audio_callback()
         return;
     }
 
+    /* If we are more than 150ms into the reset process, stop
+       playing audio altogether, to avoid scheduling a new chunk
+       too close to the actual reset instant. */
+    if(exception_reset_time() > TICKS_FROM_MS(150))  
+    {
+        return;
+    }
+
     /* Disable interrupts so we don't get a race condition with writes */
     disable_interrupts();
 
