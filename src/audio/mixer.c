@@ -571,7 +571,19 @@ void mixer_exec(int32_t *out, int num_samples) {
 		SP_DMEM[4+1*16+ch] = rvol32[ch];
 	}
 
-	SP_DMEM[0] = MIXER_FX16(Mixer.vol);
+	// Check if we the user pressed RESET. If so, we can apply
+	// a simple global volume ramp to fade out the volume.
+	// This is just a user-level feature. audio.c will truncate
+	// DMA transfers to AI anyway.
+	float gvol = Mixer.vol;
+	uint32_t reset_time = exception_reset_time();
+	if (reset_time) {
+		const float FADE_OUT_TIME = 0.2f;
+		float elapsed = (float)reset_time / TICKS_PER_SECOND;
+		gvol *= (FADE_OUT_TIME - MIN(elapsed, FADE_OUT_TIME)) * (1.0f / FADE_OUT_TIME);
+	}
+
+	SP_DMEM[0] = MIXER_FX16(gvol);
 	SP_DMEM[1] = (num_samples << 16) | Mixer.num_channels;
 	SP_DMEM[2] = (uint32_t)out;
 	SP_DMEM[3] = (uint32_t)Mixer.ucode_state;
