@@ -18,11 +18,13 @@ set -e
 
 # Cross compile for Windows if the "-xcw" flag.
 if [ "$1" == "-xcw" ]; then
+  echo "cross compiling for windows"
   # Use the script directory for the install path, as this is not for linux!
   INSTALL_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32"
-  MAKE_V=MAKE=4.3
+  MAKE_V=4.3
 else # We are compiling for the native (linux) system.
+  echo "building for linux"
   # Set N64_INST before calling the script to change the default installation directory path
   INSTALL_PATH="${N64_INST:-/usr/local}"
 fi
@@ -59,7 +61,7 @@ download () {
 test -f "binutils-$BINUTILS_V.tar.gz" || download "https://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS_V.tar.gz"
 test -f "gcc-$GCC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/gcc/gcc-$GCC_V/gcc-$GCC_V.tar.gz"
 test -f "newlib-$NEWLIB_V.tar.gz"     || download "https://sourceware.org/pub/newlib/newlib-$NEWLIB_V.tar.gz"
-if [ "MAKE_V" != "" ]; then
+if [ "$MAKE_V" != "" ]; then
 test -f "make-$MAKE_V.tar.gz"         || download"https://ftp.gnu.org/gnu/make/make-$MAKE_V.tar.gz"
 fi
 
@@ -67,7 +69,7 @@ fi
 test -d "binutils-$BINUTILS_V" || tar -xzf "binutils-$BINUTILS_V.tar.gz"
 test -d "gcc-$GCC_V"           || tar -xzf "gcc-$GCC_V.tar.gz"
 test -d "newlib-$NEWLIB_V"     || tar -xzf "newlib-$NEWLIB_V.tar.gz"
-if [ "MAKE_V" != "" ]; then
+if [ "$MAKE_V" != "" ]; then
 test -d "make-$MAKE_V"         || tar -xzf "make-$MAKE_V.tar.gz"
 fi
 
@@ -161,7 +163,7 @@ make -j "$JOBS"
 make install || sudo make install || su -c "make install make"
 fi
 
-if [ "CROSS_COMPILE_FLAGS" != "" ]; then
+if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
  echo "Cross compile successful"
 else
 echo "Native compile successful"
