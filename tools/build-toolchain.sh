@@ -1,25 +1,29 @@
 #! /bin/bash
-# N64 MIPS GCC toolchain build/install script for Unix distributions
+# N64 MIPS GCC toolchain build/install script.
 # (c) 2012-2021 Shaun Taylor and libDragon Contributors.
 # See the root folder for license information.
 
 
+# This script may prompt for a password if it is not called with elevated privileges.
+# Preferably it is fixed at the start!
+#TODO: ensure elevated privileges! e.g.
+#echo "$(whoami)"
+#[ "$UID" -eq 0 ] || exec sudo "$0" "$@"
 
-# Before calling this script, make sure you have GMP, MPFR and TexInfo
+# Before calling this script, make sure you have all required dependency
 # packages installed in your system.  On a Debian-based system this is
 # achieved by typing the following commands:
 #
-# sudo apt-get update
-# sudo apt-get upgrade
+# sudo apt-get update && sudo apt-get upgrade
 # sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
 
 # Exit on error
 set -e
 
 # Check for cross compile script flag
-if [ "$1" == "-xcw" ]; then # Cross compile for Windows if the "-xcw" flag is specified when the script is called.
+if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a parameter.
   # This (probably) requires the toolchain to have already built and installed on the native (linux) system first!
-  # This (may) also require the following (extra) dependencies:
+  # This (may) also require the following (extra) package dependencies:
   # sudo apt-get install -yq mingw-w64 libgmp-dev bison
 
   echo "cross compiling for windows"
@@ -165,7 +169,7 @@ cd "make-$MAKE_V"
     --disable-rpath \
     $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
-make install || sudo make install || su -c "make install make"
+make install || sudo make install || su -c "make install"
 fi
 
 if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
