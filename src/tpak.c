@@ -36,7 +36,8 @@
  */
 
 /**
- * @defgroup TPAK_POWER Transfer Pak power control values
+ * @anchor TPAK_POWER
+ * @name Transfer Pak power control values
  * 
  * @see #tpak_set_power
  * @{
@@ -48,7 +49,8 @@
 /** @} */
 
 /**
- * @defgroup TPAK_ADDRESS Transfer Pak address values
+ * @anchor TPAK_ADDRESS
+ * @name Transfer Pak address values
  * @{
  */
 /** @brief Transfer Pak address for power control */

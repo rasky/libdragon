@@ -10,7 +10,8 @@
 #include "libdragon.h"
 
 /**
- * @defgroup TPAK_ERROR Transfer Pak error values
+ * @anchor TPAK_ERROR
+ * @name Transfer Pak error values
  * @{
  */
 /** @brief Transfer Pak error: Invalid argument */
@@ -28,7 +29,8 @@
 /** @} */
 
 /**
- * @defgroup TPAK_STATUS Transfer Pak status bits
+ * @anchor TPAK_STATUS
+ * @name Transfer Pak status bits
  * @{
  */
 /**
