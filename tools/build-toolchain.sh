@@ -59,7 +59,7 @@ download () {
 test -f "binutils-$BINUTILS_V.tar.gz" || download "https://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS_V.tar.gz"
 test -f "gcc-$GCC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/gcc/gcc-$GCC_V/gcc-$GCC_V.tar.gz"
 test -f "newlib-$NEWLIB_V.tar.gz"     || download "https://sourceware.org/pub/newlib/newlib-$NEWLIB_V.tar.gz"
-if [ "MAKE_V" != "" ]
+if [ "MAKE_V" != "" ]; then
 test -f "make-$MAKE_V.tar.gz"         || download"https://ftp.gnu.org/gnu/make/make-$MAKE_V.tar.gz"
 fi
 
@@ -67,7 +67,7 @@ fi
 test -d "binutils-$BINUTILS_V" || tar -xzf "binutils-$BINUTILS_V.tar.gz"
 test -d "gcc-$GCC_V"           || tar -xzf "gcc-$GCC_V.tar.gz"
 test -d "newlib-$NEWLIB_V"     || tar -xzf "newlib-$NEWLIB_V.tar.gz"
-if [ "MAKE_V" != "" ]
+if [ "MAKE_V" != "" ]; then
 test -d "make-$MAKE_V"         || tar -xzf "make-$MAKE_V.tar.gz"
 fi
 
@@ -147,7 +147,7 @@ CFLAGS_FOR_TARGET="-G0 -O2" CXXFLAGS_FOR_TARGET="-G0 -O2" ../"gcc-$GCC_V"/config
 make -j "$JOBS"
 make install || sudo make install || su -c "make install gcc"
 
-if [ "MAKE_V" != "" ]
+if [ "MAKE_V" != "" ]; then
 # Compile make
 cd ..
 cd "make-$MAKE_V"
@@ -161,6 +161,8 @@ make -j "$JOBS"
 make install || sudo make install || su -c "make install make"
 fi
 
-if [ "CROSS_COMPILE_FLAGS" == "" ]
-
+if [ "CROSS_COMPILE_FLAGS" != "" ]; then
+ echo "Cross compile successful"
+else
+echo "Native compile successful"
 fi
