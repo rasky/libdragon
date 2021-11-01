@@ -16,7 +16,7 @@
 # Exit on error
 set -e
 
-# Cross compile for Windows if the "-xcw" flag.
+# Cross compile for Windows if the "-xcw" flag is specified when the script is called.
 if [ "$1" == "-xcw" ]; then
   echo "cross compiling for windows"
   # Use the script directory for the install path, as this is not for linux!
@@ -149,7 +149,7 @@ CFLAGS_FOR_TARGET="-G0 -O2" CXXFLAGS_FOR_TARGET="-G0 -O2" ../"gcc-$GCC_V"/config
 make -j "$JOBS"
 make install || sudo make install || su -c "make install gcc"
 
-if [ "MAKE_V" != "" ]; then
+if [ "$MAKE_V" != "" ]; then
 # Compile make
 cd ..
 cd "make-$MAKE_V"
