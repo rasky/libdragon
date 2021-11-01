@@ -16,8 +16,17 @@
 # Exit on error
 set -e
 
-# Set N64_INST before calling the script to change the default installation directory path
-INSTALL_PATH="${N64_INST:-/usr/local}"
+# Cross compile for Windows if the "-xcw" flag.
+if [ "$1" == "-xcw" ]; then
+  # Use the script directory for the install path, as this is not for linux!
+  INSTALL_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+  CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32"
+  MAKE_V=MAKE=4.3
+else # We are compiling for the native (linux) system.
+  # Set N64_INST before calling the script to change the default installation directory path
+  INSTALL_PATH="${N64_INST:-/usr/local}"
+fi
+
 # Set PATH for newlib to compile using GCC for MIPS N64 (pass 1)
 export PATH="$PATH:$INSTALL_PATH/bin"
 
@@ -50,11 +59,17 @@ download () {
 test -f "binutils-$BINUTILS_V.tar.gz" || download "https://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS_V.tar.gz"
 test -f "gcc-$GCC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/gcc/gcc-$GCC_V/gcc-$GCC_V.tar.gz"
 test -f "newlib-$NEWLIB_V.tar.gz"     || download "https://sourceware.org/pub/newlib/newlib-$NEWLIB_V.tar.gz"
+if [ "MAKE_V" != "" ]
+test -f "make-$MAKE_V.tar.gz"         || download"https://ftp.gnu.org/gnu/make/make-$MAKE_V.tar.gz"
+fi
 
 # Dependency source: Extract stage
 test -d "binutils-$BINUTILS_V" || tar -xzf "binutils-$BINUTILS_V.tar.gz"
 test -d "gcc-$GCC_V"           || tar -xzf "gcc-$GCC_V.tar.gz"
 test -d "newlib-$NEWLIB_V"     || tar -xzf "newlib-$NEWLIB_V.tar.gz"
+if [ "MAKE_V" != "" ]
+test -d "make-$MAKE_V"         || tar -xzf "make-$MAKE_V.tar.gz"
+fi
 
 # Compile binutils
 cd "binutils-$BINUTILS_V"
@@ -62,9 +77,10 @@ cd "binutils-$BINUTILS_V"
   --prefix="$INSTALL_PATH" \
   --target=mips64-elf \
   --with-cpu=mips64vr4300 \
-  --disable-werror
+  --disable-werror \
+  $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
-make install || sudo make install || su -c "make install"
+make install || sudo make install || su -c "make install binutils"
 
 # Compile GCC for MIPS N64 (pass 1) outside of the source tree
 cd ..
@@ -87,7 +103,8 @@ cd gcc_compile
   --disable-win32-registry \
   --disable-nls \
   --disable-werror \
-  --with-system-zlib
+  --with-system-zlib \
+  $CROSS_COMPILE_FLAGS
 make all-gcc -j "$JOBS"
 make all-target-libgcc -j "$JOBS"
 make install-gcc || sudo make install-gcc || su -c "make install-gcc"
@@ -101,9 +118,10 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC" ./configure \
   --with-cpu=mips64vr4300 \
   --disable-threads \
   --disable-libssp \
-  --disable-werror
+  --disable-werror \
+  $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
-make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install"
+make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install newlib"
 
 # Compile GCC for MIPS N64 (pass 2) outside of the source tree
 cd ..
@@ -124,6 +142,25 @@ CFLAGS_FOR_TARGET="-G0 -O2" CXXFLAGS_FOR_TARGET="-G0 -O2" ../"gcc-$GCC_V"/config
   --disable-threads \
   --disable-win32-registry \
   --disable-nls \
-  --with-system-zlib
+  --with-system-zlib \
+  $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
-make install || sudo make install || su -c "make install"
+make install || sudo make install || su -c "make install gcc"
+
+if [ "MAKE_V" != "" ]
+# Compile make
+cd ..
+cd "make-$MAKE_V"
+  ./configure \
+    --prefix="$INSTALL_PATH" \
+    --disable-largefile \
+    --disable-nls \
+    --disable-rpath \
+    $CROSS_COMPILE_FLAGS
+make -j "$JOBS"
+make install || sudo make install || su -c "make install make"
+fi
+
+if [ "CROSS_COMPILE_FLAGS" == "" ]
+
+fi
