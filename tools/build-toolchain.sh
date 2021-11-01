@@ -9,20 +9,25 @@
 # packages installed in your system.  On a Debian-based system this is
 # achieved by typing the following commands:
 #
-# sudo apt-get install libmpfr-dev
-# sudo apt-get install texinfo
-# sudo apt-get install libmpc-dev
+# sudo apt-get update
+# sudo apt-get upgrade
+# sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
 
 # Exit on error
 set -e
 
-# Cross compile for Windows if the "-xcw" flag is specified when the script is called.
-if [ "$1" == "-xcw" ]; then
+# Check for cross compile script flag
+if [ "$1" == "-xcw" ]; then # Cross compile for Windows if the "-xcw" flag is specified when the script is called.
+  # This (probably) requires the toolchain to have already built and installed on the native (linux) system first!
+  # This (may) also require the following (extra) dependencies:
+  # sudo apt-get install -yq mingw-w64 libgmp-dev bison
+
   echo "cross compiling for windows"
   # Use the script directory for the install path, as this is not for linux!
   INSTALL_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-  CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32"
-  MAKE_V=4.3
+  CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32" # TODO: --build is probably not required...
+  MAKE_V=4.3 #TODO: ensure this is working. V4.2.1 required a patch.
+
 else # We are compiling for the native (linux) system.
   echo "building for linux"
   # Set N64_INST before calling the script to change the default installation directory path
@@ -62,7 +67,7 @@ test -f "binutils-$BINUTILS_V.tar.gz" || download "https://ftp.gnu.org/gnu/binut
 test -f "gcc-$GCC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/gcc/gcc-$GCC_V/gcc-$GCC_V.tar.gz"
 test -f "newlib-$NEWLIB_V.tar.gz"     || download "https://sourceware.org/pub/newlib/newlib-$NEWLIB_V.tar.gz"
 if [ "$MAKE_V" != "" ]; then
-test -f "make-$MAKE_V.tar.gz"         || download"https://ftp.gnu.org/gnu/make/make-$MAKE_V.tar.gz"
+test -f "make-$MAKE_V.tar.gz"         || download "https://ftp.gnu.org/gnu/make/make-$MAKE_V.tar.gz"
 fi
 
 # Dependency source: Extract stage
