@@ -87,7 +87,7 @@ cd "binutils-$BINUTILS_V"
   --disable-werror \
   $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
-make install || sudo make install || su -c "make install binutils"
+make install || sudo make install || su -c "make install"
 
 # Compile GCC for MIPS N64 (pass 1) outside of the source tree
 cd ..
@@ -128,7 +128,7 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC" ./configure \
   --disable-werror \
   $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
-make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install newlib"
+make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install"
 
 # Compile GCC for MIPS N64 (pass 2) outside of the source tree
 cd ..
@@ -152,7 +152,7 @@ CFLAGS_FOR_TARGET="-G0 -O2" CXXFLAGS_FOR_TARGET="-G0 -O2" ../"gcc-$GCC_V"/config
   --with-system-zlib \
   $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
-make install || sudo make install || su -c "make install gcc"
+make install || sudo make install || su -c "make install"
 
 if [ "$MAKE_V" != "" ]; then
 # Compile make
