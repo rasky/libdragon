@@ -139,10 +139,10 @@ jobs:
          name: windows-${{ matrix.arch }}-${{ matrix.build }}
          path: ${{ github.workspace }}/**/tools/**/*.exe
 
-  publish-windows-artifacts:
-    runs-on: ubuntu-latest
-    needs: [Compile-Windows-Toolchain, Compile-Library-And-Examples, Build-Tools-Windows]
-    steps:
-    - name: Up0load-Artifacts
-        run: |
-          echo "Requires artifact upload."
+  # publish-windows-artifacts:
+  #   runs-on: ubuntu-latest
+  #   needs: [Compile-Windows-Toolchain, Compile-Library-And-Examples, Build-Tools-Windows]
+  #   steps:
+  #    - name: Up0load-Artifacts
+  #      run: |
+  #        echo "Requires artifact upload."
