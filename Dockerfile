@@ -5,9 +5,11 @@ FROM ubuntu:18.04
 ARG N64_INST=/n64_toolchain
 ENV N64_INST=${N64_INST}
 
-# install dependencies
+# install linux dependencies
 RUN apt-get update
 RUN apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
+# Windows cross compile extras.
+RUN apt-get install -yq mingw-w64 libgmp-dev bison
 
 # Build
 COPY ./tools/build-toolchain.sh /tmp/tools/build-toolchain.sh

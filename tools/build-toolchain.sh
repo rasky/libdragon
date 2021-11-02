@@ -61,7 +61,7 @@ download () {
   if   command_exists wget ; then wget -c  "$1"
   elif command_exists curl ; then curl -LO "$1"
   else
-    echo "Install `wget` or `curl` to download toolchain sources" 1>&2
+    echo "Install 'wget' or 'curl' to download toolchain sources" 1>&2
     return 1
   fi
 }

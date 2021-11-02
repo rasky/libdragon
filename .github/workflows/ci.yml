@@ -56,16 +56,6 @@ jobs:
           ghcr.io/dragonminded/libdragon:latest \
           ./tools/build-toolchain.sh -xcw
 
-      # As we have a "latest" tagged image now, we can use that to run build.sh
-      # if it is built in the previous step. o/w it will be downloaded from the
-      # registry. Then verify everything is building properly
-      - name: Build libdragon (lib)
-        run: |
-          docker run \
-          --mount type=bind,source=$(pwd),target=/libdragon \
-          --workdir=/libdragon \
-          ghcr.io/dragonminded/libdragon:latest \
-          ./build.sh
           
 
   Compile-Library-And-Examples:
@@ -148,3 +138,11 @@ jobs:
        with:
          name: windows-${{ matrix.arch }}-${{ matrix.build }}
          path: ${{ github.workspace }}/**/tools/**/*.exe
+
+  publish-windows-artifacts:
+    runs-on: ubuntu-latest
+    needs: [Compile-Windows-Toolchain, Compile-Library-And-Examples, Build-Tools-Windows]
+    steps:
+    - name: Up0load-Artifacts
+        run: |
+          echo "Requires artifact upload."
