@@ -8,8 +8,6 @@ ENV N64_INST=${N64_INST}
 # install linux dependencies
 RUN apt-get update
 RUN apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
-# Windows cross compile extras.
-RUN apt-get install -yq mingw-w64 libgmp-dev bison
 
 # Build
 COPY ./tools/build-toolchain.sh /tmp/tools/build-toolchain.sh

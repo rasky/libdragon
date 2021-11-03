@@ -25,12 +25,16 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   # This (probably) requires the toolchain to have already built and installed on the native (linux) system first!
   # This (may) also require the following (extra) package dependencies:
   # sudo apt-get install -yq mingw-w64 libgmp-dev bison
+  #sudo apt install pacman
 
   echo "cross compiling for windows"
   # Use the script directory for the install path, as this is not for linux!
   INSTALL_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32" # TODO: --build is probably not required...
   MAKE_V=4.3 #TODO: ensure this is working. V4.2.1 required a patch.
+  GMP_V=6.2.1
+  MPC_V=1.2.1
+  MPFR_V=4.1.0
 
 else # We are compiling for the native (linux) system.
   echo "building for linux"
@@ -70,16 +74,62 @@ download () {
 test -f "binutils-$BINUTILS_V.tar.gz" || download "https://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS_V.tar.gz"
 test -f "gcc-$GCC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/gcc/gcc-$GCC_V/gcc-$GCC_V.tar.gz"
 test -f "newlib-$NEWLIB_V.tar.gz"     || download "https://sourceware.org/pub/newlib/newlib-$NEWLIB_V.tar.gz"
-if [ "$MAKE_V" != "" ]; then
+if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
 test -f "make-$MAKE_V.tar.gz"         || download "https://ftp.gnu.org/gnu/make/make-$MAKE_V.tar.gz"
+test -f "gmp-$GMP_V.tar.xz"           || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
+test -f "mpc-$MPC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
+test -f "mpfr-$MPFR_V.tar.gz"         || download "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_V.tar.gz"
 fi
 
 # Dependency source: Extract stage
 test -d "binutils-$BINUTILS_V" || tar -xzf "binutils-$BINUTILS_V.tar.gz"
 test -d "gcc-$GCC_V"           || tar -xzf "gcc-$GCC_V.tar.gz"
 test -d "newlib-$NEWLIB_V"     || tar -xzf "newlib-$NEWLIB_V.tar.gz"
-if [ "$MAKE_V" != "" ]; then
+if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
 test -d "make-$MAKE_V"         || tar -xzf "make-$MAKE_V.tar.gz"
+test -d "gmp-$GMP_V"           || tar -xf "gmp-$GMP_V.tar.xz"
+test -d "mpc-$MPC_V"           || tar -xzf "mpc-$MPC_V.tar.gz"
+test -d "mpfr-$MPFR_V"         || tar -xzf "mpfr-$MPFR_V.tar.gz"
+
+export PATH="$PATH:$INSTALL_PATH/mingw-libs"
+#TODO: check if already installed.
+cd "gmp-$GMP_V"
+#make clean #clean up, just to be sure
+
+# CC=x86_64-w64-mingw32-gcc \
+# CC_FOR_BUILD=x86_64-linux-gnu-gcc \
+# CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
+# LDFLAGS="-static-libgcc -static-libstdc++" \
+./configure --prefix="$INSTALL_PATH/mingw-libs/" $CROSS_COMPILE_FLAGS
+make -j "$JOBS" > build.log
+# make check
+make install || sudo make install || su -c "make install"
+
+cd ..
+cd "mpfr-$MPFR_V"
+#make clean #clean up, just to be sure
+# CC=x86_64-w64-mingw32-gcc \
+# CC_FOR_BUILD=x86_64-linux-gnu-gcc \
+# CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
+# LDFLAGS="-static-libgcc -static-libstdc++" \
+./configure --prefix="$INSTALL_PATH/mingw-libs/" $CROSS_COMPILE_FLAGS --enable-static --disable-shared #--enable-shared --disable-static --enable-thread-safe #--with-gmp=/usr/x86_64-w64-mingw32/
+make -j "$JOBS" > build.log
+# make check
+make install || sudo make install || su -c "make install"
+
+cd ..
+cd "mpc-$MPC_V"
+#make clean #clean up, just to be sure
+# CC=x86_64-w64-mingw32-gcc \
+# CC_FOR_BUILD=x86_64-linux-gnu-gcc \
+# CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
+# LDFLAGS="-static-libgcc -static-libstdc++" \
+./configure --prefix="$INSTALL_PATH/mingw-libs/" $CROSS_COMPILE_FLAGS --enable-static --disable-shared #--enable-shared --disable-static --enable-thread-safe #--with-gmp=/usr/x86_64-w64-mingw32/ --with-mpfr=/usr/x86_64-w64-mingw32/
+make -j "$JOBS" > build.log
+# make check
+make install || sudo make install || su -c "make install"
+
+cd ..
 fi
 
 # Compile binutils
