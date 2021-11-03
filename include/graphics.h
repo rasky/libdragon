@@ -26,6 +26,19 @@ typedef struct
     uint8_t a;
 } color_t;
 
+typedef enum {
+    FMT_NONE = 0,
+
+    FMT_RGBA32,
+    FMT_RGBA16,
+    FMT_CI8,
+    FMT_I8,
+    FMT_IA8,
+    FMT_CI4,
+    FMT_I4,
+    FMT_IA4
+} tex_format_t;
+
 /** @brief Sprite structure */
 typedef struct
 {
@@ -33,16 +46,9 @@ typedef struct
     uint16_t width;
     /** @brief Height in pixels */
     uint16_t height;
-    /** 
-     * @brief Bit depth expressed in bytes
-     *
-     * A 32 bit sprite would have a value of '4' here
-     */
+    /** @brief Bit depth expressed in bits */
     uint8_t bitdepth;
-    /** 
-     * @brief Sprite format
-     * @note Currently unused
-     */
+    /** @brief Sprite format (tex_format_t) */
     uint8_t format;
     /** @brief Number of horizontal slices for spritemaps */
     uint8_t hslices;
