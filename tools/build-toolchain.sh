@@ -98,9 +98,10 @@ cd "gmp-$GMP_V"
 
 # CC=x86_64-w64-mingw32-gcc \
 # CC_FOR_BUILD=x86_64-linux-gnu-gcc \
+# CPP_FOR_BUILD=x86_64-linux-gnu-cpp \
 # CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
 # LDFLAGS="-static-libgcc -static-libstdc++" \
-./configure --prefix="$INSTALL_PATH/mingw-libs/" $CROSS_COMPILE_FLAGS
+./configure --prefix="$INSTALL_PATH/mingw-libs" $CROSS_COMPILE_FLAGS
 make -j "$JOBS" > build.log
 # make check
 make install || sudo make install || su -c "make install"
@@ -108,11 +109,11 @@ make install || sudo make install || su -c "make install"
 cd ..
 cd "mpfr-$MPFR_V"
 #make clean #clean up, just to be sure
-# CC=x86_64-w64-mingw32-gcc \
-# CC_FOR_BUILD=x86_64-linux-gnu-gcc \
-# CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
+#CC=x86_64-w64-mingw32-gcc \
+#CC_FOR_BUILD=x86_64-linux-gnu-gcc \
+#CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
 # LDFLAGS="-static-libgcc -static-libstdc++" \
-./configure --prefix="$INSTALL_PATH/mingw-libs/" $CROSS_COMPILE_FLAGS --enable-static --disable-shared #--enable-shared --disable-static --enable-thread-safe #--with-gmp=/usr/x86_64-w64-mingw32/
+./configure --prefix="$INSTALL_PATH/mingw-libs" $CROSS_COMPILE_FLAGS --enable-static --disable-shared --with-gmp="$INSTALL_PATH/mingw-libs" #--enable-shared --disable-static --enable-thread-safe #--with-gmp=/usr/x86_64-w64-mingw32/
 make -j "$JOBS" > build.log
 # make check
 make install || sudo make install || su -c "make install"
@@ -120,11 +121,11 @@ make install || sudo make install || su -c "make install"
 cd ..
 cd "mpc-$MPC_V"
 #make clean #clean up, just to be sure
-# CC=x86_64-w64-mingw32-gcc \
-# CC_FOR_BUILD=x86_64-linux-gnu-gcc \
-# CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
+#CC=x86_64-w64-mingw32-gcc \
+#CC_FOR_BUILD=x86_64-linux-gnu-gcc \
+#CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
 # LDFLAGS="-static-libgcc -static-libstdc++" \
-./configure --prefix="$INSTALL_PATH/mingw-libs/" $CROSS_COMPILE_FLAGS --enable-static --disable-shared #--enable-shared --disable-static --enable-thread-safe #--with-gmp=/usr/x86_64-w64-mingw32/ --with-mpfr=/usr/x86_64-w64-mingw32/
+./configure --prefix="$INSTALL_PATH/mingw-libs" $CROSS_COMPILE_FLAGS --enable-static --disable-shared --with-gmp="$INSTALL_PATH/mingw-libs" --with-mpfr="$INSTALL_PATH/mingw-libs" #--enable-shared --disable-static --enable-thread-safe #--with-gmp=/usr/x86_64-w64-mingw32/ --with-mpfr=/usr/x86_64-w64-mingw32/
 make -j "$JOBS" > build.log
 # make check
 make install || sudo make install || su -c "make install"
