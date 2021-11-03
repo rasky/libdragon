@@ -32,8 +32,8 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   INSTALL_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32" # TODO: --build is probably not required...
   MAKE_V=4.3 #TODO: ensure this is working. V4.2.1 required a patch.
-  GMP_V=6.2.1
-  MPC_V=1.2.1
+  GMP_V=6.2.0
+  MPC_V=1.1.0
   MPFR_V=4.1.0
 
 else # We are compiling for the native (linux) system.
@@ -125,7 +125,7 @@ cd "mpc-$MPC_V"
 #CC_FOR_BUILD=x86_64-linux-gnu-gcc \
 #CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
 # LDFLAGS="-static-libgcc -static-libstdc++" \
-./configure --prefix="$INSTALL_PATH/mingw-libs" $CROSS_COMPILE_FLAGS --enable-static --disable-shared --with-gmp="$INSTALL_PATH/mingw-libs" --with-mpfr="$INSTALL_PATH/mingw-libs" #--enable-shared --disable-static --enable-thread-safe #--with-gmp=/usr/x86_64-w64-mingw32/ --with-mpfr=/usr/x86_64-w64-mingw32/
+./configure --prefix="$INSTALL_PATH/mingw-libs" $CROSS_COMPILE_FLAGS --enable-static --disable-shared --with-gmp="$INSTALL_PATH/mingw-libs" --with-mpfr="$INSTALL_PATH/mingw-libs" #--enable-shared --disable-static --enable-thread-safe
 make -j "$JOBS" > build.log
 # make check
 make install || sudo make install || su -c "make install"
@@ -166,7 +166,9 @@ cd gcc_compile
   --disable-nls \
   --disable-werror \
   --with-system-zlib \
-  --with-gmp="$INSTALL_PATH/mingw-libs" --with-mpfr="$INSTALL_PATH/mingw-libs" --with-mpc="$INSTALL_PATH/mingw-libs"
+  --with-gmp="$INSTALL_PATH/mingw-libs" \
+  --with-mpfr="$INSTALL_PATH/mingw-libs" \
+  --with-mpc="$INSTALL_PATH/mingw-libs" \
   $CROSS_COMPILE_FLAGS
 make all-gcc -j "$JOBS"
 make all-target-libgcc -j "$JOBS"
