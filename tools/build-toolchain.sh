@@ -166,6 +166,7 @@ cd gcc_compile
   --disable-nls \
   --disable-werror \
   --with-system-zlib \
+  --with-gmp="$INSTALL_PATH/mingw-libs" --with-mpfr="$INSTALL_PATH/mingw-libs" --with-mpc="$INSTALL_PATH/mingw-libs"
   $CROSS_COMPILE_FLAGS
 make all-gcc -j "$JOBS"
 make all-target-libgcc -j "$JOBS"
