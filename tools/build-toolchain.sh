@@ -31,6 +31,7 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   # Use the script directory for the install path, as this is not for linux!
   INSTALL_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32" # TODO: --build is probably not required...
+  CROSS_COMPILE_MATH_FLAGS='--with-gmp="$INSTALL_PATH/mingw-libs" -with-mpfr="$INSTALL_PATH/mingw-libs" --with-mpc="$INSTALL_PATH/mingw-libs'
   MAKE_V=4.3 #TODO: ensure this is working. V4.2.1 required a patch.
   GMP_V=6.2.0
   MPC_V=1.1.0
@@ -182,9 +183,7 @@ cd gcc_compile
   --disable-nls \
   --disable-werror \
   --with-system-zlib \
-  --with-gmp="$INSTALL_PATH/mingw-libs" \
-  --with-mpfr="$INSTALL_PATH/mingw-libs" \
-  --with-mpc="$INSTALL_PATH/mingw-libs" \
+  $CROSS_COMPILE_MATH_FLAGS \
   $CROSS_COMPILE_FLAGS
 make all-gcc -j "$JOBS"
 make all-target-libgcc -j "$JOBS"
@@ -200,9 +199,7 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC" ./configure \
   --disable-threads \
   --disable-libssp \
   --disable-werror \
-  --with-gmp="$INSTALL_PATH/mingw-libs" \
-  --with-mpfr="$INSTALL_PATH/mingw-libs" \
-  --with-mpc="$INSTALL_PATH/mingw-libs" \
+  $CROSS_COMPILE_MATH_FLAGS \
   $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install"
@@ -227,6 +224,7 @@ CFLAGS_FOR_TARGET="-G0 -O2" CXXFLAGS_FOR_TARGET="-G0 -O2" ../"gcc-$GCC_V"/config
   --disable-win32-registry \
   --disable-nls \
   --with-system-zlib \
+  $CROSS_COMPILE_MATH_FLAGS \
   $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
 make install || sudo make install || su -c "make install"
