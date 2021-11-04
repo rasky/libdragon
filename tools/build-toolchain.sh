@@ -31,7 +31,7 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   # Use the script directory for the install path, as this is not for linux!
   INSTALL_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32" # TODO: --build is probably not required...
-  CROSS_COMPILE_MATH_FLAGS='"--with-gmp="$INSTALL_PATH/mingw-libs" -with-mpfr="$INSTALL_PATH/mingw-libs" --with-mpc="$INSTALL_PATH/mingw-libs"'
+  CROSS_COMPILE_MATH_FLAGS='--with-gmp="$INSTALL_PATH/mingw-libs" --with-mpfr="$INSTALL_PATH/mingw-libs" --with-mpc="$INSTALL_PATH/mingw-libs"'
   MAKE_V=4.3 #TODO: ensure this is working. V4.2.1 required a patch.
   GMP_V=6.2.0
   MPC_V=1.1.0
