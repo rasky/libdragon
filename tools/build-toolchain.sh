@@ -148,19 +148,19 @@ make install || sudo make install || su -c "make install"
 cd ..
 fi
 
-# Compile binutils
+echo "Compile binutils"
 cd "binutils-$BINUTILS_V"
 ./configure \
   --prefix="$INSTALL_PATH" \
   --target=mips64-elf \
-  --with-lib-path="$INSTALL_PATH/lib" \
+  --with-lib-path="$INSTALL_PATH" \
   --with-cpu=mips64vr4300 \
   --disable-werror \
   $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
 make install || sudo make install || su -c "make install"
 
-# Compile GCC for MIPS N64 (pass 1) outside of the source tree
+echo "Compile GCC for MIPS N64 (pass 1) outside of the source tree"
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
@@ -191,7 +191,7 @@ make all-target-libgcc -j "$JOBS"
 make install-gcc || sudo make install-gcc || su -c "make install-gcc"
 make install-target-libgcc || sudo make install-target-libgcc || su -c "make install-target-libgcc"
 
-# Compile newlib
+echo "Compile newlib"
 cd ../"newlib-$NEWLIB_V"
 CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC" ./configure \
   --target=mips64-elf \

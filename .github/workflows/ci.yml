@@ -43,12 +43,11 @@ jobs:
           #TODO: zip binaries and move to artifacts folder.
 
       # publish windows toolchain artifacts:
-      - name: Up0load-Artifacts
+      - name: Upoload-Artifacts
         run: |
           echo "Requires artifact upload."
 
-  #TODO: should be split, only compile rom samples if lib is built!
-  Compile-Dragon-Library-And-Examples:
+  Compile-Test-Example-Roms:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
