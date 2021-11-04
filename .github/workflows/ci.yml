@@ -41,7 +41,7 @@ jobs:
 
           # We need to have the ability to target for mips64 elf packages, so build for linux first!
           mkdir -p toolchain/{linux,windows}
-          cp -v ./tools/build-toolchain.sh toolchain/{linux,windows}
+          cp -r -v ./tools/build-toolchain.sh toolchain/{linux,windows}
 
           cd ./toolchain/linux
           ./tools/build-toolchain.sh # Should really create a .deb pkg for later!
