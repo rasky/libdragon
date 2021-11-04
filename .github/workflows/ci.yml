@@ -46,11 +46,11 @@ jobs:
           cp ./tools/build-toolchain.sh toolchain/windows
 
           cd ./toolchain/linux
-          ./tools/build-toolchain.sh # Should really create a .deb pkg for later!
+          build-toolchain.sh # Should really create a .deb pkg for later!
 
           cd ..
-          cd ./toolchain/win
-          ./tools/build-toolchain.sh -xcw
+          cd ./toolchain/windows
+          build-toolchain.sh -xcw
 
           #TODO: zip binaries and move to artifacts folder.
 
