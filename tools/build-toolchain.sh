@@ -101,7 +101,9 @@ cd "gmp-$GMP_V"
 # CPP_FOR_BUILD=x86_64-linux-gnu-cpp \
 # CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
 # LDFLAGS="-static-libgcc -static-libstdc++" \
-./configure --prefix="$INSTALL_PATH/mingw-libs" $CROSS_COMPILE_FLAGS
+./configure \
+  --prefix="$INSTALL_PATH/mingw-libs" \
+  $CROSS_COMPILE_FLAGS
 make -j "$JOBS" > build.log
 # make check
 make install || sudo make install || su -c "make install"
@@ -113,7 +115,13 @@ cd "mpfr-$MPFR_V"
 #CC_FOR_BUILD=x86_64-linux-gnu-gcc \
 #CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
 # LDFLAGS="-static-libgcc -static-libstdc++" \
-./configure --prefix="$INSTALL_PATH/mingw-libs" $CROSS_COMPILE_FLAGS --enable-static --disable-shared --with-gmp="$INSTALL_PATH/mingw-libs" #--enable-shared --disable-static --enable-thread-safe #--with-gmp=/usr/x86_64-w64-mingw32/
+./configure \
+  --prefix="$INSTALL_PATH/mingw-libs" \
+  --enable-static \
+  --disable-shared \
+  --with-gmp="$INSTALL_PATH/mingw-libs" \
+  $CROSS_COMPILE_FLAGS 
+#--with-gmp=/usr/x86_64-w64-mingw32/
 make -j "$JOBS" > build.log
 # make check
 make install || sudo make install || su -c "make install"
@@ -125,7 +133,14 @@ cd "mpc-$MPC_V"
 #CC_FOR_BUILD=x86_64-linux-gnu-gcc \
 #CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
 # LDFLAGS="-static-libgcc -static-libstdc++" \
-./configure --prefix="$INSTALL_PATH/mingw-libs" $CROSS_COMPILE_FLAGS --enable-static --disable-shared --with-gmp="$INSTALL_PATH/mingw-libs" --with-mpfr="$INSTALL_PATH/mingw-libs" #--enable-shared --disable-static --enable-thread-safe
+./configure \
+  --prefix="$INSTALL_PATH/mingw-libs" \
+  --enable-static \
+  --disable-shared \
+  --with-gmp="$INSTALL_PATH/mingw-libs" \
+  --with-mpfr="$INSTALL_PATH/mingw-libs" 
+  $CROSS_COMPILE_FLAGS 
+  #--enable-thread-safe
 make -j "$JOBS" > build.log
 # make check
 make install || sudo make install || su -c "make install"
@@ -138,6 +153,7 @@ cd "binutils-$BINUTILS_V"
 ./configure \
   --prefix="$INSTALL_PATH" \
   --target=mips64-elf \
+  --with-lib-path="$INSTALL_PATH/lib" \
   --with-cpu=mips64vr4300 \
   --disable-werror \
   $CROSS_COMPILE_FLAGS

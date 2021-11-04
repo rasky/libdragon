@@ -16,7 +16,7 @@ on:
       - completed
 
 jobs:
-  Compile-Windows-Toolchain:
+  Compile-Toolchain-Windows:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -42,8 +42,13 @@ jobs:
           ./tools/build-toolchain.sh -xcw
           #TODO: zip binaries and move to artifacts folder.
 
-          
-  Compile-Library-And-Examples:
+      # publish windows toolchain artifacts:
+      - name: Up0load-Artifacts
+        run: |
+          echo "Requires artifact upload."
+
+  #TODO: should be split, only compile rom samples if lib is built!
+  Compile-Dragon-Library-And-Examples:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -85,7 +90,7 @@ jobs:
           ghcr.io/dragonminded/libdragon:latest \
           ./build.sh
 
-  Build-Tools-Windows:
+  Compile-Tools-Windows:
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -124,10 +129,3 @@ jobs:
          name: windows-${{ matrix.arch }}-${{ matrix.build }}
          path: ${{ github.workspace }}/**/tools/**/*.exe
 
-  # publish-windows-artifacts:
-  #   runs-on: ubuntu-latest
-  #   needs: [Compile-Windows-Toolchain, Compile-Library-And-Examples, Build-Tools-Windows]
-  #   steps:
-  #    - name: Up0load-Artifacts
-  #      run: |
-  #        echo "Requires artifact upload."
