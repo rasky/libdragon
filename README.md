@@ -59,7 +59,6 @@ be found in `libdragon/examples` in the skeleton project.
 1. Create a directory and copy the `build-toolchain.sh` script there from the `tools/` directory.
 2. Read the comments in the build script to see what additional packages are needed.
 3. Run `./build-toolchain.sh` from the created directory, let it build and install the toolchain.
-4. Install libpng-dev if not already installed.
 
 *Below steps can also be executed by running `build.sh` at the top level.*
 
