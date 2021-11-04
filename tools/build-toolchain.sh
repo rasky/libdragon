@@ -138,7 +138,7 @@ cd "mpc-$MPC_V"
   --enable-static \
   --disable-shared \
   --with-gmp="$INSTALL_PATH/mingw-libs" \
-  --with-mpfr="$INSTALL_PATH/mingw-libs" 
+  --with-mpfr="$INSTALL_PATH/mingw-libs" \
   $CROSS_COMPILE_FLAGS 
   #--enable-thread-safe
 make -j "$JOBS" > build.log
