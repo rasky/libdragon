@@ -184,6 +184,9 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC" ./configure \
   --disable-threads \
   --disable-libssp \
   --disable-werror \
+  --with-gmp="$INSTALL_PATH/mingw-libs" \
+  --with-mpfr="$INSTALL_PATH/mingw-libs" \
+  --with-mpc="$INSTALL_PATH/mingw-libs" \
   $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install"
