@@ -38,8 +38,20 @@ jobs:
         run: |
           # install required dependencies
           sudo apt-get install -yq mingw-w64 libz-mingw-w64-dev
+          
+          # We need to have the ability to target for mips64 elf packages, so build for linux first!
+          mkdir ./toolchain/linux
+          mkdir ./toolchain/win
+          cp ./tools/build-toolchain.sh ./toolchain/linux/build-toolchain.sh
+          cp ./tools/build-toolchain.sh ./toolchain/win/build-toolchain.sh
 
+          cd ./toolchain/linux
+          ./tools/build-toolchain.sh
+
+          cd ..
+          cd ./toolchain/win
           ./tools/build-toolchain.sh -xcw
+
           #TODO: zip binaries and move to artifacts folder.
 
       # publish windows toolchain artifacts:
