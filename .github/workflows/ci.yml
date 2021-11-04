@@ -40,8 +40,10 @@ jobs:
           sudo apt-get install -yq mingw-w64 libz-mingw-w64-dev
 
           # We need to have the ability to target for mips64 elf packages, so build for linux first!
-          mkdir -p toolchain/{linux,windows}
-          cp -r -v ./tools/build-toolchain.sh toolchain/{linux,windows}
+          mkdir -p toolchain/linux
+          mkdir -p toolchain/windows
+          cp ./tools/build-toolchain.sh toolchain/linux
+          cp ./tools/build-toolchain.sh toolchain/windows
 
           cd ./toolchain/linux
           ./tools/build-toolchain.sh # Should really create a .deb pkg for later!
