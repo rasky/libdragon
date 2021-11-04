@@ -37,7 +37,7 @@ jobs:
         if: ${{ steps.path_diff.outputs.changed == 1 }}
         run: |
           # install required dependencies
-          sudo apt-get install -yq mingw-w64 libz-mingw-w64-dev
+          sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
 
           # We need to have the ability to target for mips64 elf packages, so build for linux first!
           mkdir -p toolchain/linux
@@ -49,6 +49,8 @@ jobs:
           ./build-toolchain.sh # Should really create a .deb pkg for later!
 
           cd ..
+          sudo apt-get install -yq mingw-w64 libz-mingw-w64-dev
+
           cd ./windows
           ./build-toolchain.sh -xcw
 
