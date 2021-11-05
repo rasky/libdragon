@@ -38,9 +38,7 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
 
   # We will have to build Make and (MinGW libs)
   MAKE_V=4.2.1
-  GMP_V=6.2.0
-  MPC_V=1.1.0
-  MPFR_V=4.1.0
+ 
 
 else # We are compiling for the native (linux) system.
   echo "building for linux"
@@ -59,6 +57,10 @@ JOBS="${JOBS:-1}" # If getconf returned nothing, default to 1
 BINUTILS_V=2.36.1
 GCC_V=10.2.0
 NEWLIB_V=4.1.0
+
+GMP_V=6.2.0
+MPC_V=1.1.0
+MPFR_V=4.1.0
 
 # Check if a command-line tool is available: status 0 means "yes"; status 1 means "no"
 command_exists () {
