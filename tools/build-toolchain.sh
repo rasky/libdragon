@@ -24,16 +24,19 @@ set -e
 if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a parameter.
   # This (probably) requires the toolchain to have already built and installed on the native (linux) system first!
   # This (may) also require the following (extra) package dependencies:
-  # sudo apt-get install -yq mingw-w64 libgmp-dev bison
-  #sudo apt install pacman
+  # sudo apt-get install -yq mingw-w64 libgmp-dev bison libz-mingw-w64-dev
 
   echo "cross compiling for windows"
-  # Use the script directory for the install path, as this is not for linux!
+  # Use the current-directory/win_binaries for the install path, as this is not for linux!
   mkdir win_binaries
   CURRENT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   INSTALL_PATH="$CURRENT_PATH/win_binaries"
+
+  # We will require the extra flags (under certain libs)
   CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32" # TODO: --build is probably not required...
   CROSS_COMPILE_MATH_FLAGS="--with-gmp=$CURRENT_PATH/mingw-libs --with-mpfr=$CURRENT_PATH/mingw-libs --with-mpc=$CURRENT_PATH/mingw-libs"
+
+  # We will have to build Make and (MinGW libs)
   MAKE_V=4.2.1
   GMP_V=6.2.0
   MPC_V=1.1.0
@@ -89,62 +92,62 @@ test -d "binutils-$BINUTILS_V" || tar -xzf "binutils-$BINUTILS_V.tar.gz"
 test -d "gcc-$GCC_V"           || tar -xzf "gcc-$GCC_V.tar.gz"
 test -d "newlib-$NEWLIB_V"     || tar -xzf "newlib-$NEWLIB_V.tar.gz"
 if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
-test -d "make-$MAKE_V"         || tar -xzf "make-$MAKE_V.tar.gz"
-test -d "gmp-$GMP_V"           || tar -xf "gmp-$GMP_V.tar.xz"
-test -d "mpc-$MPC_V"           || tar -xzf "mpc-$MPC_V.tar.gz"
-test -d "mpfr-$MPFR_V"         || tar -xzf "mpfr-$MPFR_V.tar.gz"
+  test -d "make-$MAKE_V"         || tar -xzf "make-$MAKE_V.tar.gz"
+  test -d "gmp-$GMP_V"           || tar -xf "gmp-$GMP_V.tar.xz"
+  test -d "mpc-$MPC_V"           || tar -xzf "mpc-$MPC_V.tar.gz"
+  test -d "mpfr-$MPFR_V"         || tar -xzf "mpfr-$MPFR_V.tar.gz"
 
-export PATH="$PATH:$INSTALL_PATH/mingw-libs"
-#TODO: check if already installed.
-cd "gmp-$GMP_V"
-#make clean #clean up, just to be sure
+  export PATH="$PATH:$INSTALL_PATH/mingw-libs"
+  #TODO: check if already installed.
+  cd "gmp-$GMP_V"
+  #make clean #clean up, just to be sure
 
-if grep -qEi "(Microsoft|WSL)" /proc/version &> /dev/null ; then
-# Following build options required on WSL2 only (it seems).
-  CC=x86_64-w64-mingw32-gcc \
-  CC_FOR_BUILD=x86_64-linux-gnu-gcc \
-  CPP_FOR_BUILD=x86_64-linux-gnu-cpp \
-  CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
-  LDFLAGS="-static-libgcc -static-libstdc++" \
+  if grep -qEi "(Microsoft|WSL)" /proc/version &> /dev/null ; then
+    # Following build options required on WSL2 only (it seems).
+    CC=x86_64-w64-mingw32-gcc \
+    CC_FOR_BUILD=x86_64-linux-gnu-gcc \
+    CPP_FOR_BUILD=x86_64-linux-gnu-cpp \
+    CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
+    LDFLAGS="-static-libgcc -static-libstdc++" \
+    ./configure \
+      --prefix="$CURRENT_PATH/mingw-libs" \
+      $CROSS_COMPILE_FLAGS
+  else
+    ./configure \
+      --prefix="$CURRENT_PATH/mingw-libs" \
+      $CROSS_COMPILE_FLAGS
+  fi
+  make -j "$JOBS" > build.log
+  # make check
+  make install || sudo make install || su -c "make install"
+
+  cd ..
+  cd "mpfr-$MPFR_V"
+  #make clean #clean up, just to be sure
   ./configure \
     --prefix="$CURRENT_PATH/mingw-libs" \
-    $CROSS_COMPILE_FLAGS
-else
+    --enable-static \
+    --disable-shared \
+    --with-gmp="$CURRENT_PATH/mingw-libs" \
+    $CROSS_COMPILE_FLAGS 
+  make -j "$JOBS" > build.log
+  make install || sudo make install || su -c "make install"
+
+  cd ..
+  cd "mpc-$MPC_V"
+  #make clean #clean up, just to be sure
   ./configure \
     --prefix="$CURRENT_PATH/mingw-libs" \
-    $CROSS_COMPILE_FLAGS
-fi
-make -j "$JOBS" > build.log
-# make check
-make install || sudo make install || su -c "make install"
+    --enable-static \
+    --disable-shared \
+    --with-gmp="$CURRENT_PATH/mingw-libs" \
+    --with-mpfr="$CURRENT_PATH/mingw-libs" \
+    $CROSS_COMPILE_FLAGS 
+  make -j "$JOBS" > build.log
+  # make check
+  make install || sudo make install || su -c "make install"
 
-cd ..
-cd "mpfr-$MPFR_V"
-#make clean #clean up, just to be sure
-./configure \
-  --prefix="$CURRENT_PATH/mingw-libs" \
-  --enable-static \
-  --disable-shared \
-  --with-gmp="$CURRENT_PATH/mingw-libs" \
-  $CROSS_COMPILE_FLAGS 
-make -j "$JOBS" > build.log
-make install || sudo make install || su -c "make install"
-
-cd ..
-cd "mpc-$MPC_V"
-#make clean #clean up, just to be sure
-./configure \
-  --prefix="$CURRENT_PATH/mingw-libs" \
-  --enable-static \
-  --disable-shared \
-  --with-gmp="$CURRENT_PATH/mingw-libs" \
-  --with-mpfr="$CURRENT_PATH/mingw-libs" \
-  $CROSS_COMPILE_FLAGS 
-make -j "$JOBS" > build.log
-# make check
-make install || sudo make install || su -c "make install"
-
-cd ..
+  cd ..
 fi
 
 echo "Compile binutils"
