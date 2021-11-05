@@ -5,7 +5,7 @@ FROM ubuntu:18.04
 ARG N64_INST=/n64_toolchain
 ENV N64_INST=${N64_INST}
 
-# install linux dependencies
+# install dependencies
 RUN apt-get update
 RUN apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
 # Extra dependencies for CMake builds

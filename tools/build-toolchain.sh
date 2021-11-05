@@ -34,7 +34,7 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
 
   # We will require the extra flags (under certain libs)
   CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32" # TODO: --build is probably not required...
-  CROSS_COMPILE_MATH_FLAGS="--with-gmp=$CURRENT_PATH/mingw-libs --with-mpfr=$CURRENT_PATH/mingw-libs --with-mpc=$CURRENT_PATH/mingw-libs"
+  CROSS_COMPILE_FP_LIB_LOC_FLAGS="--with-gmp=$CURRENT_PATH/mingw-libs --with-mpfr=$CURRENT_PATH/mingw-libs --with-mpc=$CURRENT_PATH/mingw-libs"
 
   # We will have to build Make and (MinGW libs)
   MAKE_V=4.2.1
@@ -184,7 +184,7 @@ cd gcc_compile
   --disable-nls \
   --disable-werror \
   --with-system-zlib \
-  $CROSS_COMPILE_MATH_FLAGS \
+  $CROSS_COMPILE_FP_LIB_LOC_FLAGS \
   $CROSS_COMPILE_FLAGS
 make all-gcc -j "$JOBS"
 make all-target-libgcc -j "$JOBS"
@@ -200,7 +200,7 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --disable-threads \
   --disable-libssp \
   --disable-werror \
-  $CROSS_COMPILE_MATH_FLAGS \
+  $CROSS_COMPILE_FP_LIB_LOC_FLAGS \
   $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install"
@@ -225,7 +225,7 @@ CFLAGS_FOR_TARGET="-G0 -O2" CXXFLAGS_FOR_TARGET="-G0 -O2" ../"gcc-$GCC_V"/config
   --disable-win32-registry \
   --disable-nls \
   --with-system-zlib \
-  $CROSS_COMPILE_MATH_FLAGS \
+  $CROSS_COMPILE_FP_LIB_LOC_FLAGS \
   $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
 make install || sudo make install || su -c "make install"
