@@ -8,6 +8,8 @@ ENV N64_INST=${N64_INST}
 # install linux dependencies
 RUN apt-get update
 RUN apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
+# Extra dependencies for CMake builds
+RUN apt-get install -yq ninja-build rsync zip
 
 # Build
 COPY ./tools/build-toolchain.sh /tmp/tools/build-toolchain.sh
