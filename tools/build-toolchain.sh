@@ -167,9 +167,9 @@ echo "Compiling GCC-$GCC_V for MIPS N64 (pass 1) outside of the source tree"
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
-cp -a "gmp-$GMP_V" gcc_compile/gmp
-cp -a "mpfr-$MPFR_V" gcc_compile/mpfr
-cp -a "mpc-$MPC_V" gcc_compile/mpc
+cp "gmp-$GMP_V" gcc_compile/gmp
+cp "mpfr-$MPFR_V" gcc_compile/mpfr
+cp "mpc-$MPC_V" gcc_compile/mpc
 cd gcc_compile
 ../"gcc-$GCC_V"/configure \
   --prefix="$INSTALL_PATH" \
@@ -198,9 +198,9 @@ echo "Finished Compiling GCC-$GCC_V for MIPS N64 (pass 1) outside of the source 
 
 echo "Compiling newlib-$NEWLIB_V"
 cd ../"newlib-$NEWLIB_V"
-cp -a "gmp-$GMP_V" gcc_compile/gmp
-cp -a "mpfr-$MPFR_V" gcc_compile/mpfr
-cp -a "mpc-$MPC_V" gcc_compile/mpc
+cp "gmp-$GMP_V" gcc_compile/gmp
+cp "mpfr-$MPFR_V" gcc_compile/mpfr
+cp "mpc-$MPC_V" gcc_compile/mpc
 CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --target=mips64-elf \
   --prefix="$INSTALL_PATH" \
@@ -218,9 +218,9 @@ echo "Compiling gcc-$GCC_V for MIPS N64 (pass 2) outside of the source tree"
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
-cp -a "gmp-$GMP_V" gcc_compile/gmp
-cp -a "mpfr-$MPFR_V" gcc_compile/mpfr
-cp -a "mpc-$MPC_V" gcc_compile/mpc
+cp "gmp-$GMP_V" gcc_compile/gmp
+cp "mpfr-$MPFR_V" gcc_compile/mpfr
+cp "mpc-$MPC_V" gcc_compile/mpc
 cd gcc_compile
 CFLAGS_FOR_TARGET="-G0 -O2" CXXFLAGS_FOR_TARGET="-G0 -O2" ../"gcc-$GCC_V"/configure \
   --prefix="$INSTALL_PATH" \
