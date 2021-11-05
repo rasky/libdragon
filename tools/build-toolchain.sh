@@ -34,7 +34,7 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   INSTALL_PATH="$CURRENT_PATH/win_binaries"
   CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32" # TODO: --build is probably not required...
   CROSS_COMPILE_MATH_FLAGS="--with-gmp=$CURRENT_PATH/mingw-libs --with-mpfr=$CURRENT_PATH/mingw-libs --with-mpc=$CURRENT_PATH/mingw-libs"
-  MAKE_V=4.3 #TODO: ensure this is working. V4.2.1 required a patch.
+  MAKE_V=4.2.1
   GMP_V=6.2.0
   MPC_V=1.1.0
   MPFR_V=4.1.0
@@ -99,14 +99,21 @@ export PATH="$PATH:$INSTALL_PATH/mingw-libs"
 cd "gmp-$GMP_V"
 #make clean #clean up, just to be sure
 
-# CC=x86_64-w64-mingw32-gcc \
-# CC_FOR_BUILD=x86_64-linux-gnu-gcc \
-# CPP_FOR_BUILD=x86_64-linux-gnu-cpp \
-# CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
-# LDFLAGS="-static-libgcc -static-libstdc++" \
-./configure \
-  --prefix="$CURRENT_PATH/mingw-libs" \
-  $CROSS_COMPILE_FLAGS
+if grep -qEi "(Microsoft|WSL)" /proc/version &> /dev/null ; then
+# Following build options required on WSL2 only (it seems).
+  CC=x86_64-w64-mingw32-gcc \
+  CC_FOR_BUILD=x86_64-linux-gnu-gcc \
+  CPP_FOR_BUILD=x86_64-linux-gnu-cpp \
+  CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
+  LDFLAGS="-static-libgcc -static-libstdc++" \
+  ./configure \
+    --prefix="$CURRENT_PATH/mingw-libs" \
+    $CROSS_COMPILE_FLAGS
+else
+  ./configure \
+    --prefix="$CURRENT_PATH/mingw-libs" \
+    $CROSS_COMPILE_FLAGS
+fi
 make -j "$JOBS" > build.log
 # make check
 make install || sudo make install || su -c "make install"
@@ -114,28 +121,18 @@ make install || sudo make install || su -c "make install"
 cd ..
 cd "mpfr-$MPFR_V"
 #make clean #clean up, just to be sure
-#CC=x86_64-w64-mingw32-gcc \
-#CC_FOR_BUILD=x86_64-linux-gnu-gcc \
-#CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
-# LDFLAGS="-static-libgcc -static-libstdc++" \
 ./configure \
   --prefix="$CURRENT_PATH/mingw-libs" \
   --enable-static \
   --disable-shared \
   --with-gmp="$CURRENT_PATH/mingw-libs" \
   $CROSS_COMPILE_FLAGS 
-#--with-gmp=/usr/x86_64-w64-mingw32/
 make -j "$JOBS" > build.log
-# make check
 make install || sudo make install || su -c "make install"
 
 cd ..
 cd "mpc-$MPC_V"
 #make clean #clean up, just to be sure
-#CC=x86_64-w64-mingw32-gcc \
-#CC_FOR_BUILD=x86_64-linux-gnu-gcc \
-#CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
-# LDFLAGS="-static-libgcc -static-libstdc++" \
 ./configure \
   --prefix="$CURRENT_PATH/mingw-libs" \
   --enable-static \
@@ -143,7 +140,6 @@ cd "mpc-$MPC_V"
   --with-gmp="$CURRENT_PATH/mingw-libs" \
   --with-mpfr="$CURRENT_PATH/mingw-libs" \
   $CROSS_COMPILE_FLAGS 
-  #--enable-thread-safe
 make -j "$JOBS" > build.log
 # make check
 make install || sudo make install || su -c "make install"
@@ -194,7 +190,7 @@ make install-target-libgcc || sudo make install-target-libgcc || su -c "make ins
 
 echo "Compile newlib"
 cd ../"newlib-$NEWLIB_V"
-CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC" ./configure \
+CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --target=mips64-elf \
   --prefix="$INSTALL_PATH" \
   --with-cpu=mips64vr4300 \
@@ -246,7 +242,7 @@ make install || sudo make install || su -c "make install"
 fi
 
 if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
- echo "Cross compile successful"
+  echo "Cross compile successful"
 else
-echo "Native compile successful"
+  echo "Native compile successful"
 fi
