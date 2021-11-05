@@ -34,7 +34,7 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
 
   # We will require the extra flags (under certain libs)
   CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32" # TODO: --build is probably not required...
-  CROSS_COMPILE_FP_LIB_LOC_FLAGS="--with-gmp=$CURRENT_PATH/mingw-libs --with-mpfr=$CURRENT_PATH/mingw-libs --with-mpc=$CURRENT_PATH/mingw-libs"
+  # CROSS_COMPILE_FP_LIB_LOC_FLAGS="--with-gmp=$CURRENT_PATH/mingw-libs --with-mpfr=$CURRENT_PATH/mingw-libs --with-mpc=$CURRENT_PATH/mingw-libs"
 
   # We will have to build Make and (MinGW libs)
   MAKE_V=4.2.1
@@ -97,57 +97,57 @@ if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
   test -d "mpc-$MPC_V"           || tar -xzf "mpc-$MPC_V.tar.gz"
   test -d "mpfr-$MPFR_V"         || tar -xzf "mpfr-$MPFR_V.tar.gz"
 
-  export PATH="$PATH:$INSTALL_PATH/mingw-libs"
-  #TODO: check if already installed.
-  cd "gmp-$GMP_V"
-  #make clean #clean up, just to be sure
+  # export PATH="$PATH:$INSTALL_PATH/mingw-libs"
+  # #TODO: check if already installed.
+  # cd "gmp-$GMP_V"
+  # #make clean #clean up, just to be sure
 
-  if grep -qEi "(Microsoft|WSL)" /proc/version &> /dev/null ; then
-    # Following build options required on WSL2 only (it seems).
-    CC=x86_64-w64-mingw32-gcc \
-    CC_FOR_BUILD=x86_64-linux-gnu-gcc \
-    CPP_FOR_BUILD=x86_64-linux-gnu-cpp \
-    CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
-    LDFLAGS="-static-libgcc -static-libstdc++" \
-    ./configure \
-      --prefix="$CURRENT_PATH/mingw-libs" \
-      $CROSS_COMPILE_FLAGS
-  else
-    ./configure \
-      --prefix="$CURRENT_PATH/mingw-libs" \
-      $CROSS_COMPILE_FLAGS
-  fi
-  make -j "$JOBS" > build.log
-  # make check
-  make install || sudo make install || su -c "make install"
+  # if grep -qEi "(Microsoft|WSL)" /proc/version &> /dev/null ; then
+  #   # Following build options required on WSL2 only (it seems).
+  #   CC=x86_64-w64-mingw32-gcc \
+  #   CC_FOR_BUILD=x86_64-linux-gnu-gcc \
+  #   CPP_FOR_BUILD=x86_64-linux-gnu-cpp \
+  #   CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
+  #   LDFLAGS="-static-libgcc -static-libstdc++" \
+  #   ./configure \
+  #     --prefix="$CURRENT_PATH/mingw-libs" \
+  #     $CROSS_COMPILE_FLAGS
+  # else
+  #   ./configure \
+  #     --prefix="$CURRENT_PATH/mingw-libs" \
+  #     $CROSS_COMPILE_FLAGS
+  # fi
+  # make -j "$JOBS" > build.log
+  # # make check
+  # make install || sudo make install || su -c "make install"
 
-  cd ..
-  cd "mpfr-$MPFR_V"
-  #make clean #clean up, just to be sure
-  ./configure \
-    --prefix="$CURRENT_PATH/mingw-libs" \
-    --enable-static \
-    --disable-shared \
-    --with-gmp="$CURRENT_PATH/mingw-libs" \
-    $CROSS_COMPILE_FLAGS 
-  make -j "$JOBS" > build.log
-  make install || sudo make install || su -c "make install"
+  # cd ..
+  # cd "mpfr-$MPFR_V"
+  # #make clean #clean up, just to be sure
+  # ./configure \
+  #   --prefix="$CURRENT_PATH/mingw-libs" \
+  #   --enable-static \
+  #   --disable-shared \
+  #   --with-gmp="$CURRENT_PATH/mingw-libs" \
+  #   $CROSS_COMPILE_FLAGS 
+  # make -j "$JOBS" > build.log
+  # make install || sudo make install || su -c "make install"
 
-  cd ..
-  cd "mpc-$MPC_V"
-  #make clean #clean up, just to be sure
-  ./configure \
-    --prefix="$CURRENT_PATH/mingw-libs" \
-    --enable-static \
-    --disable-shared \
-    --with-gmp="$CURRENT_PATH/mingw-libs" \
-    --with-mpfr="$CURRENT_PATH/mingw-libs" \
-    $CROSS_COMPILE_FLAGS 
-  make -j "$JOBS" > build.log
-  # make check
-  make install || sudo make install || su -c "make install"
+  # cd ..
+  # cd "mpc-$MPC_V"
+  # #make clean #clean up, just to be sure
+  # ./configure \
+  #   --prefix="$CURRENT_PATH/mingw-libs" \
+  #   --enable-static \
+  #   --disable-shared \
+  #   --with-gmp="$CURRENT_PATH/mingw-libs" \
+  #   --with-mpfr="$CURRENT_PATH/mingw-libs" \
+  #   $CROSS_COMPILE_FLAGS 
+  # make -j "$JOBS" > build.log
+  # # make check
+  # make install || sudo make install || su -c "make install"
 
-  cd ..
+  # cd ..
 fi
 
 echo "Compiling binutils-$BINUTILS_V"
@@ -167,6 +167,9 @@ echo "Compiling GCC-$GCC_V for MIPS N64 (pass 1) outside of the source tree"
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
+cp -a gmp-$GMP_V/. gcc_compile/gmp
+cp -a mpfr-$MPFR_V/. gcc_compile/mpfr
+cp -a mpc-$MPC_V/. gcc_compile/mpc
 cd gcc_compile
 ../"gcc-$GCC_V"/configure \
   --prefix="$INSTALL_PATH" \
@@ -195,6 +198,9 @@ echo "Finished Compiling GCC-$GCC_V for MIPS N64 (pass 1) outside of the source 
 
 echo "Compiling newlib-$NEWLIB_V"
 cd ../"newlib-$NEWLIB_V"
+cp -a gmp-$GMP_V/. gcc_compile/gmp
+cp -a mpfr-$MPFR_V/. gcc_compile/mpfr
+cp -a mpc-$MPC_V/. gcc_compile/mpc
 CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --target=mips64-elf \
   --prefix="$INSTALL_PATH" \
@@ -212,6 +218,9 @@ echo "Compiling gcc-$GCC_V for MIPS N64 (pass 2) outside of the source tree"
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
+cp -a gmp-$GMP_V/. gcc_compile/gmp
+cp -a mpfr-$MPFR_V/. gcc_compile/mpfr
+cp -a mpc-$MPC_V/. gcc_compile/mpc
 cd gcc_compile
 CFLAGS_FOR_TARGET="-G0 -O2" CXXFLAGS_FOR_TARGET="-G0 -O2" ../"gcc-$GCC_V"/configure \
   --prefix="$INSTALL_PATH" \
