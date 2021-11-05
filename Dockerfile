@@ -8,8 +8,6 @@ ENV N64_INST=${N64_INST}
 # install dependencies
 RUN apt-get update
 RUN apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
-# Extra dependencies for CMake builds
-RUN apt-get install -yq ninja-build rsync zip
 
 # Build
 COPY ./tools/build-toolchain.sh /tmp/tools/build-toolchain.sh
@@ -37,6 +35,7 @@ ENV PATH="${N64_INST}/bin:$PATH"
 
 COPY --from=0 ${N64_INST} ${N64_INST}
 RUN apt-get update && \
-    apt-get install -yq gcc g++ make libpng-dev git  && \
+    apt-get install -yq gcc g++ make libpng-dev git && \
+    apt-get install -yq ninja-build rsync zip && \
     apt-get clean && \
     apt autoremove -yq
