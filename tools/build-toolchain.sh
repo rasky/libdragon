@@ -150,7 +150,7 @@ if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
   cd ..
 fi
 
-echo "Compile binutils"
+echo "Compiling binutils-$BINUTILS_V"
 cd "binutils-$BINUTILS_V"
 ./configure \
   --prefix="$INSTALL_PATH" \
@@ -161,8 +161,9 @@ cd "binutils-$BINUTILS_V"
   $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
 make install || sudo make install || su -c "make install"
+echo "Finished Compiling binutils-$BINUTILS_V"
 
-echo "Compile GCC for MIPS N64 (pass 1) outside of the source tree"
+echo "Compiling GCC-$GCC_V for MIPS N64 (pass 1) outside of the source tree"
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
@@ -190,8 +191,9 @@ make all-gcc -j "$JOBS"
 make all-target-libgcc -j "$JOBS"
 make install-gcc || sudo make install-gcc || su -c "make install-gcc"
 make install-target-libgcc || sudo make install-target-libgcc || su -c "make install-target-libgcc"
+echo "Finished Compiling GCC-$GCC_V for MIPS N64 (pass 1) outside of the source tree"
 
-echo "Compile newlib"
+echo "Compiling newlib-$NEWLIB_V"
 cd ../"newlib-$NEWLIB_V"
 CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --target=mips64-elf \
@@ -204,8 +206,9 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install"
+echo "Finished Compiling newlib-$NEWLIB_V"
 
-# Compile GCC for MIPS N64 (pass 2) outside of the source tree
+echo "Compiling gcc-$GCC_V for MIPS N64 (pass 2) outside of the source tree"
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
@@ -229,9 +232,10 @@ CFLAGS_FOR_TARGET="-G0 -O2" CXXFLAGS_FOR_TARGET="-G0 -O2" ../"gcc-$GCC_V"/config
   $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
 make install || sudo make install || su -c "make install"
+echo "Finished Compiling gcc-$GCC_V for MIPS N64 (pass 2) outside of the source tree"
 
 if [ "$MAKE_V" != "" ]; then
-# Compile make
+echo "Compiling make-$MAKE_V"
 cd ..
 cd "make-$MAKE_V"
   ./configure \
@@ -242,6 +246,7 @@ cd "make-$MAKE_V"
     $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
 make install || sudo make install || su -c "make install"
+echo "Finished Compiling make-$MAKE_V"
 fi
 
 if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
