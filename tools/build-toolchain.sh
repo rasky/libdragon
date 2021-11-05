@@ -29,9 +29,11 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
 
   echo "cross compiling for windows"
   # Use the script directory for the install path, as this is not for linux!
-  INSTALL_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+  mkdir win_binaries
+  CURRENT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+  INSTALL_PATH="$CURRENT_PATH/win_binaries"
   CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32" # TODO: --build is probably not required...
-  CROSS_COMPILE_MATH_FLAGS="--with-gmp=$INSTALL_PATH/mingw-libs --with-mpfr=$INSTALL_PATH/mingw-libs --with-mpc=$INSTALL_PATH/mingw-libs"
+  CROSS_COMPILE_MATH_FLAGS="--with-gmp=$CURRENT_PATH/mingw-libs --with-mpfr=$CURRENT_PATH/mingw-libs --with-mpc=$CURRENT_PATH/mingw-libs"
   MAKE_V=4.3 #TODO: ensure this is working. V4.2.1 required a patch.
   GMP_V=6.2.0
   MPC_V=1.1.0
@@ -103,7 +105,7 @@ cd "gmp-$GMP_V"
 # CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
 # LDFLAGS="-static-libgcc -static-libstdc++" \
 ./configure \
-  --prefix="$INSTALL_PATH/mingw-libs" \
+  --prefix="$CURRENT_PATH/mingw-libs" \
   $CROSS_COMPILE_FLAGS
 make -j "$JOBS" > build.log
 # make check
@@ -117,10 +119,10 @@ cd "mpfr-$MPFR_V"
 #CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
 # LDFLAGS="-static-libgcc -static-libstdc++" \
 ./configure \
-  --prefix="$INSTALL_PATH/mingw-libs" \
+  --prefix="$CURRENT_PATH/mingw-libs" \
   --enable-static \
   --disable-shared \
-  --with-gmp="$INSTALL_PATH/mingw-libs" \
+  --with-gmp="$CURRENT_PATH/mingw-libs" \
   $CROSS_COMPILE_FLAGS 
 #--with-gmp=/usr/x86_64-w64-mingw32/
 make -j "$JOBS" > build.log
@@ -135,11 +137,11 @@ cd "mpc-$MPC_V"
 #CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
 # LDFLAGS="-static-libgcc -static-libstdc++" \
 ./configure \
-  --prefix="$INSTALL_PATH/mingw-libs" \
+  --prefix="$CURRENT_PATH/mingw-libs" \
   --enable-static \
   --disable-shared \
-  --with-gmp="$INSTALL_PATH/mingw-libs" \
-  --with-mpfr="$INSTALL_PATH/mingw-libs" \
+  --with-gmp="$CURRENT_PATH/mingw-libs" \
+  --with-mpfr="$CURRENT_PATH/mingw-libs" \
   $CROSS_COMPILE_FLAGS 
   #--enable-thread-safe
 make -j "$JOBS" > build.log
