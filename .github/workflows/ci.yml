@@ -33,7 +33,7 @@ jobs:
           head: ${{ github.sha }}
 
       # Build the toolchain if toolchain files changed w.r.t default which is
-      - name: Build Debian Toolchain
+      - name: Build Toolchain
         if: ${{ steps.path_diff.outputs.changed == 1 }}
         run: |
           # install required dependencies
@@ -71,10 +71,10 @@ jobs:
 
       #     #upload here!
 
-      # publish package toolchain artifacts:
-      - name: Upoload-Artifacts
-        run: |
-          echo "Requires artifact upload."
+      # # publish package toolchain artifacts:
+      # - name: Upoload-Artifacts
+      #   run: |
+      #     echo "Requires artifact upload."
 
   Compile-Toolchain-Windows:
     runs-on: ubuntu-latest
@@ -94,7 +94,7 @@ jobs:
           head: ${{ github.sha }}
 
       # Build the toolchain if toolchain files changed w.r.t default which is
-      - name: Build Windows toolchain
+      - name: Build Toolchain
         if: ${{ steps.path_diff.outputs.changed == 1 }}
         run: |
           # install required dependencies
@@ -112,10 +112,10 @@ jobs:
 
           #TODO: zip binaries and move to artifacts folder.
 
-      # publish windows toolchain artifacts:
-      - name: Upoload-Artifacts
-        run: |
-          echo "Requires artifact upload."
+      # # publish windows toolchain artifacts:
+      # - name: Upoload-Artifacts
+      #   run: |
+      #     echo "Requires artifact upload."
 
   # Compile-Test-Example-Roms:
   #   runs-on: ubuntu-latest
