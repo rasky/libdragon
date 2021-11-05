@@ -108,9 +108,9 @@ jobs:
 
           cd ./toolchain
 
-          # cd ./linux
-          # ./build-toolchain.sh
-          # cd ..
+          cd ./linux
+          ./build-toolchain.sh
+          cd ..
 
 
           sudo apt-get install -yq mingw-w64 libz-mingw-w64-dev
