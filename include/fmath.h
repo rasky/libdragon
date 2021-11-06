@@ -45,6 +45,14 @@
  * additionally define macros that override the standard library functions,
  * so that calling `sinf(x)` will actually invoke `fm_sinf(x)`.
  * 
+ * The following C99 functions have been tested and the default implementation
+ * is already very good (eg: they are intrinsified):
+ * 
+ *   * fabsf
+ *   * copysignf
+ *   * sqrtf (uses the sqrt.s opcode). Also 1.0f/sqrtf(x) is fast enough not to
+ *     worry about using a fast inverse square root. 
+ * 
  */
 
 #ifndef __LIBDRAGON_FMATH_H
@@ -145,18 +153,16 @@ float fm_sinf(float x);
 float fm_cosf(float x);
 
 /**
- * @brief Faster version of sqrtf.
+ * @brief Faster version of atan2f.
  * 
- * The average numerical error is ~= 0.35 * 10e-6.
- */
-float fm_sqrtf(float x);
-
-/**
- * @brief Inverse square root (not available in the standard library).
+ * Given a point (x,y), return the angle in radians that the vector (x,y)
+ * forms with the X axis. This is the same of arctan(y/x).
  * 
- * The average numerical error is ~= 0.35 * 10e-6.
+ * This function runs in about ~XX ticks, versus ~YY ticks of the newlib
+ * version. The maximum measured error is ~6.14e-4, which is usually more
+ * than enough in the context of angles.
  */
-float fm_inv_sqrtf(float x);
+float fm_atan2f(float y, float x);
 
 #ifdef LIBDRAGON_FAST_MATH
     #define truncf(x)     fm_truncf(x)
@@ -173,7 +179,7 @@ float fm_inv_sqrtf(float x);
     #define fmodf(x, y)   ((__builtin_constant_p(x) && __builtin_constant_p(y)) ? fmodf(x,y) : fm_fmodf(x,y))
     #define sinf(x)       (__builtin_constant_p(x) ? sinf(x) : fm_sinf(x))
     #define cosf(x)       (__builtin_constant_p(x) ? cosf(x) : fm_sinf(x))
-    #define sqrtf(x)      (__builtin_constant_p(x) ? sqrtf(x) : fm_sqrtf(x))
+    #define atan2f(y, x)  ((__builtin_constant_p(x) && __builtin_constant_p(y)) ? atan2f(y, x) : fm_atan2f(y, x))
 #endif
 
 #ifdef __cplusplus
