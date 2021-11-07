@@ -19,7 +19,7 @@ libdragonsys.a: $(BUILD_DIR)/system.o
 	@echo "    [AR] $@"
 	$(AR) -rcs -o $@ $^
 
-libdragon.a: $(BUILD_DIR)/n64sys.o $(BUILD_DIR)/interrupt.o \
+libdragon.a: $(BUILD_DIR)/n64sys.o $(BUILD_DIR)/interrupt.o $(BUILD_DIR)/tlb.o \
 			 $(BUILD_DIR)/inthandler.o $(BUILD_DIR)/entrypoint.o \
 			 $(BUILD_DIR)/debug.o $(BUILD_DIR)/usb.o $(BUILD_DIR)/fatfs/ff.o \
 			 $(BUILD_DIR)/fatfs/ffunicode.o $(BUILD_DIR)/dragonfs.o \
