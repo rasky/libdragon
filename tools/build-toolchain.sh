@@ -54,8 +54,8 @@ JOBS="${JOBS:-`getconf _NPROCESSORS_ONLN`}"
 JOBS="${JOBS:-1}" # If getconf returned nothing, default to 1
 
 # Dependency source libs (Versions)
-BINUTILS_V=2.36.1
-GCC_V=10.2.0
+BINUTILS_V=2.37
+GCC_V=11.2.0
 NEWLIB_V=4.1.0
 
 GMP_V=6.2.0
@@ -224,7 +224,7 @@ mkdir gcc_compile
 # cp "mpfr-$MPFR_V" gcc_compile/mpfr
 # cp "mpc-$MPC_V" gcc_compile/mpc
 cd gcc_compile
-CFLAGS_FOR_TARGET="-G0 -O2" CXXFLAGS_FOR_TARGET="-G0 -O2" ../"gcc-$GCC_V"/configure \
+CFLAGS_FOR_TARGET="-O2" CXXFLAGS_FOR_TARGET=" -O2" ../"gcc-$GCC_V"/configure \
   --prefix="$INSTALL_PATH" \
   --target=mips64-elf \
   --with-arch=vr4300 \
