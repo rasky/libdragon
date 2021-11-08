@@ -16,34 +16,34 @@ on:
       - completed
 
 jobs:
-  Compile-Toolchain-Debian:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+  # Compile-Toolchain-Debian:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v2
 
-      # We first compare the default branch to the event commit. In case this is
-      # the default branch, this should return 0, skipping the build and using
-      # the latest image from "Docker Build"
-      - name: Compare files to default branch
-        uses: ./.github/actions/path-diff
-        id: path_diff
-        with:
-          base: ${{ format('refs/remotes/origin/{0}', github.event.repository.default_branch) }}
-          head: ${{ github.sha }}
+  #     # We first compare the default branch to the event commit. In case this is
+  #     # the default branch, this should return 0, skipping the build and using
+  #     # the latest image from "Docker Build"
+  #     - name: Compare files to default branch
+  #       uses: ./.github/actions/path-diff
+  #       id: path_diff
+  #       with:
+  #         base: ${{ format('refs/remotes/origin/{0}', github.event.repository.default_branch) }}
+  #         head: ${{ github.sha }}
 
-      # Build the toolchain if toolchain files changed w.r.t default which is
-      - name: Build Toolchain Debian
-        if: ${{ steps.path_diff.outputs.changed == 1 }}
-        run: |
-          # install required dependencies
-          sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
+  #     # Build the toolchain if toolchain files changed w.r.t default which is
+  #     - name: Build Toolchain Debian
+  #       if: ${{ steps.path_diff.outputs.changed == 1 }}
+  #       run: |
+  #         # install required dependencies
+  #         sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
 
-          mkdir -p build/toolchain/linux
-          cp ./tools/build-toolchain.sh ./build/toolchain/linux/build-toolchain.sh
+  #         mkdir -p build/toolchain/linux
+  #         cp ./tools/build-toolchain.sh ./build/toolchain/linux/build-toolchain.sh
 
-          cd ./build/toolchain/linux
-          ./build-toolchain.sh
+  #         cd ./build/toolchain/linux
+  #         ./build-toolchain.sh
 
       # - name: Create-Debian-Package
       #   run: |
@@ -78,7 +78,7 @@ jobs:
 
   Compile-Toolchain-Windows:
     runs-on: ubuntu-latest
-    needs: Compile-Toolchain-Debian # We need to have the ability to target for mips64 elf packages, so build for linux first!
+    # needs: Compile-Toolchain-Debian # We need to have the ability to target for mips64 elf packages, so build for linux first!
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -105,7 +105,7 @@ jobs:
 
           cd ./build/toolchain
 
-          sudo apt-get install -yq mingw-w64 libz-mingw-w64-dev autoconf
+          sudo apt-get install -yq mingw-w64 libz-mingw-w64-dev autoconf autoconf-archive
 
           cd ./windows
           ./build-toolchain.sh -xcw
