@@ -39,24 +39,13 @@ jobs:
           # install required dependencies
           sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
 
+          # set N64INST to a local directory so we can make it into an install package?
+          
           mkdir -p build/toolchain/linux
           cp ./tools/build-toolchain.sh ./build/toolchain/linux/build-toolchain.sh
 
           cd ./build/toolchain/linux
           ./build-toolchain.sh
-
-      - name: Cache N64 Toolchain
-        uses: actions/cache@v2
-        env:
-          cache-name: cache-n64-toolchain
-        with:
-          # toolchain cache files are stored in `/usr/local` on debian
-          path: /usr/local
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
 
       # - name: Create-Debian-Package
       #   run: |
@@ -84,10 +73,23 @@ jobs:
 
       #     # move to artifacts folder
 
-      # # publish package toolchain artifacts:
-      # - name: Upload-Artifacts
-      #   run: |
-      #     echo "Requires artifact upload."
+      - name: Cache N64 Toolchain
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-n64-toolchain
+        with:
+          # toolchain cache files are stored in `/usr/local` on debian
+          path: /usr/local
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
+      # publish package toolchain artifacts:
+      - name: Upload-Artifacts
+        run: |
+          echo "Requires artifact upload."
 
   # Compile-Toolchain-Windows:
   #   runs-on: ubuntu-latest

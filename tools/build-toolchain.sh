@@ -24,26 +24,25 @@ set -e
 if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a parameter.
   # This (probably) requires the toolchain to have already built and installed on the native (linux) system first!
   # This (may) also require the following (extra) package dependencies:
-  # sudo apt-get install -yq mingw-w64 libgmp-dev bison libz-mingw-w64-dev
-  # sudo apt-get install -yq autoconf
+  # sudo apt-get install -yq mingw-w64 libgmp-dev bison libz-mingw-w64-dev autoconf
 
-  echo "cross compiling for windows"
+  echo "Cross compiling for Windows x86_64"
   # Use the current-directory/win_binaries for the install path, as this is not for linux!
   rm -rf win_binaries
   mkdir win_binaries
   CURRENT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   INSTALL_PATH="$CURRENT_PATH/win_binaries"
 
-  # We will require the extra flags (under certain libs)
-  CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32" # TODO: --build is probably not required...
+  # This will require the extra flags (under certain libs)
+  CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32"
 
   # Dependency source libs (Versions)
-  # We will have to build Make and FP libs
+  # This will have to build Make and download FP libs
   GMP_V=6.2.0
   MPC_V=1.2.1
   MPFR_V=4.1.0
   MAKE_V=4.2.1
-  # These "should" be the same as linux, but need to ensure working first.
+  # These "should" be the same as linux, but may be out of sync (as need to ensure working natively first).
   BINUTILS_V=2.36.1
   GCC_V=10.2.0
   NEWLIB_V=4.1.0
@@ -105,6 +104,7 @@ if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
   test -d "mpc-$MPC_V"           || tar -xzf "mpc-$MPC_V.tar.gz"
   test -d "mpfr-$MPFR_V"         || tar -xzf "mpfr-$MPFR_V.tar.gz"
 
+  # Copies the FP libs into GCC sources so they are compiled as part of it
   cp -R "gmp-$GMP_V" "gcc-$GCC_V"/gmp
   cp -R "mpc-$MPC_V" "gcc-$GCC_V"/mpc
   cp -R "mpfr-$MPFR_V" "gcc-$GCC_V"/mpfr
@@ -115,7 +115,6 @@ cd "binutils-$BINUTILS_V"
 ./configure \
   --prefix="$INSTALL_PATH" \
   --target=mips64-elf \
-  --with-lib-path="$INSTALL_PATH" \
   --with-cpu=mips64vr4300 \
   --disable-werror \
   $CROSS_COMPILE_FLAGS
@@ -145,7 +144,6 @@ cd gcc_compile
   --disable-nls \
   --disable-werror \
   --with-system-zlib \
-  $CROSS_COMPILE_FP_LIB_LOC_FLAGS \
   $CROSS_COMPILE_FLAGS
 make all-gcc -j "$JOBS"
 make all-target-libgcc -j "$JOBS"
@@ -155,9 +153,6 @@ echo "Finished Compiling GCC-$GCC_V for MIPS N64 (pass 1) outside of the source 
 
 echo "Compiling newlib-$NEWLIB_V"
 cd ../"newlib-$NEWLIB_V"
-# cp "gmp-$GMP_V" gcc_compile/gmp
-# cp "mpfr-$MPFR_V" gcc_compile/mpfr
-# cp "mpc-$MPC_V" gcc_compile/mpc
 CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --target=mips64-elf \
   --prefix="$INSTALL_PATH" \
@@ -165,7 +160,6 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --disable-threads \
   --disable-libssp \
   --disable-werror \
-  $CROSS_COMPILE_FP_LIB_LOC_FLAGS \
   $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install"
@@ -191,7 +185,6 @@ CFLAGS_FOR_TARGET="-O2" CXXFLAGS_FOR_TARGET=" -O2" ../"gcc-$GCC_V"/configure \
   --disable-win32-registry \
   --disable-nls \
   --with-system-zlib \
-  $CROSS_COMPILE_FP_LIB_LOC_FLAGS \
   $CROSS_COMPILE_FLAGS
 make -j "$JOBS"
 make install || sudo make install || su -c "make install"
@@ -199,6 +192,7 @@ echo "Finished Compiling gcc-$GCC_V for MIPS N64 (pass 2) outside of the source 
 
 if [ "$MAKE_V" != "" ]; then
 echo "Compiling make-$MAKE_V"
+# As make is otherwise not available on Windows
 cd ../"make-$MAKE_V"
   ./configure \
     --prefix="$INSTALL_PATH" \
