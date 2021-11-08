@@ -110,8 +110,9 @@ if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
   cp -R "mpfr-$MPFR_V" "gcc-$GCC_V"/mpfr
 
   echo "Compiling binutils-$BINUTILS_V pass 1 (no cross compile)"
+  cp -R "binutils-$BINUTILS_V" "binutils-$BINUTILS_V-native"
   # Required as otherwise we cannot "seem" to use the cross compiled one as an input! 
-  cd "binutils-$BINUTILS_V"
+  cd "binutils-$BINUTILS_V-native"
   ./configure \
     --prefix="${N64_INST:-/usr/local}" \
     --target=mips64-elf \
