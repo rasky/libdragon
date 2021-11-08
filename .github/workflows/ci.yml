@@ -16,34 +16,47 @@ on:
       - completed
 
 jobs:
-  # Compile-Toolchain-Debian:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v2
+  Compile-Toolchain-Debian:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
 
-  #     # We first compare the default branch to the event commit. In case this is
-  #     # the default branch, this should return 0, skipping the build and using
-  #     # the latest image from "Docker Build"
-  #     - name: Compare files to default branch
-  #       uses: ./.github/actions/path-diff
-  #       id: path_diff
-  #       with:
-  #         base: ${{ format('refs/remotes/origin/{0}', github.event.repository.default_branch) }}
-  #         head: ${{ github.sha }}
+      # We first compare the default branch to the event commit. In case this is
+      # the default branch, this should return 0, skipping the build and using
+      # the latest image from "Docker Build"
+      - name: Compare files to default branch
+        uses: ./.github/actions/path-diff
+        id: path_diff
+        with:
+          base: ${{ format('refs/remotes/origin/{0}', github.event.repository.default_branch) }}
+          head: ${{ github.sha }}
 
-  #     # Build the toolchain if toolchain files changed w.r.t default which is
-  #     - name: Build Toolchain Debian
-  #       if: ${{ steps.path_diff.outputs.changed == 1 }}
-  #       run: |
-  #         # install required dependencies
-  #         sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
+      # Build the toolchain if toolchain files changed w.r.t default which is
+      - name: Build Toolchain Debian
+        if: ${{ steps.path_diff.outputs.changed == 1 }}
+        run: |
+          # install required dependencies
+          sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
 
-  #         mkdir -p build/toolchain/linux
-  #         cp ./tools/build-toolchain.sh ./build/toolchain/linux/build-toolchain.sh
+          mkdir -p build/toolchain/linux
+          cp ./tools/build-toolchain.sh ./build/toolchain/linux/build-toolchain.sh
 
-  #         cd ./build/toolchain/linux
-  #         ./build-toolchain.sh
+          cd ./build/toolchain/linux
+          ./build-toolchain.sh
+
+      - name: Cache N64 Toolchain
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-n64-toolchain
+        with:
+          # toolchain cache files are stored in `/usr/local` on debian
+          path: /usr/local
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
 
       # - name: Create-Debian-Package
       #   run: |
@@ -76,22 +89,23 @@ jobs:
       #   run: |
       #     echo "Requires artifact upload."
 
-  Compile-Toolchain-Windows:
-    runs-on: ubuntu-latest
-    # needs: Compile-Toolchain-Debian # We need to have the ability to target for mips64 elf packages, so build for linux first!
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+  # Compile-Toolchain-Windows:
+  #   runs-on: ubuntu-latest
+  #   needs: Compile-Toolchain-Debian # We need to have the ability to target for mips64 elf packages, so build for linux first!
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v2
 
-      # We first compare the default branch to the event commit. In case this is
-      # the default branch, this should return 0, skipping the build and using
-      # the latest image from "Docker Build"
-      - name: Compare files to default branch
-        uses: ./.github/actions/path-diff
-        id: path_diff
-        with:
-          base: ${{ format('refs/remotes/origin/{0}', github.event.repository.default_branch) }}
-          head: ${{ github.sha }}
+  #     - name: Get N64 Toolchain Cache
+  #       id: cache-n64-toolchain
+  #       uses: actions/cache@v2
+  #       with:
+  #         path: /usr/local
+  #         key: ${{ runner.os }}-n64-toolchain
+
+  #     - name: Re-instate n64 toolchain from cache
+  #       if: steps.cache-n64-toolchain.outputs.cache-hit != 'true'
+  #       run: /blah.sh -d blah
 
       # Build the toolchain if toolchain files changed w.r.t default which is
       - name: Build Toolchain Windows
@@ -99,7 +113,7 @@ jobs:
         run: |
           # install required dependencies
           sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
-          sudo apt-get install -yq build-essential software-properties-common gcc-mips-linux-gnu
+          # sudo apt-get install -yq build-essential software-properties-common gcc-mips-linux-gnu
 
           mkdir -p build/toolchain/windows
           cp ./tools/build-toolchain.sh ./build/toolchain/windows/build-toolchain.sh
