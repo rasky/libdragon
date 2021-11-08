@@ -76,24 +76,24 @@ jobs:
       #   run: |
       #     echo "Requires artifact upload."
 
-  # Compile-Toolchain-Windows:
-  #   runs-on: ubuntu-latest
-  #   needs: Compile-Toolchain-Debian # We need to have the ability to target for mips64 elf packages, so build for linux first!
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v2
+  Compile-Toolchain-Windows:
+    runs-on: ubuntu-latest
+    needs: Compile-Toolchain-Debian # We need to have the ability to target for mips64 elf packages, so build for linux first!
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
 
-  #     # We first compare the default branch to the event commit. In case this is
-  #     # the default branch, this should return 0, skipping the build and using
-  #     # the latest image from "Docker Build"
-  #     - name: Compare files to default branch
-  #       uses: ./.github/actions/path-diff
-  #       id: path_diff
-  #       with:
-  #         base: ${{ format('refs/remotes/origin/{0}', github.event.repository.default_branch) }}
-  #         head: ${{ github.sha }}
+      # We first compare the default branch to the event commit. In case this is
+      # the default branch, this should return 0, skipping the build and using
+      # the latest image from "Docker Build"
+      - name: Compare files to default branch
+        uses: ./.github/actions/path-diff
+        id: path_diff
+        with:
+          base: ${{ format('refs/remotes/origin/{0}', github.event.repository.default_branch) }}
+          head: ${{ github.sha }}
 
-  #     # Build the toolchain if toolchain files changed w.r.t default which is
+      # Build the toolchain if toolchain files changed w.r.t default which is
       - name: Build Toolchain Windows
         # if: ${{ steps.path_diff.outputs.changed == 1 }}
         run: |
@@ -105,7 +105,7 @@ jobs:
 
           cd ./build/toolchain
 
-          sudo apt-get install -yq mingw-w64 libz-mingw-w64-dev
+          sudo apt-get install -yq mingw-w64 libz-mingw-w64-dev autoconf
 
           cd ./windows
           ./build-toolchain.sh -xcw

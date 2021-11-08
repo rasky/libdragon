@@ -25,25 +25,39 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   # This (probably) requires the toolchain to have already built and installed on the native (linux) system first!
   # This (may) also require the following (extra) package dependencies:
   # sudo apt-get install -yq mingw-w64 libgmp-dev bison libz-mingw-w64-dev
+  # sudo apt-get install -yq autoconf
 
   echo "cross compiling for windows"
   # Use the current-directory/win_binaries for the install path, as this is not for linux!
+  rm -rf win_binaries
   mkdir win_binaries
   CURRENT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   INSTALL_PATH="$CURRENT_PATH/win_binaries"
 
   # We will require the extra flags (under certain libs)
   CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32" # TODO: --build is probably not required...
-  CROSS_COMPILE_FP_LIB_LOC_FLAGS="--with-gmp=$CURRENT_PATH/mingw-libs --with-mpfr=$CURRENT_PATH/mingw-libs --with-mpc=$CURRENT_PATH/mingw-libs"
 
-  # We will have to build Make and (MinGW libs)
+  # Dependency source libs (Versions)
+  # We will have to build Make and FP libs
+  GMP_V=6.2.0
+  MPC_V=1.2.1
+  MPFR_V=4.1.0
   MAKE_V=4.2.1
+  # These "should" be the same as linux, but need to ensure working first.
+  BINUTILS_V=2.36.1
+  GCC_V=10.2.0
+  NEWLIB_V=4.1.0
  
 
 else # We are compiling for the native (linux) system.
   echo "building for linux"
   # Set N64_INST before calling the script to change the default installation directory path
   INSTALL_PATH="${N64_INST:-/usr/local}"
+  
+  # Dependency source libs (Versions)
+  BINUTILS_V=2.37
+  GCC_V=11.2.0
+  NEWLIB_V=4.1.0
 fi
 
 # Set PATH for newlib to compile using GCC for MIPS N64 (pass 1)
@@ -53,14 +67,6 @@ export PATH="$PATH:$INSTALL_PATH/bin"
 JOBS="${JOBS:-`getconf _NPROCESSORS_ONLN`}"
 JOBS="${JOBS:-1}" # If getconf returned nothing, default to 1
 
-# Dependency source libs (Versions)
-BINUTILS_V=2.37
-GCC_V=11.2.0
-NEWLIB_V=4.1.0
-
-GMP_V=6.2.0
-MPC_V=1.1.0
-MPFR_V=4.1.0
 
 # Check if a command-line tool is available: status 0 means "yes"; status 1 means "no"
 command_exists () {
@@ -83,10 +89,10 @@ test -f "binutils-$BINUTILS_V.tar.gz" || download "https://ftp.gnu.org/gnu/binut
 test -f "gcc-$GCC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/gcc/gcc-$GCC_V/gcc-$GCC_V.tar.gz"
 test -f "newlib-$NEWLIB_V.tar.gz"     || download "https://sourceware.org/pub/newlib/newlib-$NEWLIB_V.tar.gz"
 if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
-test -f "make-$MAKE_V.tar.gz"         || download "https://ftp.gnu.org/gnu/make/make-$MAKE_V.tar.gz"
-test -f "gmp-$GMP_V.tar.xz"           || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
-test -f "mpc-$MPC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
-test -f "mpfr-$MPFR_V.tar.gz"         || download "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_V.tar.gz"
+  test -f "make-$MAKE_V.tar.gz"         || download "https://ftp.gnu.org/gnu/make/make-$MAKE_V.tar.gz"
+  test -f "gmp-$GMP_V.tar.xz"           || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
+  test -f "mpc-$MPC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
+  test -f "mpfr-$MPFR_V.tar.gz"         || download "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_V.tar.gz"
 fi
 
 # Dependency source: Extract stage
@@ -99,57 +105,9 @@ if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
   test -d "mpc-$MPC_V"           || tar -xzf "mpc-$MPC_V.tar.gz"
   test -d "mpfr-$MPFR_V"         || tar -xzf "mpfr-$MPFR_V.tar.gz"
 
-  # export PATH="$PATH:$INSTALL_PATH/mingw-libs"
-  # #TODO: check if already installed.
-  cd "gmp-$GMP_V"
-  # #make clean #clean up, just to be sure
-
-  if grep -qEi "(Microsoft|WSL)" /proc/version &> /dev/null ; then
-    # Following build options required on WSL2 only (it seems).
-    CC=x86_64-w64-mingw32-gcc \
-    CC_FOR_BUILD=x86_64-linux-gnu-gcc \
-    CPP_FOR_BUILD=x86_64-linux-gnu-cpp \
-    CPPFLAGS=-D__USE_MINGW_ANSI_STDIO \
-    LDFLAGS="-static-libgcc -static-libstdc++" \
-    ./configure \
-      --prefix="$CURRENT_PATH/mingw-libs" \
-      $CROSS_COMPILE_FLAGS
-  else
-    ./configure \
-      --prefix="$CURRENT_PATH/mingw-libs" \
-      $CROSS_COMPILE_FLAGS
-  fi
-  make -j "$JOBS" > build.log
-  # make check
-  make install || sudo make install || su -c "make install"
-
-  cd ..
-  cd "mpfr-$MPFR_V"
-  #make clean #clean up, just to be sure
-  ./configure \
-    --prefix="$CURRENT_PATH/mingw-libs" \
-    --enable-static \
-    --disable-shared \
-    --with-gmp="$CURRENT_PATH/mingw-libs" \
-    $CROSS_COMPILE_FLAGS 
-  make -j "$JOBS" > build.log
-  make install || sudo make install || su -c "make install"
-
-  cd ..
-  cd "mpc-$MPC_V"
-  #make clean #clean up, just to be sure
-  ./configure \
-    --prefix="$CURRENT_PATH/mingw-libs" \
-    --enable-static \
-    --disable-shared \
-    --with-gmp="$CURRENT_PATH/mingw-libs" \
-    --with-mpfr="$CURRENT_PATH/mingw-libs" \
-    $CROSS_COMPILE_FLAGS 
-  make -j "$JOBS" > build.log
-  # make check
-  make install || sudo make install || su -c "make install"
-
-  cd ..
+  cp -R "gmp-$GMP_V" "gcc-$GCC_V"/gmp
+  cp -R "mpc-$MPC_V" "gcc-$GCC_V"/mpc
+  cp -R "mpfr-$MPFR_V" "gcc-$GCC_V"/mpfr
 fi
 
 echo "Compiling binutils-$BINUTILS_V"
@@ -169,9 +127,6 @@ echo "Compiling GCC-$GCC_V for MIPS N64 (pass 1) outside of the source tree"
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
-# cp "gmp-$GMP_V" gcc_compile/gmp
-# cp "mpfr-$MPFR_V" gcc_compile/mpfr
-# cp "mpc-$MPC_V" gcc_compile/mpc
 cd gcc_compile
 ../"gcc-$GCC_V"/configure \
   --prefix="$INSTALL_PATH" \
@@ -220,9 +175,6 @@ echo "Compiling gcc-$GCC_V for MIPS N64 (pass 2) outside of the source tree"
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
-# cp "gmp-$GMP_V" gcc_compile/gmp
-# cp "mpfr-$MPFR_V" gcc_compile/mpfr
-# cp "mpc-$MPC_V" gcc_compile/mpc
 cd gcc_compile
 CFLAGS_FOR_TARGET="-O2" CXXFLAGS_FOR_TARGET=" -O2" ../"gcc-$GCC_V"/configure \
   --prefix="$INSTALL_PATH" \
@@ -247,8 +199,7 @@ echo "Finished Compiling gcc-$GCC_V for MIPS N64 (pass 2) outside of the source 
 
 if [ "$MAKE_V" != "" ]; then
 echo "Compiling make-$MAKE_V"
-cd ..
-cd "make-$MAKE_V"
+cd ../"make-$MAKE_V"
   ./configure \
     --prefix="$INSTALL_PATH" \
     --disable-largefile \
