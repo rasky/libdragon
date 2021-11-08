@@ -108,6 +108,19 @@ if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
   cp -R "gmp-$GMP_V" "gcc-$GCC_V"/gmp
   cp -R "mpc-$MPC_V" "gcc-$GCC_V"/mpc
   cp -R "mpfr-$MPFR_V" "gcc-$GCC_V"/mpfr
+
+  echo "Compiling binutils-$BINUTILS_V pass 1 (no cross compile)"
+  # Required as otherwise we cannot "seem" to use the cross compiled one as an input! 
+  cd "binutils-$BINUTILS_V"
+  ./configure \
+    --prefix="${N64_INST:-/usr/local}" \
+    --target=mips64-elf \
+    --with-lib-path="${N64_INST:-/usr/local}" \
+    --with-cpu=mips64vr4300 \
+    --disable-werror
+  make -j "$JOBS"
+  make install || sudo make install || su -c "make install"
+  echo "Finished Compiling binutils-$BINUTILS_V"
 fi
 
 echo "Compiling binutils-$BINUTILS_V"
