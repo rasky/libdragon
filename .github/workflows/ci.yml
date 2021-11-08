@@ -98,7 +98,8 @@ jobs:
         # if: ${{ steps.path_diff.outputs.changed == 1 }}
         run: |
           # install required dependencies
-          # sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
+          sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
+          sudo apt-get install -yq build-essential software-properties-common gcc-mips-linux-gnu
 
           mkdir -p build/toolchain/windows
           cp ./tools/build-toolchain.sh ./build/toolchain/windows/build-toolchain.sh
