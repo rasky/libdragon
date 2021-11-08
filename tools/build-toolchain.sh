@@ -121,6 +121,7 @@ if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
   make -j "$JOBS"
   make install || sudo make install || su -c "make install"
   echo "Finished Compiling binutils-$BINUTILS_V"
+  cd ..
 fi
 
 echo "Compiling binutils-$BINUTILS_V"
