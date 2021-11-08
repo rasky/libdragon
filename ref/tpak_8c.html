@@ -80,30 +80,6 @@ $(function() {
 </div><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="define-members"></a>
 Macros</h2></td></tr>
-<tr class="memitem:ga8c5ca9dc530de610b3544336f0a7226f"><td class="memItemLeft" align="right" valign="top">
-#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__TPAK__POWER.html#ga8c5ca9dc530de610b3544336f0a7226f">TPAK_POWER_ON</a>&#160;&#160;&#160;0x84</td></tr>
-<tr class="memdesc:ga8c5ca9dc530de610b3544336f0a7226f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transfer Pak power on. <br /></td></tr>
-<tr class="separator:ga8c5ca9dc530de610b3544336f0a7226f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:gab62ad788345487decb64effb822c0e43"><td class="memItemLeft" align="right" valign="top">
-#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__TPAK__POWER.html#gab62ad788345487decb64effb822c0e43">TPAK_POWER_OFF</a>&#160;&#160;&#160;0xFE</td></tr>
-<tr class="memdesc:gab62ad788345487decb64effb822c0e43"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transfer Pak power off. <br /></td></tr>
-<tr class="separator:gab62ad788345487decb64effb822c0e43"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:gae8c69750bc8d7c3d0ef139b40681fdb3"><td class="memItemLeft" align="right" valign="top">
-#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__TPAK__ADDRESS.html#gae8c69750bc8d7c3d0ef139b40681fdb3">TPAK_ADDRESS_POWER</a>&#160;&#160;&#160;0x8000</td></tr>
-<tr class="memdesc:gae8c69750bc8d7c3d0ef139b40681fdb3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transfer Pak address for power control. <br /></td></tr>
-<tr class="separator:gae8c69750bc8d7c3d0ef139b40681fdb3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:gaf625ca0229f59a1d74b2a6b096164f96"><td class="memItemLeft" align="right" valign="top">
-#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__TPAK__ADDRESS.html#gaf625ca0229f59a1d74b2a6b096164f96">TPAK_ADDRESS_BANK</a>&#160;&#160;&#160;0xA000</td></tr>
-<tr class="memdesc:gaf625ca0229f59a1d74b2a6b096164f96"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transfer Pak address for bank switching. <br /></td></tr>
-<tr class="separator:gaf625ca0229f59a1d74b2a6b096164f96"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:gaad605bf162cbc7e90c45b39e3bbb3574"><td class="memItemLeft" align="right" valign="top">
-#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__TPAK__ADDRESS.html#gaad605bf162cbc7e90c45b39e3bbb3574">TPAK_ADDRESS_STATUS</a>&#160;&#160;&#160;0xB000</td></tr>
-<tr class="memdesc:gaad605bf162cbc7e90c45b39e3bbb3574"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transfer Pak address for status flags. <br /></td></tr>
-<tr class="separator:gaad605bf162cbc7e90c45b39e3bbb3574"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ga18ae694312911fbba535535a57398f4e"><td class="memItemLeft" align="right" valign="top">
-#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__TPAK__ADDRESS.html#ga18ae694312911fbba535535a57398f4e">TPAK_ADDRESS_DATA</a>&#160;&#160;&#160;0xC000</td></tr>
-<tr class="memdesc:ga18ae694312911fbba535535a57398f4e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transfer Pak address for cartridge data. <br /></td></tr>
-<tr class="separator:ga18ae694312911fbba535535a57398f4e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a32db920b763347ed10c8f161250962cd"><td class="memItemLeft" align="right" valign="top"><a id="a32db920b763347ed10c8f161250962cd"></a>
 #define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="tpak_8c.html#a32db920b763347ed10c8f161250962cd">TPAK_BLOCK_SIZE</a>&#160;&#160;&#160;0x20</td></tr>
 <tr class="memdesc:a32db920b763347ed10c8f161250962cd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transfer Pak command block size (32 bytes) <br /></td></tr>
@@ -112,6 +88,37 @@ Macros</h2></td></tr>
 #define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="tpak_8c.html#a48f2d4664a5fd24d83959ccd801947b8">TPAK_BANK_SIZE</a>&#160;&#160;&#160;0x4000</td></tr>
 <tr class="memdesc:a48f2d4664a5fd24d83959ccd801947b8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transfer Pak cartridge bank size (16KB) <br /></td></tr>
 <tr class="separator:a48f2d4664a5fd24d83959ccd801947b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr><td colspan="2"><div class="groupHeader">Transfer Pak power control values</div></td></tr>
+<tr><td colspan="2"><div class="groupText"><p><a class="anchor" id="TPAK_POWER"></a></p>
+<dl class="section see"><dt>See also</dt><dd><a class="el" href="tpak_8c.html#a3462ab638f177b4f9c8d41939b06df94" title="Set the power enabled flag for a Transfer Pak.">tpak_set_power</a> </dd></dl>
+</div></td></tr>
+<tr class="memitem:a8c5ca9dc530de610b3544336f0a7226f"><td class="memItemLeft" align="right" valign="top"><a id="a8c5ca9dc530de610b3544336f0a7226f"></a>
+#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="tpak_8c.html#a8c5ca9dc530de610b3544336f0a7226f">TPAK_POWER_ON</a>&#160;&#160;&#160;0x84</td></tr>
+<tr class="memdesc:a8c5ca9dc530de610b3544336f0a7226f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transfer Pak power on. <br /></td></tr>
+<tr class="separator:a8c5ca9dc530de610b3544336f0a7226f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab62ad788345487decb64effb822c0e43"><td class="memItemLeft" align="right" valign="top"><a id="ab62ad788345487decb64effb822c0e43"></a>
+#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="tpak_8c.html#ab62ad788345487decb64effb822c0e43">TPAK_POWER_OFF</a>&#160;&#160;&#160;0xFE</td></tr>
+<tr class="memdesc:ab62ad788345487decb64effb822c0e43"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transfer Pak power off. <br /></td></tr>
+<tr class="separator:ab62ad788345487decb64effb822c0e43"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr><td colspan="2"><div class="groupHeader">Transfer Pak address values</div></td></tr>
+<tr><td colspan="2"><div class="groupText"><p><a class="anchor" id="TPAK_ADDRESS"></a></p>
+</div></td></tr>
+<tr class="memitem:ae8c69750bc8d7c3d0ef139b40681fdb3"><td class="memItemLeft" align="right" valign="top"><a id="ae8c69750bc8d7c3d0ef139b40681fdb3"></a>
+#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="tpak_8c.html#ae8c69750bc8d7c3d0ef139b40681fdb3">TPAK_ADDRESS_POWER</a>&#160;&#160;&#160;0x8000</td></tr>
+<tr class="memdesc:ae8c69750bc8d7c3d0ef139b40681fdb3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transfer Pak address for power control. <br /></td></tr>
+<tr class="separator:ae8c69750bc8d7c3d0ef139b40681fdb3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af625ca0229f59a1d74b2a6b096164f96"><td class="memItemLeft" align="right" valign="top"><a id="af625ca0229f59a1d74b2a6b096164f96"></a>
+#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="tpak_8c.html#af625ca0229f59a1d74b2a6b096164f96">TPAK_ADDRESS_BANK</a>&#160;&#160;&#160;0xA000</td></tr>
+<tr class="memdesc:af625ca0229f59a1d74b2a6b096164f96"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transfer Pak address for bank switching. <br /></td></tr>
+<tr class="separator:af625ca0229f59a1d74b2a6b096164f96"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aad605bf162cbc7e90c45b39e3bbb3574"><td class="memItemLeft" align="right" valign="top"><a id="aad605bf162cbc7e90c45b39e3bbb3574"></a>
+#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="tpak_8c.html#aad605bf162cbc7e90c45b39e3bbb3574">TPAK_ADDRESS_STATUS</a>&#160;&#160;&#160;0xB000</td></tr>
+<tr class="memdesc:aad605bf162cbc7e90c45b39e3bbb3574"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transfer Pak address for status flags. <br /></td></tr>
+<tr class="separator:aad605bf162cbc7e90c45b39e3bbb3574"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a18ae694312911fbba535535a57398f4e"><td class="memItemLeft" align="right" valign="top"><a id="a18ae694312911fbba535535a57398f4e"></a>
+#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="tpak_8c.html#a18ae694312911fbba535535a57398f4e">TPAK_ADDRESS_DATA</a>&#160;&#160;&#160;0xC000</td></tr>
+<tr class="memdesc:a18ae694312911fbba535535a57398f4e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transfer Pak address for cartridge data. <br /></td></tr>
+<tr class="separator:a18ae694312911fbba535535a57398f4e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
@@ -210,7 +217,7 @@ Functions</h2></td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd>0 if successful or <a class="el" href="group__TPAK__ERROR.html">Transfer Pak error values</a> otherwise. </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>0 if successful or <a class="el" href="tpak_8h.html#TPAK_ERROR">TPAK_ERROR</a> otherwise. </dd></dl>
 
 </div>
 </div>
@@ -237,7 +244,7 @@ Functions</h2></td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd>The status byte with <a class="el" href="group__TPAK__STATUS.html">Transfer Pak status bits</a> flags </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>The status byte with <a class="el" href="tpak_8h.html#TPAK_STATUS">TPAK_STATUS</a> flags </dd></dl>
 
 </div>
 </div>
@@ -265,7 +272,7 @@ Functions</h2></td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd>0 if successful or <a class="el" href="group__TPAK__ERROR.html">Transfer Pak error values</a> otherwise. </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>0 if successful or <a class="el" href="tpak_8h.html#TPAK_ERROR">TPAK_ERROR</a> otherwise. </dd></dl>
 
 </div>
 </div>
@@ -317,7 +324,7 @@ Functions</h2></td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd>0 if successful or <a class="el" href="group__TPAK__ERROR.html">Transfer Pak error values</a> otherwise. </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>0 if successful or <a class="el" href="tpak_8h.html#TPAK_ERROR">TPAK_ERROR</a> otherwise. </dd></dl>
 
 </div>
 </div>
@@ -355,7 +362,7 @@ Functions</h2></td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd>0 if successful or <a class="el" href="group__TPAK__ERROR.html">Transfer Pak error values</a> otherwise. </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>0 if successful or <a class="el" href="tpak_8h.html#TPAK_ERROR">TPAK_ERROR</a> otherwise. </dd></dl>
 
 </div>
 </div>
@@ -394,7 +401,7 @@ Functions</h2></td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd>0 if successful or <a class="el" href="group__TPAK__ERROR.html">Transfer Pak error values</a> otherwise. </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>0 if successful or <a class="el" href="tpak_8h.html#TPAK_ERROR">TPAK_ERROR</a> otherwise. </dd></dl>
 
 </div>
 </div>
@@ -432,7 +439,7 @@ Functions</h2></td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd>0 if successful or <a class="el" href="group__TPAK__ERROR.html">Transfer Pak error values</a> otherwise. </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>0 if successful or <a class="el" href="tpak_8h.html#TPAK_ERROR">TPAK_ERROR</a> otherwise. </dd></dl>
 
 </div>
 </div>
@@ -530,14 +537,14 @@ Functions</h2></td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd>0 if successful or <a class="el" href="group__TPAK__ERROR.html">Transfer Pak error values</a> otherwise. </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>0 if successful or <a class="el" href="tpak_8h.html#TPAK_ERROR">TPAK_ERROR</a> otherwise. </dd></dl>
 
 </div>
 </div>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Sat Oct 30 2021 23:27:04 for libdragon by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Mon Nov 8 2021 23:51:34 for libdragon by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>

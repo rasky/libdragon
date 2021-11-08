@@ -76,6 +76,7 @@ $(function() {
 <p>Player for the .YM64 module format (Arkos Tracker 2)  
 <a href="#details">More...</a></p>
 <div class="textblock"><code>#include &lt;stdint.h&gt;</code><br />
+<code>#include &lt;stdio.h&gt;</code><br />
 <code>#include &lt;stdbool.h&gt;</code><br />
 <code>#include &quot;<a class="el" href="mixer_8h_source.html">mixer.h</a>&quot;</code><br />
 <code>#include &quot;ay8910.h&quot;</code><br />
@@ -169,9 +170,9 @@ decoder</td>
 <td class="fielddoc">
 Optional LHA decoder (compressed YM files) </td></tr>
 <tr><td class="fieldtype">
-<a id="a052d09f8b3c0aa61d1efb5d52cd4001b"></a>int</td>
+<a id="a134cf98f97982482e86d944eae146a0b"></a>FILE *</td>
 <td class="fieldname">
-fh</td>
+f</td>
 <td class="fielddoc">
 Open file handle. </td></tr>
 <tr><td class="fieldtype">
@@ -360,7 +361,7 @@ Name of the song. </td></tr>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramdir">[in]</td><td class="paramname">player</td><td>YM64 player to initialize </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">fn</td><td>Filename to open </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">fn</td><td>Filename of the XM64 (with filesystem prefix, e.g. <code>rom://</code>). </td></tr>
     <tr><td class="paramdir">[out]</td><td class="paramname">info</td><td>Optional structure to fill with information on the song (pass NULL if not needed) </td></tr>
   </table>
   </dd>
@@ -513,7 +514,7 @@ Name of the song. </td></tr>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Sat Oct 30 2021 23:27:04 for libdragon by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Mon Nov 8 2021 23:51:34 for libdragon by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>
