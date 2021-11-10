@@ -95,7 +95,7 @@ test -d "newlib-$NEWLIB_V"     || tar -xzf "newlib-$NEWLIB_V.tar.gz"
 
 # Optional dependency handling
 # Copies the FP libs into GCC sources so they are compiled as part of it
-if [ "$$GMP_V" != "" ]; then
+if [ "$GMP_V" != "" ]; then
   test -f "gmp-$GMP_V.tar.xz"           || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
   test -d "gmp-$GMP_V"           || tar -xf "gmp-$GMP_V.tar.xz"
   ln -s "gmp-$GMP_V" "gcc-$GCC_V"/gmp
