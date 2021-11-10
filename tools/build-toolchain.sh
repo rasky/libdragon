@@ -173,7 +173,7 @@ make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" 
 echo "Finished Compiling newlib-$NEWLIB_V"
 
 if [ "$BUILD" != "$HOST" ]; then
-  INSTALL_PATH= "$FOREIGN_INSTALL_PATH"
+  INSTALL_PATH="${FOREIGN_INSTALL_PATH}"
   echo "Compiling foreign binutils-$BINUTILS_V"
   cd "binutils-$BINUTILS_V"
   make clean # required because we have already built it for a different system.
