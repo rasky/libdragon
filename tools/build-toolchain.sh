@@ -172,8 +172,8 @@ make -j "$JOBS"
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install"
 echo "Finished Compiling newlib-$NEWLIB_V"
 
-if [ $BUILD != $HOST ]; then
-  INSTALL_PATH = $FOREIGN_INSTALL_PATH
+if [ "$BUILD" != "$HOST" ]; then
+  INSTALL_PATH= "$FOREIGN_INSTALL_PATH"
   echo "Compiling foreign binutils-$BINUTILS_V"
   cd "binutils-$BINUTILS_V"
   make clean # required because we have already built it for a different system.
@@ -230,7 +230,7 @@ make install || sudo make install || su -c "make install"
 echo "Finished Compiling make-$MAKE_V"
 fi
 
-if [ $BUILD != $HOST ]; then
+if [ "$BUILD" != "$HOST" ]; then
   echo "Cross compile successful"
 else
   echo "Native compile successful"
