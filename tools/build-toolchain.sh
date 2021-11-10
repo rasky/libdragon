@@ -87,7 +87,7 @@ download () {
   fi
 }
 
-# Dependency source: Download and Extract stage
+echo "Stage: Download and extract dependencies"
 test -f "binutils-$BINUTILS_V.tar.gz" || download "https://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS_V.tar.gz"
 test -d "binutils-$BINUTILS_V"        || tar -xzf "binutils-$BINUTILS_V.tar.gz"
 
@@ -120,6 +120,8 @@ if [ "$MAKE_V" != "" ]; then
   test -d "make-$MAKE_V"              || tar -xzf "make-$MAKE_V.tar.gz"
 fi
 
+echo "Stage: Compile toolchain"
+
 echo "Compiling binutils-$BINUTILS_V"
 cd "binutils-$BINUTILS_V"
 ./configure \
@@ -131,7 +133,7 @@ make -j "$JOBS"
 make install || sudo make install || su -c "make install"
 echo "Finished Compiling binutils-$BINUTILS_V"
 
-echo "Compiling GCC-$GCC_V for MIPS N64 (pass 1) outside of the source tree"
+echo "Compiling native build of GCC-$GCC_V for MIPS N64 [(pass 1) outside of the source tree]"
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
@@ -174,8 +176,8 @@ echo "Finished Compiling newlib-$NEWLIB_V"
 
 if [ "$BUILD" != "$HOST" ]; then
   INSTALL_PATH="${FOREIGN_INSTALL_PATH}"
-  echo "Compiling foreign binutils-$BINUTILS_V"
-  cd "binutils-$BINUTILS_V"
+  echo "Compiling binutils-$BINUTILS_V for foreign host"
+  cd ../"binutils-$BINUTILS_V"
   make clean # required because we have already built it for a different system.
   ./configure \
     --prefix="$INSTALL_PATH" \
@@ -189,7 +191,7 @@ if [ "$BUILD" != "$HOST" ]; then
   echo "Finished Compiling foreign binutils-$BINUTILS_V"
 fi
 
-echo "Compiling gcc-$GCC_V for MIPS N64 (pass 2) outside of the source tree"
+echo "Compiling gcc-$GCC_V for MIPS N64 for host [(pass 2) outside of the source tree]"
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
