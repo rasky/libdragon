@@ -46,8 +46,8 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   GCC_V=10.3.0 # so we are stuck with the 10.x branch for the moment.
 
 
-else # We are compiling for the native (linux) system.
-  echo "building for linux"
+else # We are compiling for the native system.
+  echo "building for native system"
   # Set N64_INST before calling the script to change the default installation directory path
   INSTALL_PATH="${N64_INST:-/usr/local}"
   
@@ -58,6 +58,7 @@ else # We are compiling for the native (linux) system.
 fi
 
   NEWLIB_V=4.1.0
+
 
 # Set PATH for newlib to compile using GCC for MIPS N64 (pass 1)
 export PATH="$PATH:$INSTALL_PATH/bin"
@@ -83,37 +84,37 @@ download () {
   fi
 }
 
-# Dependency source: Download stage
+# Dependency source: Download and Extract stage
 test -f "binutils-$BINUTILS_V.tar.gz" || download "https://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS_V.tar.gz"
-test -f "gcc-$GCC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/gcc/gcc-$GCC_V/gcc-$GCC_V.tar.gz"
-test -f "newlib-$NEWLIB_V.tar.gz"     || download "https://sourceware.org/pub/newlib/newlib-$NEWLIB_V.tar.gz"
+test -d "binutils-$BINUTILS_V"        || tar -xzf "binutils-$BINUTILS_V.tar.gz"
 
-# Dependency source: Extract stage
-test -d "binutils-$BINUTILS_V" || tar -xzf "binutils-$BINUTILS_V.tar.gz"
-test -d "gcc-$GCC_V"           || tar -xzf "gcc-$GCC_V.tar.gz"
-test -d "newlib-$NEWLIB_V"     || tar -xzf "newlib-$NEWLIB_V.tar.gz"
+test -f "gcc-$GCC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/gcc/gcc-$GCC_V/gcc-$GCC_V.tar.gz"
+test -d "gcc-$GCC_V"                  || tar -xzf "gcc-$GCC_V.tar.gz"
+
+test -f "newlib-$NEWLIB_V.tar.gz"     || download "https://sourceware.org/pub/newlib/newlib-$NEWLIB_V.tar.gz"
+test -d "newlib-$NEWLIB_V"            || tar -xzf "newlib-$NEWLIB_V.tar.gz"
 
 # Optional dependency handling
 # Copies the FP libs into GCC sources so they are compiled as part of it
 if [ "$GMP_V" != "" ]; then
-  test -f "gmp-$GMP_V.tar.xz"           || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
-  test -d "gmp-$GMP_V"           || tar -xf "gmp-$GMP_V.tar.xz"
+  test -f "gmp-$GMP_V.tar.xz"         || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
+  test -d "gmp-$GMP_V"                || tar -xf "gmp-$GMP_V.tar.xz" #note no .gz download currently available
   ln -s "gmp-$GMP_V" "gcc-$GCC_V"/gmp
 fi
 if [ "$MPC_V" != "" ]; then
-  test -f "mpc-$MPC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
-  test -d "mpc-$MPC_V"           || tar -xzf "mpc-$MPC_V.tar.gz"
+  test -f "mpc-$MPC_V.tar.gz"         || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
+  test -d "mpc-$MPC_V"                || tar -xzf "mpc-$MPC_V.tar.gz"
   ln -s "mpc-$MPC_V" "gcc-$GCC_V"/mpc
 fi
 if [ "$MPFR_V" != "" ]; then
-  test -f "mpfr-$MPFR_V.tar.gz"         || download "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_V.tar.gz"
-  test -d "mpfr-$MPFR_V"         || tar -xzf "mpfr-$MPFR_V.tar.gz"
+  test -f "mpfr-$MPFR_V.tar.gz"       || download "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_V.tar.gz"
+  test -d "mpfr-$MPFR_V"              || tar -xzf "mpfr-$MPFR_V.tar.gz"
   ln -s "mpfr-$MPFR_V" "gcc-$GCC_V"/mpfr
 fi
 # Certain platforms might require Makefile cross compiling
 if [ "$MAKE_V" != "" ]; then
-  test -f "make-$MAKE_V.tar.gz"         || download "https://ftp.gnu.org/gnu/make/make-$MAKE_V.tar.gz"
-  test -d "make-$MAKE_V"         || tar -xzf "make-$MAKE_V.tar.gz"
+  test -f "make-$MAKE_V.tar.gz"       || download "https://ftp.gnu.org/gnu/make/make-$MAKE_V.tar.gz"
+  test -d "make-$MAKE_V"              || tar -xzf "make-$MAKE_V.tar.gz"
 fi
 
 echo "Compiling binutils-$BINUTILS_V"
@@ -197,8 +198,7 @@ make install || sudo make install || su -c "make install"
 echo "Finished Compiling gcc-$GCC_V for MIPS N64 (pass 2) outside of the source tree"
 
 if [ "$MAKE_V" != "" ]; then
-echo "Compiling make-$MAKE_V"
-# As make is otherwise not available on Windows
+echo "Compiling make-$MAKE_V" # As make is otherwise not available on Windows
 cd ../"make-$MAKE_V"
   ./configure \
     --prefix="$INSTALL_PATH" \
