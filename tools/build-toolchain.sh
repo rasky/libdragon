@@ -4,11 +4,6 @@
 # See the root folder for license information.
 
 
-# This script may prompt for a password if it is not called with elevated privileges.
-# Preferably it is fixed at the start!
-#TODO: ensure elevated privileges! e.g.
-#echo "$(whoami)"
-#[ "$UID" -eq 0 ] || exec sudo "$0" "$@"
 
 # Before calling this script, make sure you have all required dependency
 # packages installed in your system.  On a Debian-based system this is
@@ -26,15 +21,15 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   # This (may) also require the following (extra) package dependencies:
   # sudo apt-get install -yq mingw-w64 libgmp-dev bison libz-mingw-w64-dev autoconf
 
-  echo "Cross compiling for Windows x86_64"
-  # Use the current-directory/win_binaries for the install path, as this is not for linux!
-  rm -rf win_binaries
-  mkdir win_binaries
+  echo "Cross compiling for different host"
+  # Use the current-directory/binaries for the install path, as this is not for linux!
+  rm -rf binaries
+  mkdir binaries
   CURRENT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-  INSTALL_PATH="$CURRENT_PATH/win_binaries"
+  INSTALL_PATH="$CURRENT_PATH/binaries"
 
   # This will require the extra flags (under certain libs)
-  CROSS_COMPILE_FLAGS="--build=x86_64-linux-gnu --host=x86_64-w64-mingw32"
+  CROSS_COMPILE_FLAGS="--host=x86_64-w64-mingw32" #--build=x86_64-linux-gnu
 
   # Dependency source libs (Versions)
   # This will have to build Make and download FP libs
@@ -87,27 +82,32 @@ download () {
 test -f "binutils-$BINUTILS_V.tar.gz" || download "https://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS_V.tar.gz"
 test -f "gcc-$GCC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/gcc/gcc-$GCC_V/gcc-$GCC_V.tar.gz"
 test -f "newlib-$NEWLIB_V.tar.gz"     || download "https://sourceware.org/pub/newlib/newlib-$NEWLIB_V.tar.gz"
-if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
-  test -f "make-$MAKE_V.tar.gz"         || download "https://ftp.gnu.org/gnu/make/make-$MAKE_V.tar.gz"
-  test -f "gmp-$GMP_V.tar.xz"           || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
-  test -f "mpc-$MPC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
-  test -f "mpfr-$MPFR_V.tar.gz"         || download "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_V.tar.gz"
-fi
 
 # Dependency source: Extract stage
 test -d "binutils-$BINUTILS_V" || tar -xzf "binutils-$BINUTILS_V.tar.gz"
 test -d "gcc-$GCC_V"           || tar -xzf "gcc-$GCC_V.tar.gz"
 test -d "newlib-$NEWLIB_V"     || tar -xzf "newlib-$NEWLIB_V.tar.gz"
-if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
-  test -d "make-$MAKE_V"         || tar -xzf "make-$MAKE_V.tar.gz"
-  test -d "gmp-$GMP_V"           || tar -xf "gmp-$GMP_V.tar.xz"
-  test -d "mpc-$MPC_V"           || tar -xzf "mpc-$MPC_V.tar.gz"
-  test -d "mpfr-$MPFR_V"         || tar -xzf "mpfr-$MPFR_V.tar.gz"
 
-  # Copies the FP libs into GCC sources so they are compiled as part of it
-  cp -R "gmp-$GMP_V" "gcc-$GCC_V"/gmp
-  cp -R "mpc-$MPC_V" "gcc-$GCC_V"/mpc
-  cp -R "mpfr-$MPFR_V" "gcc-$GCC_V"/mpfr
+# Optional dependency handling
+# Copies the FP libs into GCC sources so they are compiled as part of it
+if [ "$$GMP_V" != "" ]; then
+  test -f "gmp-$GMP_V.tar.xz"           || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
+  test -d "gmp-$GMP_V"           || tar -xf "gmp-$GMP_V.tar.xz"
+  ln -s "gmp-$GMP_V" "gcc-$GCC_V"/gmp
+if [ "$MPC_V" != "" ]; then
+  test -f "mpc-$MPC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
+  test -d "mpc-$MPC_V"           || tar -xzf "mpc-$MPC_V.tar.gz"
+  ln -s "mpc-$MPC_V" "gcc-$GCC_V"/mpc
+fi
+if [ "$MPFR_V" != "" ]; then
+  test -f "mpfr-$MPFR_V.tar.gz"         || download "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_V.tar.gz"
+  test -d "mpfr-$MPFR_V"         || tar -xzf "mpfr-$MPFR_V.tar.gz"
+  ln -s "mpfr-$MPFR_V" "gcc-$GCC_V"/mpfr
+fi
+# Certain platforms might require Makefile cross compiling
+if [ "$MAKE_V" != "" ]; then
+  test -f "make-$MAKE_V.tar.gz"         || download "https://ftp.gnu.org/gnu/make/make-$MAKE_V.tar.gz"
+  test -d "make-$MAKE_V"         || tar -xzf "make-$MAKE_V.tar.gz"
 fi
 
 echo "Compiling binutils-$BINUTILS_V"
