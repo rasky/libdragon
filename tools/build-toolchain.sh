@@ -4,7 +4,6 @@
 # See the root folder for license information.
 
 
-
 # Before calling this script, make sure you have all required dependency
 # packages installed in your system.  On a Debian-based system this is
 # achieved by typing the following commands:
@@ -37,11 +36,15 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   MPC_V=1.2.1
   MPFR_V=4.1.0
   MAKE_V=4.2.1
+
   # These "should" be the same as linux, but may be out of sync (as need to ensure working natively first).
   BINUTILS_V=2.36.1
-  GCC_V=10.3.0
-  NEWLIB_V=4.1.0
- 
+  
+  # GCC 11.x fails on canadian cross
+  # see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100017
+  # see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80196
+  GCC_V=10.3.0 # so we are stuck with the 10.x branch for the moment.
+
 
 else # We are compiling for the native (linux) system.
   echo "building for linux"
@@ -51,8 +54,10 @@ else # We are compiling for the native (linux) system.
   # Dependency source libs (Versions)
   BINUTILS_V=2.37
   GCC_V=11.2.0
-  NEWLIB_V=4.1.0
+
 fi
+
+  NEWLIB_V=4.1.0
 
 # Set PATH for newlib to compile using GCC for MIPS N64 (pass 1)
 export PATH="$PATH:$INSTALL_PATH/bin"
@@ -94,6 +99,7 @@ if [ "$$GMP_V" != "" ]; then
   test -f "gmp-$GMP_V.tar.xz"           || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
   test -d "gmp-$GMP_V"           || tar -xf "gmp-$GMP_V.tar.xz"
   ln -s "gmp-$GMP_V" "gcc-$GCC_V"/gmp
+fi
 if [ "$MPC_V" != "" ]; then
   test -f "mpc-$MPC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
   test -d "mpc-$MPC_V"           || tar -xzf "mpc-$MPC_V.tar.gz"

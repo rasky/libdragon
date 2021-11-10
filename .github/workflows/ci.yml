@@ -73,18 +73,18 @@ jobs:
 
       #     # move to artifacts folder
 
-      - name: Cache N64 Toolchain
-        uses: actions/cache@v2
-        env:
-          cache-name: cache-n64-toolchain
-        with:
-          # toolchain cache files are stored in `/usr/local` on debian
-          path: /usr/local
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
+      # - name: Cache N64 Toolchain
+      #   uses: actions/cache@v2
+      #   env:
+      #     cache-name: cache-n64-toolchain
+      #   with:
+      #     # toolchain cache files are stored in `/usr/local` on debian
+      #     path: /usr/local
+      #     key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-build-${{ env.cache-name }}-
+      #       ${{ runner.os }}-build-
+      #       ${{ runner.os }}-
 
       # publish package toolchain artifacts:
       - name: Upload-Artifacts
