@@ -1,5 +1,5 @@
 #! /bin/bash
-# N64 MIPS GCC toolchain build/install script.
+# N64 MIPS GCC toolchain build/install script (runs under UNIX systems).
 # (c) 2012-2021 Shaun Taylor and libDragon Contributors.
 # See the root folder for license information.
 
@@ -28,7 +28,8 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   INSTALL_PATH="$CURRENT_PATH/binaries"
 
   # This will require the extra flags (under certain libs)
-  CROSS_COMPILE_FLAGS="--host=x86_64-w64-mingw32" #--build=x86_64-linux-gnu
+  BUILD="--build=x86_64-linux-gnu"
+  HOST="--host=x86_64-w64-mingw32" 
 
   # Dependency source libs (Versions)
   # This will have to build Make and download FP libs
@@ -50,7 +51,7 @@ else # We are compiling for the native system.
   echo "building for native system"
   # Set N64_INST before calling the script to change the default installation directory path
   INSTALL_PATH="${N64_INST:-/usr/local}"
-  
+
   # Dependency source libs (Versions)
   BINUTILS_V=2.37
   GCC_V=11.2.0
@@ -99,17 +100,17 @@ test -d "newlib-$NEWLIB_V"            || tar -xzf "newlib-$NEWLIB_V.tar.gz"
 if [ "$GMP_V" != "" ]; then
   test -f "gmp-$GMP_V.tar.xz"         || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
   test -d "gmp-$GMP_V"                || tar -xf "gmp-$GMP_V.tar.xz" #note no .gz download currently available
-  ln -s "gmp-$GMP_V" "gcc-$GCC_V"/gmp
+  cp -R "gmp-$GMP_V" "gcc-$GCC_V"/gmp
 fi
 if [ "$MPC_V" != "" ]; then
   test -f "mpc-$MPC_V.tar.gz"         || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
   test -d "mpc-$MPC_V"                || tar -xzf "mpc-$MPC_V.tar.gz"
-  ln -s "mpc-$MPC_V" "gcc-$GCC_V"/mpc
+  cp -R "mpc-$MPC_V" "gcc-$GCC_V"/mpc
 fi
 if [ "$MPFR_V" != "" ]; then
   test -f "mpfr-$MPFR_V.tar.gz"       || download "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_V.tar.gz"
   test -d "mpfr-$MPFR_V"              || tar -xzf "mpfr-$MPFR_V.tar.gz"
-  ln -s "mpfr-$MPFR_V" "gcc-$GCC_V"/mpfr
+  cp -R "mpfr-$MPFR_V" "gcc-$GCC_V"/mpfr
 fi
 # Certain platforms might require Makefile cross compiling
 if [ "$MAKE_V" != "" ]; then
@@ -124,7 +125,8 @@ cd "binutils-$BINUTILS_V"
   --target=mips64-elf \
   --with-cpu=mips64vr4300 \
   --disable-werror \
-  $CROSS_COMPILE_FLAGS
+  $BUILD \
+  $HOST
 make -j "$JOBS"
 make install || sudo make install || su -c "make install"
 echo "Finished Compiling binutils-$BINUTILS_V"
@@ -151,7 +153,8 @@ cd gcc_compile
   --disable-nls \
   --disable-werror \
   --with-system-zlib \
-  $CROSS_COMPILE_FLAGS
+  $BUILD \
+  $HOST
 make all-gcc -j "$JOBS"
 make all-target-libgcc -j "$JOBS"
 make install-gcc || sudo make install-gcc || su -c "make install-gcc"
@@ -167,10 +170,26 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --disable-threads \
   --disable-libssp \
   --disable-werror \
-  $CROSS_COMPILE_FLAGS
+  $BUILD \
+  $HOST
 make -j "$JOBS"
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install"
 echo "Finished Compiling newlib-$NEWLIB_V"
+
+# if [ $BUILD != $HOST ]; then
+#   echo "Compiling binutils-$BINUTILS_V"
+#   cd "binutils-$BINUTILS_V"
+#   ./configure \
+#     --prefix="$INSTALL_PATH" \
+#     --target=mips64-elf \
+#     --with-cpu=mips64vr4300 \
+#     --disable-werror \
+#     $BUILD \
+#     $HOST
+#   make -j "$JOBS"
+#   make install || sudo make install || su -c "make install"
+#   echo "Finished Compiling binutils-$BINUTILS_V"
+# fi
 
 echo "Compiling gcc-$GCC_V for MIPS N64 (pass 2) outside of the source tree"
 cd ..
@@ -192,7 +211,8 @@ CFLAGS_FOR_TARGET="-O2" CXXFLAGS_FOR_TARGET=" -O2" ../"gcc-$GCC_V"/configure \
   --disable-win32-registry \
   --disable-nls \
   --with-system-zlib \
-  $CROSS_COMPILE_FLAGS
+  $BUILD \
+  $HOST
 make -j "$JOBS"
 make install || sudo make install || su -c "make install"
 echo "Finished Compiling gcc-$GCC_V for MIPS N64 (pass 2) outside of the source tree"
@@ -205,13 +225,14 @@ cd ../"make-$MAKE_V"
     --disable-largefile \
     --disable-nls \
     --disable-rpath \
-    $CROSS_COMPILE_FLAGS
+    $BUILD \
+    $HOST
 make -j "$JOBS"
 make install || sudo make install || su -c "make install"
 echo "Finished Compiling make-$MAKE_V"
 fi
 
-if [ "$CROSS_COMPILE_FLAGS" != "" ]; then
+if [ $BUILD != $HOST ]; then
   echo "Cross compile successful"
 else
   echo "Native compile successful"
