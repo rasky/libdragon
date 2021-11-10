@@ -44,7 +44,7 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   MAKE_V=4.2.1
   # These "should" be the same as linux, but may be out of sync (as need to ensure working natively first).
   BINUTILS_V=2.36.1
-  GCC_V=11.2.0
+  GCC_V=10.3.0
   NEWLIB_V=4.1.0
  
 
