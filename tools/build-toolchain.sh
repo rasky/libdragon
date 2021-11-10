@@ -3,6 +3,7 @@
 # (c) 2012-2021 Shaun Taylor and libDragon Contributors.
 # See the root folder for license information.
 
+# !!! This script assumes a clean build environment !!!
 
 # Before calling this script, make sure you have all required dependency
 # packages installed in your system.  On a Debian-based system this is
@@ -13,6 +14,9 @@
 
 # Exit on error
 set -e
+
+# Set N64_INST before calling the script to change the default installation directory path
+INSTALL_PATH="${N64_INST:-/usr/local}"
 
 # Check for cross compile script flag
 if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a parameter.
@@ -25,7 +29,7 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   rm -rf binaries
   mkdir binaries
   CURRENT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-  INSTALL_PATH="$CURRENT_PATH/binaries"
+  FOREIGN_INSTALL_PATH="$CURRENT_PATH/binaries"
 
   # This will require the extra flags (under certain libs)
   BUILD="--build=x86_64-linux-gnu"
@@ -39,18 +43,16 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   MAKE_V=4.2.1
 
   # These "should" be the same as linux, but may be out of sync (as need to ensure working natively first).
-  BINUTILS_V=2.36.1
+  # Binutils fails with 2.37 on canadian cross
+  BINUTILS_V=2.36.1 # so we are stuck with 2.36.1 for the moment
   
   # GCC 11.x fails on canadian cross
   # see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100017
   # see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80196
   GCC_V=10.3.0 # so we are stuck with the 10.x branch for the moment.
 
-
 else # We are compiling for the native system.
   echo "building for native system"
-  # Set N64_INST before calling the script to change the default installation directory path
-  INSTALL_PATH="${N64_INST:-/usr/local}"
 
   # Dependency source libs (Versions)
   BINUTILS_V=2.37
@@ -124,9 +126,7 @@ cd "binutils-$BINUTILS_V"
   --prefix="$INSTALL_PATH" \
   --target=mips64-elf \
   --with-cpu=mips64vr4300 \
-  --disable-werror \
-  $BUILD \
-  $HOST
+  --disable-werror
 make -j "$JOBS"
 make install || sudo make install || su -c "make install"
 echo "Finished Compiling binutils-$BINUTILS_V"
@@ -152,9 +152,7 @@ cd gcc_compile
   --disable-win32-registry \
   --disable-nls \
   --disable-werror \
-  --with-system-zlib \
-  $BUILD \
-  $HOST
+  --with-system-zlib
 make all-gcc -j "$JOBS"
 make all-target-libgcc -j "$JOBS"
 make install-gcc || sudo make install-gcc || su -c "make install-gcc"
@@ -169,27 +167,27 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --with-cpu=mips64vr4300 \
   --disable-threads \
   --disable-libssp \
-  --disable-werror \
-  $BUILD \
-  $HOST
+  --disable-werror
 make -j "$JOBS"
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install"
 echo "Finished Compiling newlib-$NEWLIB_V"
 
-# if [ $BUILD != $HOST ]; then
-#   echo "Compiling binutils-$BINUTILS_V"
-#   cd "binutils-$BINUTILS_V"
-#   ./configure \
-#     --prefix="$INSTALL_PATH" \
-#     --target=mips64-elf \
-#     --with-cpu=mips64vr4300 \
-#     --disable-werror \
-#     $BUILD \
-#     $HOST
-#   make -j "$JOBS"
-#   make install || sudo make install || su -c "make install"
-#   echo "Finished Compiling binutils-$BINUTILS_V"
-# fi
+if [ $BUILD != $HOST ]; then
+  INSTALL_PATH = $FOREIGN_INSTALL_PATH
+  echo "Compiling foreign binutils-$BINUTILS_V"
+  cd "binutils-$BINUTILS_V"
+  make clean # required because we have already built it for a different system.
+  ./configure \
+    --prefix="$INSTALL_PATH" \
+    --target=mips64-elf \
+    --with-cpu=mips64vr4300 \
+     --disable-werror \
+    $BUILD \
+    $HOST
+  make -j "$JOBS"
+  make install || sudo make install || su -c "make install"
+  echo "Finished Compiling foreign binutils-$BINUTILS_V"
+fi
 
 echo "Compiling gcc-$GCC_V for MIPS N64 (pass 2) outside of the source tree"
 cd ..
