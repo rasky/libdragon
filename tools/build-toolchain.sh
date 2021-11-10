@@ -143,7 +143,7 @@ cd gcc_compile
   --target=mips64-elf \
   --with-arch=vr4300 \
   --with-tune=vr4300 \
-  --enable-languages=c \
+  --enable-languages=c,c++ \
   --without-headers \
   --with-newlib \
   --disable-libssp \
