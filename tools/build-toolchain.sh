@@ -5,17 +5,18 @@
 
 # !!! This script assumes a clean build environment !!!
 
-# Before calling this script, make sure you have all required dependency
-# packages installed in your system.  On a Debian-based system this is
-# achieved by typing the following commands:
+# Before calling this script, make sure you have all required
+# dependency packages installed in your system.  On a Debian-based systems
+# this is achieved by typing the following commands:
 #
 # sudo apt-get update && sudo apt-get upgrade
 # sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
 
-# Exit on error
+# Exit script on error
 set -e
 
-# Set N64_INST before calling the script to change the default installation directory path
+# Ensure you set 'N64_INST' before calling the script to change the default installation directory path
+# by default it will presume 'usr/local'
 INSTALL_PATH="${N64_INST:-/usr/local}"
 
 # Check for cross compile script flag
@@ -26,8 +27,7 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
 
   echo "Cross compiling for different host"
   # Use the current-directory/binaries for the install path, as this is not for linux!
-  rm -rf binaries
-  mkdir binaries
+  rm -rf binaries && mkdir binaries # always ensure the folder is clean (if rebuilding)
   CURRENT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   FOREIGN_INSTALL_PATH="$CURRENT_PATH/binaries"
 
@@ -64,7 +64,7 @@ fi
 
 
 # Set PATH for newlib to compile using GCC for MIPS N64 (pass 1)
-export PATH="$PATH:$INSTALL_PATH/bin"
+export PATH="$PATH:$INSTALL_PATH/bin" #TODO: why is this export?!
 
 # Determine how many parallel Make jobs to run based on CPU count
 JOBS="${JOBS:-`getconf _NPROCESSORS_ONLN`}"
