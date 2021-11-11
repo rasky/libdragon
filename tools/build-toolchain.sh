@@ -3,7 +3,6 @@
 # (c) 2012-2021 Shaun Taylor and libDragon Contributors.
 # See the root folder for license information.
 
-# !!! This script assumes a clean build environment !!!
 
 # Before calling this script, make sure you have all required
 # dependency packages installed in your system.  On a Debian-based systems
@@ -28,8 +27,8 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   echo "Cross compiling for different host"
   # Use the current-directory/binaries for the install path, as this is not for linux!
   rm -rf binaries && mkdir binaries # always ensure the folder is clean (if rebuilding)
-  CURRENT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-  FOREIGN_INSTALL_PATH="$CURRENT_PATH/binaries"
+  THIS_SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+  FOREIGN_INSTALL_PATH="$THIS_SCRIPT_PATH/binaries"
 
   # This will require the extra flags (under certain libs)
   BUILD="--build=x86_64-linux-gnu"
@@ -130,10 +129,11 @@ cd "binutils-$BINUTILS_V"
   --with-cpu=mips64vr4300 \
   --disable-werror
 make -j "$JOBS"
-make install || sudo make install || su -c "make install"
+make install || sudo make install || su -c "make install" # Perhaps use `checkinstall` instead?!
+make distclean # Ensure we can build it again
 echo "Finished Compiling binutils-$BINUTILS_V"
 
-echo "Compiling native build of GCC-$GCC_V for MIPS N64 [(pass 1) outside of the source tree]"
+echo "Compiling native build of GCC-$GCC_V for MIPS N64 - (pass 1) outside of the source tree"
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
@@ -159,7 +159,7 @@ make all-gcc -j "$JOBS"
 make all-target-libgcc -j "$JOBS"
 make install-gcc || sudo make install-gcc || su -c "make install-gcc"
 make install-target-libgcc || sudo make install-target-libgcc || su -c "make install-target-libgcc"
-echo "Finished Compiling GCC-$GCC_V for MIPS N64 (pass 1) outside of the source tree"
+echo "Finished Compiling GCC-$GCC_V for MIPS N64 - (pass 1) outside of the source tree"
 
 echo "Compiling newlib-$NEWLIB_V"
 cd ../"newlib-$NEWLIB_V"
@@ -171,15 +171,14 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --disable-libssp \
   --disable-werror
 make -j "$JOBS"
-make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install"
+make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install" # Perhaps use `checkinstall` instead?!
+make clean # Ensure we can build it again
 echo "Finished Compiling newlib-$NEWLIB_V"
 
 if [ "$BUILD" != "$HOST" ]; then
   INSTALL_PATH="${FOREIGN_INSTALL_PATH}"
   echo "Compiling binutils-$BINUTILS_V for foreign host"
   cd ../"binutils-$BINUTILS_V"
-  make distclean # required because we have already built it for a different system.
-  # rm ./config.cache
   ./configure \
     --prefix="$INSTALL_PATH" \
     --target=mips64-elf \
@@ -189,10 +188,11 @@ if [ "$BUILD" != "$HOST" ]; then
     $HOST
   make -j "$JOBS"
   make install || sudo make install || su -c "make install"
+  make distclean # Ensure we can build it again
   echo "Finished Compiling foreign binutils-$BINUTILS_V"
 fi
 
-echo "Compiling gcc-$GCC_V for MIPS N64 for host [(pass 2) outside of the source tree]"
+echo "Compiling gcc-$GCC_V for MIPS N64 for host - (pass 2) outside of the source tree"
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
@@ -216,7 +216,7 @@ CFLAGS_FOR_TARGET="-O2" CXXFLAGS_FOR_TARGET=" -O2" ../"gcc-$GCC_V"/configure \
   $HOST
 make -j "$JOBS"
 make install || sudo make install || su -c "make install"
-echo "Finished Compiling gcc-$GCC_V for MIPS N64 (pass 2) outside of the source tree"
+echo "Finished Compiling gcc-$GCC_V for MIPS N64 - (pass 2) outside of the source tree"
 
 if [ "$MAKE_V" != "" ]; then
 echo "Compiling make-$MAKE_V" # As make is otherwise not available on Windows
