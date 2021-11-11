@@ -101,17 +101,17 @@ test -d "newlib-$NEWLIB_V"            || tar -xzf "newlib-$NEWLIB_V.tar.gz"
 if [ "$GMP_V" != "" ]; then
   test -f "gmp-$GMP_V.tar.xz"         || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
   test -d "gmp-$GMP_V"                || tar -xf "gmp-$GMP_V.tar.xz" #note no .gz download currently available
-  cp -R "gmp-$GMP_V" "gcc-$GCC_V"/gmp
+  cp -R "gmp-$GMP_V" "gcc-$GCC_V"/gmp #TODO: should be a symbolic link `ln -s` rather than copy!
 fi
 if [ "$MPC_V" != "" ]; then
   test -f "mpc-$MPC_V.tar.gz"         || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
   test -d "mpc-$MPC_V"                || tar -xzf "mpc-$MPC_V.tar.gz"
-  cp -R "mpc-$MPC_V" "gcc-$GCC_V"/mpc
+  cp -R "mpc-$MPC_V" "gcc-$GCC_V"/mpc #TODO: should be a symbolic link `ln -s` rather than copy!
 fi
 if [ "$MPFR_V" != "" ]; then
   test -f "mpfr-$MPFR_V.tar.gz"       || download "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_V.tar.gz"
   test -d "mpfr-$MPFR_V"              || tar -xzf "mpfr-$MPFR_V.tar.gz"
-  cp -R "mpfr-$MPFR_V" "gcc-$GCC_V"/mpfr
+  cp -R "mpfr-$MPFR_V" "gcc-$GCC_V"/mpfr #TODO: should be a symbolic link `ln -s` rather than copy!
 fi
 # Certain platforms might require Makefile cross compiling
 if [ "$MAKE_V" != "" ]; then
