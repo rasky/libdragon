@@ -98,17 +98,17 @@ test -d "newlib-$NEWLIB_V"            || tar -xzf "newlib-$NEWLIB_V.tar.gz"
 if [ "$GMP_V" != "" ]; then
   test -f "gmp-$GMP_V.tar.xz"         || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
   test -d "gmp-$GMP_V"                || tar -xf "gmp-$GMP_V.tar.xz" # note no .gz download file currently available
-  ln -s -T ./"gmp-$GMP_V"/ ./"gcc-$GCC_V"/gmp
+  cp -R "gmp-$GMP_V"/ ./"gcc-$GCC_V"/gmp #TODO: use symbolic link `ln -s` (cannot get to work)
 fi
 if [ "$MPC_V" != "" ]; then
   test -f "mpc-$MPC_V.tar.gz"         || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
   test -d "mpc-$MPC_V"                || tar -xzf "mpc-$MPC_V.tar.gz"
-  ln -s -T ./"mpc-$MPC_V"/ ./"gcc-$GCC_V"/mpc
+  cp -R "mpc-$MPC_V" "gcc-$GCC_V"/mpc #TODO: use symbolic link `ln -s` (cannot get to work)
 fi
 if [ "$MPFR_V" != "" ]; then
   test -f "mpfr-$MPFR_V.tar.gz"       || download "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_V.tar.gz"
   test -d "mpfr-$MPFR_V"              || tar -xzf "mpfr-$MPFR_V.tar.gz"
-  ln -s -T ./"mpfr-$MPFR_V"/ ./"gcc-$GCC_V"/mpfr
+  cp -R "mpfr-$MPFR_V" "gcc-$GCC_V"/mpfr #TODO: use symbolic link `ln -s` (cannot get to work)
 fi
 # Certain platforms might require Makefile cross compiling
 if [ "$MAKE_V" != "" ]; then
@@ -165,11 +165,12 @@ if [ "$BUILD" != "$HOST" ]; then
   INSTALL_PATH="${FOREIGN_INSTALL_PATH}"
 fi
 
-# Set PATH for newlib to compile using GCC for MIPS N64 (pass 1)
+echo "Compiling newlib-$NEWLIB_V"
+cd ../"newlib-$NEWLIB_V"
+
+# Set PATH for newlib
 export PATH="$PATH:$INSTALL_PATH/bin" #TODO: why is this export?!
 
-echo "Compiling newlib-$NEWLIB_V for foreign host"
-cd ../"newlib-$NEWLIB_V"
 CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --target=mips64-elf \
   --prefix="$INSTALL_PATH" \
@@ -181,7 +182,8 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   $HOST
 make -j "$JOBS"
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install" # Perhaps use `checkinstall` instead?!
-make clean # Ensure we can build it again
+make clean # Ensure we can build it again (newlib does not seem to handle `distclean`)
+# rm -f ./config.cache # alternative to `distclean`
 echo "Finished Compiling newlib-$NEWLIB_V"
 
 echo "Compiling binutils-$BINUTILS_V for foreign host"
