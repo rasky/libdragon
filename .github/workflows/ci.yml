@@ -121,10 +121,12 @@ jobs:
       
       # Until a better place can be used, lets use dropbox!
       - name: Upload-Artifact-Dropbox
-        accessToken: ${{ secrets.DROPBOX_ACCESS_TOKEN }}
-        destination: "/Libdragon"
-        file: "libdragon-gcc-toolchain-mips64-win64.zip"
-        displayProgress: true
+        uses: whalemare/action-dropbox@v1.0.0
+        with:
+          accessToken: ${{ secrets.DROPBOX_ACCESS_TOKEN }}
+          destination: "/Libdragon"
+          file: "libdragon-gcc-toolchain-mips64-win64.zip"
+          displayProgress: true
 
 
   Compile-Test-Example-Roms-Docker:
