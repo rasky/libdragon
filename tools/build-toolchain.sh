@@ -100,18 +100,18 @@ test -d "newlib-$NEWLIB_V"            || tar -xzf "newlib-$NEWLIB_V.tar.gz"
 # Copies the FP libs into GCC sources so they are compiled as part of it
 if [ "$GMP_V" != "" ]; then
   test -f "gmp-$GMP_V.tar.xz"         || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
-  test -d "gmp-$GMP_V"                || tar -xf "gmp-$GMP_V.tar.xz" #note no .gz download currently available
-  cp -R "gmp-$GMP_V" "gcc-$GCC_V"/gmp #TODO: should be a symbolic link `ln -s` rather than copy!
+  test -d "gmp-$GMP_V"                || tar -xf "gmp-$GMP_V.tar.xz" # note no .gz download file currently available
+  ln -s -T ./"gmp-$GMP_V"/ ./"gcc-$GCC_V"/gmp
 fi
 if [ "$MPC_V" != "" ]; then
   test -f "mpc-$MPC_V.tar.gz"         || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
   test -d "mpc-$MPC_V"                || tar -xzf "mpc-$MPC_V.tar.gz"
-  cp -R "mpc-$MPC_V" "gcc-$GCC_V"/mpc #TODO: should be a symbolic link `ln -s` rather than copy!
+  ln -s -T ./"mpc-$MPC_V"/ ./"gcc-$GCC_V"/mpc
 fi
 if [ "$MPFR_V" != "" ]; then
   test -f "mpfr-$MPFR_V.tar.gz"       || download "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_V.tar.gz"
   test -d "mpfr-$MPFR_V"              || tar -xzf "mpfr-$MPFR_V.tar.gz"
-  cp -R "mpfr-$MPFR_V" "gcc-$GCC_V"/mpfr #TODO: should be a symbolic link `ln -s` rather than copy!
+  ln -s -T ./"mpfr-$MPFR_V"/ ./"gcc-$GCC_V"/mpfr
 fi
 # Certain platforms might require Makefile cross compiling
 if [ "$MAKE_V" != "" ]; then
@@ -161,53 +161,40 @@ make install-gcc || sudo make install-gcc || su -c "make install-gcc"
 make install-target-libgcc || sudo make install-target-libgcc || su -c "make install-target-libgcc"
 echo "Finished Compiling GCC-$GCC_V for MIPS N64 - (pass 1) outside of the source tree"
 
-# echo "Compiling newlib-$NEWLIB_V"
-# cd ../"newlib-$NEWLIB_V"
-# CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
-#   --target=mips64-elf \
-#   --prefix="$INSTALL_PATH" \
-#   --with-cpu=mips64vr4300 \
-#   --disable-threads \
-#   --disable-libssp \
-#   --disable-werror
-# make -j "$JOBS"
-# make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install" # Perhaps use `checkinstall` instead?!
-# make distclean # Ensure we can build it again
-# echo "Finished Compiling newlib-$NEWLIB_V"
 
 if [ "$BUILD" != "$HOST" ]; then
   export INSTALL_PATH="${FOREIGN_INSTALL_PATH}"
 fi
 
-echo "Compiling newlib-$NEWLIB_V for foreign host"
-cd ../"newlib-$NEWLIB_V"
-CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
-  --target=mips64-elf \
-  --prefix="$INSTALL_PATH" \
-  --with-cpu=mips64vr4300 \
-  --disable-threads \
-  --disable-libssp \
-  --disable-werror \
-  $BUILD \
-  $HOST
-make -j "$JOBS"
-make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install" # Perhaps use `checkinstall` instead?!
-make clean # Ensure we can build it again
-echo "Finished Compiling newlib-$NEWLIB_V"
-
-echo "Compiling binutils-$BINUTILS_V for foreign host"
-cd ../"binutils-$BINUTILS_V"
-./configure \
-  --prefix="$INSTALL_PATH" \
-  --target=mips64-elf \
-  --with-cpu=mips64vr4300 \
+  echo "Compiling newlib-$NEWLIB_V for foreign host"
+  cd ../"newlib-$NEWLIB_V"
+  CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
+    --target=mips64-elf \
+    --prefix="$INSTALL_PATH" \
+    --with-cpu=mips64vr4300 \
+    --disable-threads \
+    --disable-libssp \
     --disable-werror \
-  $BUILD \
-  $HOST
-make -j "$JOBS"
-make install || sudo make install || su -c "make install"
-make distclean # Ensure we can build it again
-echo "Finished Compiling foreign binutils-$BINUTILS_V"
+    $BUILD \
+    $HOST
+  make -j "$JOBS"
+  make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install" # Perhaps use `checkinstall` instead?!
+  make distclean # Ensure we can build it again
+  echo "Finished Compiling newlib-$NEWLIB_V"
+
+  echo "Compiling binutils-$BINUTILS_V for foreign host"
+  cd ../"binutils-$BINUTILS_V"
+  ./configure \
+    --prefix="$INSTALL_PATH" \
+    --target=mips64-elf \
+    --with-cpu=mips64vr4300 \
+     --disable-werror \
+    $BUILD \
+    $HOST
+  make -j "$JOBS"
+  make install || sudo make install || su -c "make install"
+  make distclean # Ensure we can build it again
+  echo "Finished Compiling foreign binutils-$BINUTILS_V"
 
 echo "Compiling gcc-$GCC_V for MIPS N64 for host - (pass 2) outside of the source tree"
 cd ..
@@ -215,11 +202,11 @@ rm -rf gcc_compile
 mkdir gcc_compile
 cd gcc_compile
 CFLAGS_FOR_TARGET="-O2" CXXFLAGS_FOR_TARGET=" -O2" ../"gcc-$GCC_V"/configure \
-  --prefix="$INSTALL_PATH" \
   --target=mips64-elf \
   --with-arch=vr4300 \
   --with-tune=vr4300 \
   --enable-languages=c,c++ \
+  --without-headers \
   --with-newlib \
   --disable-libssp \
   --enable-multilib \
@@ -228,6 +215,7 @@ CFLAGS_FOR_TARGET="-O2" CXXFLAGS_FOR_TARGET=" -O2" ../"gcc-$GCC_V"/configure \
   --disable-threads \
   --disable-win32-registry \
   --disable-nls \
+  --disable-werror \
   --with-system-zlib \
   $BUILD \
   $HOST
@@ -247,6 +235,7 @@ cd ../"make-$MAKE_V"
     $HOST
 make -j "$JOBS"
 make install || sudo make install || su -c "make install"
+make clean
 echo "Finished Compiling make-$MAKE_V"
 fi
 
