@@ -35,6 +35,11 @@ N64_CFLAGS += -DN64 -O2 -Wall -Werror -Wno-error=deprecated-declarations -fdiagn
 N64_ASFLAGS = -mtune=vr4300 -march=vr4300 -Wa,--fatal-warnings
 N64_LDFLAGS = -L$(N64_LIBDIR) -ldragon -lm -ldragonsys -Tn64.ld --gc-sections --wrap __do_global_ctors
 
+$(BUILD_DIR)/overlay0/%.o: N64_CFLAGS += -mlong-calls
+$(BUILD_DIR)/overlay1/%.o: N64_CFLAGS += -mlong-calls
+$(BUILD_DIR)/overlay2/%.o: N64_CFLAGS += -mlong-calls
+$(BUILD_DIR)/overlay3/%.o: N64_CFLAGS += -mlong-calls
+
 N64_TOOLFLAGS = --header $(N64_HEADERPATH) --title $(N64_ROM_TITLE)
 N64_ED64ROMCONFIGFLAGS =  $(if $(N64_ROM_SAVETYPE),--savetype $(N64_ROM_SAVETYPE))
 N64_ED64ROMCONFIGFLAGS += $(if $(N64_ROM_RTC),--rtc) 
@@ -65,7 +70,11 @@ N64_CFLAGS += -std=gnu99
 %.z64: LDFLAGS+=$(N64_LDFLAGS)
 %.z64: $(BUILD_DIR)/%.elf
 	@echo "    [Z64] $@"
-	$(N64_OBJCOPY) -O binary $< $<.bin
+	$(N64_OBJCOPY) -O binary -R .ovl0 -R .ovl1 -R .ovl2 -R .ovl3 $< $<.bin
+	$(N64_OBJCOPY) -O binary -j .ovl0 $< $<.ovl0.bin
+	$(N64_OBJCOPY) -O binary -j .ovl1 $< $<.ovl1.bin
+	$(N64_OBJCOPY) -O binary -j .ovl2 $< $<.ovl2.bin
+	$(N64_OBJCOPY) -O binary -j .ovl3 $< $<.ovl3.bin
 	@rm -f $@
 	DFS_FILE="$(filter %.dfs, $^)"; \
 	if [ -z "$$DFS_FILE" ]; then \

@@ -24,6 +24,7 @@ libdragon.a: $(BUILD_DIR)/n64sys.o $(BUILD_DIR)/interrupt.o $(BUILD_DIR)/tlb.o \
 			 $(BUILD_DIR)/debug.o $(BUILD_DIR)/usb.o $(BUILD_DIR)/fatfs/ff.o \
 			 $(BUILD_DIR)/fatfs/ffunicode.o $(BUILD_DIR)/dragonfs.o \
 			 $(BUILD_DIR)/audio.o $(BUILD_DIR)/display.o \
+			 $(BUILD_DIR)/overlay.o $(BUILD_DIR)/overlay_handler.o \
 			 $(BUILD_DIR)/console.o $(BUILD_DIR)/joybus.o \
 			 $(BUILD_DIR)/controller.o $(BUILD_DIR)/rtc.o \
 			 $(BUILD_DIR)/eeprom.o $(BUILD_DIR)/eepromfs.o $(BUILD_DIR)/mempak.o \
