@@ -181,7 +181,7 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   $HOST
 make -j "$JOBS"
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install" # Perhaps use `checkinstall` instead?!
-make distclean # Ensure we can build it again
+make clean # Ensure we can build it again
 echo "Finished Compiling newlib-$NEWLIB_V"
 
 echo "Compiling binutils-$BINUTILS_V for foreign host"
