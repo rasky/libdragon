@@ -161,10 +161,6 @@ make install-gcc || sudo make install-gcc || su -c "make install-gcc"
 make install-target-libgcc || sudo make install-target-libgcc || su -c "make install-target-libgcc"
 echo "Finished Compiling GCC-$GCC_V for MIPS N64 - (pass 1) outside of the source tree"
 
-if [ "$BUILD" != "$HOST" ]; then
-  INSTALL_PATH="${FOREIGN_INSTALL_PATH}"
-fi
-
 echo "Compiling newlib-$NEWLIB_V"
 cd ../"newlib-$NEWLIB_V"
 CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
@@ -173,15 +169,33 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --with-cpu=mips64vr4300 \
   --disable-threads \
   --disable-libssp \
-  --disable-werror \
-  $BUILD \
-  $HOST
+  --disable-werror
 make -j "$JOBS"
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install" # Perhaps use `checkinstall` instead?!
 make clean # Ensure we can build it again
 echo "Finished Compiling newlib-$NEWLIB_V"
 
 if [ "$BUILD" != "$HOST" ]; then
+  INSTALL_PATH="${FOREIGN_INSTALL_PATH}"
+fi
+
+if [ "$BUILD" != "$HOST" ]; then
+  echo "Compiling newlib-$NEWLIB_V for foreign host"
+  cd ../"newlib-$NEWLIB_V"
+  CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
+    --target=mips64-elf \
+    --prefix="$INSTALL_PATH" \
+    --with-cpu=mips64vr4300 \
+    --disable-threads \
+    --disable-libssp \
+    --disable-werror \
+    $BUILD \
+    $HOST
+  make -j "$JOBS"
+  make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install" # Perhaps use `checkinstall` instead?!
+  make clean # Ensure we can build it again
+  echo "Finished Compiling newlib-$NEWLIB_V"
+
   echo "Compiling binutils-$BINUTILS_V for foreign host"
   cd ../"binutils-$BINUTILS_V"
   ./configure \
