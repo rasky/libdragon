@@ -131,6 +131,8 @@ make distclean # Ensure we can build it again
 echo "Finished Compiling binutils-$BINUTILS_V"
 
 echo "Compiling native build of GCC-$GCC_V for MIPS N64 - (pass 1) outside of the source tree"
+# TODO why do we bother if we already have a good (compatible) compiler installed?! 
+# e.g. we could use ` whereis` ?! it does not need to be up-to-date as we have a second pass?!
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
