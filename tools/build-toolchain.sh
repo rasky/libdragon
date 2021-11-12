@@ -62,9 +62,6 @@ fi
   NEWLIB_V=4.1.0
 
 
-# Set PATH for newlib to compile using GCC for MIPS N64 (pass 1)
-export PATH="$PATH:$INSTALL_PATH/bin" #TODO: why is this export?!
-
 # Determine how many parallel Make jobs to run based on CPU count
 JOBS="${JOBS:-`getconf _NPROCESSORS_ONLN`}"
 JOBS="${JOBS:-1}" # If getconf returned nothing, default to 1
@@ -163,38 +160,41 @@ echo "Finished Compiling GCC-$GCC_V for MIPS N64 - (pass 1) outside of the sourc
 
 
 if [ "$BUILD" != "$HOST" ]; then
-  export INSTALL_PATH="${FOREIGN_INSTALL_PATH}"
+  INSTALL_PATH="${FOREIGN_INSTALL_PATH}"
 fi
 
-  echo "Compiling newlib-$NEWLIB_V for foreign host"
-  cd ../"newlib-$NEWLIB_V"
-  CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
-    --target=mips64-elf \
-    --prefix="$INSTALL_PATH" \
-    --with-cpu=mips64vr4300 \
-    --disable-threads \
-    --disable-libssp \
-    --disable-werror \
-    $BUILD \
-    $HOST
-  make -j "$JOBS"
-  make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install" # Perhaps use `checkinstall` instead?!
-  make distclean # Ensure we can build it again
-  echo "Finished Compiling newlib-$NEWLIB_V"
+# Set PATH for newlib to compile using GCC for MIPS N64 (pass 1)
+export PATH="$PATH:$INSTALL_PATH/bin" #TODO: why is this export?!
 
-  echo "Compiling binutils-$BINUTILS_V for foreign host"
-  cd ../"binutils-$BINUTILS_V"
-  ./configure \
-    --prefix="$INSTALL_PATH" \
-    --target=mips64-elf \
-    --with-cpu=mips64vr4300 \
-     --disable-werror \
-    $BUILD \
-    $HOST
-  make -j "$JOBS"
-  make install || sudo make install || su -c "make install"
-  make distclean # Ensure we can build it again
-  echo "Finished Compiling foreign binutils-$BINUTILS_V"
+echo "Compiling newlib-$NEWLIB_V for foreign host"
+cd ../"newlib-$NEWLIB_V"
+CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
+  --target=mips64-elf \
+  --prefix="$INSTALL_PATH" \
+  --with-cpu=mips64vr4300 \
+  --disable-threads \
+  --disable-libssp \
+  --disable-werror \
+  $BUILD \
+  $HOST
+make -j "$JOBS"
+make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install" # Perhaps use `checkinstall` instead?!
+make distclean # Ensure we can build it again
+echo "Finished Compiling newlib-$NEWLIB_V"
+
+echo "Compiling binutils-$BINUTILS_V for foreign host"
+cd ../"binutils-$BINUTILS_V"
+./configure \
+  --prefix="$INSTALL_PATH" \
+  --target=mips64-elf \
+  --with-cpu=mips64vr4300 \
+    --disable-werror \
+  $BUILD \
+  $HOST
+make -j "$JOBS"
+make install || sudo make install || su -c "make install"
+make distclean # Ensure we can build it again
+echo "Finished Compiling foreign binutils-$BINUTILS_V"
 
 echo "Compiling gcc-$GCC_V for MIPS N64 for host - (pass 2) outside of the source tree"
 cd ..
