@@ -173,7 +173,7 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --with-cpu=mips64vr4300 \
   --disable-threads \
   --disable-libssp \
-  --disable-werror
+  --disable-werror \
   $BUILD \
   $HOST
 make -j "$JOBS"
