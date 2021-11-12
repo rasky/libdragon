@@ -172,7 +172,7 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --disable-werror
 make -j "$JOBS"
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install" # Perhaps use `checkinstall` instead?!
-make clean # Ensure we can build it again
+make distclean # Ensure we can build it again
 echo "Finished Compiling newlib-$NEWLIB_V"
 
 if [ "$BUILD" != "$HOST" ]; then
