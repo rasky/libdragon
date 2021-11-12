@@ -176,7 +176,7 @@ echo "Finished Compiling GCC-$GCC_V for MIPS N64 - (pass 1) outside of the sourc
 # echo "Finished Compiling newlib-$NEWLIB_V"
 
 if [ "$BUILD" != "$HOST" ]; then
-  INSTALL_PATH="${FOREIGN_INSTALL_PATH}"
+  export INSTALL_PATH="${FOREIGN_INSTALL_PATH}"
 fi
 
 echo "Compiling newlib-$NEWLIB_V for foreign host"
