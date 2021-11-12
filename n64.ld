@@ -33,9 +33,34 @@ __libdragon_text_start  = __kseg0_start + 0x400;
 MEMORY
 {
     mem : ORIGIN = __kseg0_start, LENGTH = 4M
+    ovl0 : ORIGIN = 0xE0000000, LENGTH = 1M
+    ovl1 : ORIGIN = 0xE1000000, LENGTH = 1M
+    ovl2 : ORIGIN = 0xE2000000, LENGTH = 1M
+    ovl3 : ORIGIN = 0xE3000000, LENGTH = 1M
 }
 
 SECTIONS {
+    .ovl0 : {
+        __ld_ovl0 = .;
+        */overlay0/*(.text.*)
+        __ld_ovl0_end = .;
+    } > ovl0
+    .ovl1 : {
+        __ld_ovl1 = .;
+        */overlay1/*(.text.*)
+        __ld_ovl1_end = .;
+    } > ovl1
+    .ovl2 : {
+        __ld_ovl2 = .;
+        */overlay2/*(.text)
+        __ld_ovl2_end = .;
+    } > ovl2
+    .ovl3 : {
+        __ld_ovl3 = .;
+        */overlay3/*(.text)
+        __ld_ovl3_end = .;
+    } > ovl3
+
     /* The text section carries the app code and its relocation addr is
     * the first byte of the cart domain in cached, unmapped memory
     */
