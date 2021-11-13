@@ -98,7 +98,7 @@ test -d "newlib-$NEWLIB_V"            || tar -xzf "newlib-$NEWLIB_V.tar.gz"
 if [ "$GMP_V" != "" ]; then
   test -f "gmp-$GMP_V.tar.xz"         || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
   test -d "gmp-$GMP_V"                || tar -xf "gmp-$GMP_V.tar.xz" # note no .gz download file currently available
-  cp -R "gmp-$GMP_V"/ ./"gcc-$GCC_V"/gmp #TODO: use symbolic link `ln -s` (cannot get to work)
+  cp -R "gmp-$GMP_V" "gcc-$GCC_V"/gmp #TODO: use symbolic link `ln -s` (cannot get to work)
 fi
 if [ "$MPC_V" != "" ]; then
   test -f "mpc-$MPC_V.tar.gz"         || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
