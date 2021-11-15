@@ -1,0 +1,1 @@
+FROM ghcr.io/dragonminded/dev-container-toolchain:v1.0

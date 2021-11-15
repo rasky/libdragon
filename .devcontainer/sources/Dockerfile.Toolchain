@@ -1,0 +1,74 @@
+FROM debian:10.4-slim AS toolchain_builder
+# Avoid warnings by switching to noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
+# Install required dependencies
+RUN apt-get update \
+    && apt-get -y install --no-install-recommends apt-utils \
+    && apt-get install -y \
+    wget \
+    bzip2 \
+    gcc \
+    g++ \
+    make \
+    file \
+    libmpfr-dev \
+    libmpc-dev \
+    zlib1g-dev \
+    texinfo \
+    git \
+    gcc-multilib
+
+
+# ARG CMAKE_SCRIPT=https://cmake.org/files/v3.19/cmake-3.19.0-Linux-x86_64.sh
+# RUN curl -o /tmp/dc-downloads/cmake.sh $CMAKE_SCRIPT \
+#     && chmod +x /tmp/dc-downloads/cmake.sh \
+#     && bash /tmp/dc-downloads/cmake.sh --skip-license --prefix=/tmp/dc-extracted/cmake
+
+ARG N64_INST=/n64_toolchain
+ENV N64_INST=${N64_INST}
+
+# Build
+COPY ./tools/build-toolchain.sh /tmp/tools/build-toolchain.sh
+WORKDIR /tmp/tools
+RUN ./build-toolchain.sh
+
+# Remove locale strings which are not so important in our use case
+RUN rm -rf ${N64_INST}/share/locale/*
+
+
+# Stage 2 - Prepare minimal image
+FROM debian:10.4-slim AS devcontainer
+ARG DEBIAN_FRONTEND=noninteractive
+
+# You can set up non-root user
+# ARG USERNAME=vscode
+# ARG USER_UID=1000
+# ARG USER_GID=$USER_UID
+
+RUN apt-get update && \
+    apt-get -y install --no-install-recommends apt-utils dialog icu-devtools 2>&1 &&\
+    apt-get install -yq \
+    gcc \
+    g++ \
+    make \
+    libpng-dev \
+    git \
+    curl \
+    ninja-build \
+    rsync \
+    srecord \
+    zip
+
+ARG N64_INST=/n64_toolchain
+ENV N64_INST=${N64_INST}
+ENV PATH="${N64_INST}/bin:$PATH"
+
+COPY --from=toolchain_builder ${N64_INST} ${N64_INST}
+
+# Clean up downloaded files
+RUN apt-get autoremove -y \
+    && apt-get clean -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# Switch back to dialog for any ad-hoc use of apt-get
+ENV DEBIAN_FRONTEND=dialog
