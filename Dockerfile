@@ -2,14 +2,28 @@
 
 # Stage 1 - Build the toolchain
 FROM ubuntu:20.04
-ARG DEBIAN_FRONTEND=noninteractive
+# Avoid warnings by switching to noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install required dependencies
+RUN apt-get update \
+    && apt-get -y install --no-install-recommends apt-utils \
+    && apt-get install -y \
+    wget \
+    bzip2 \
+    gcc \
+    g++ \
+    make \
+    file \
+    libmpfr-dev \
+    libmpc-dev \
+    zlib1g-dev \
+    texinfo \
+    git \
+    gcc-multilib
+
 ARG N64_INST=/n64_toolchain
 ENV N64_INST=${N64_INST}
-
-# install dependencies
-RUN apt-get update
-RUN DEBIAN_FRONTEND="noninteractive" apt-get install -yq \
-    wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib autoconf autoconf-archive
 
 # Build
 COPY ./tools/build-toolchain.sh /tmp/tools/build-toolchain.sh
@@ -21,14 +35,32 @@ RUN rm -rf ${N64_INST}/share/locale/*
 
 # Stage 2 - Prepare minimal image
 FROM ubuntu:20.04
-ARG DEBIAN_FRONTEND=noninteractive
+# Avoid warnings by switching to noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
 ARG N64_INST=/n64_toolchain
 ENV N64_INST=${N64_INST}
 ENV PATH="${N64_INST}/bin:$PATH"
 
+RUN apt-get update && \
+    apt-get -y install --no-install-recommends apt-utils dialog icu-devtools 2>&1 &&\
+    apt-get install -yq \
+    gcc \
+    g++ \
+    make \
+    libpng-dev \
+    git \
+    curl \
+    ninja-build \
+    rsync \
+    srecord \
+    zip
+
 COPY --from=0 ${N64_INST} ${N64_INST}
-RUN apt-get update
-RUN apt-get install -yq gcc g++ make libpng-dev git && \
-    apt-get install -yq ninja-build rsync zip && \
-    apt-get clean && \
-    apt autoremove -yq
+
+# Clean up downloaded files
+RUN apt-get autoremove -y \
+    && apt-get clean -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# Switch back to dialog for any ad-hoc use of apt-get
+ENV DEBIAN_FRONTEND=dialog
