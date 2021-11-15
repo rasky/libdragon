@@ -45,7 +45,7 @@ jobs:
           cp ./tools/build-toolchain.sh ./build/toolchain/linux/build-toolchain.sh
 
           cd ./build/toolchain/linux
-          ./build-toolchain.sh
+          sudo ./build-toolchain.sh
 
       # - name: Create-Debian-Package
       #   run: |
@@ -108,7 +108,7 @@ jobs:
           cp ./tools/build-toolchain.sh ./build/toolchain/windows/build-toolchain.sh
 
           cd ./build/toolchain/windows
-          ./build-toolchain.sh -xcw
+          sudo ./build-toolchain.sh -xcw
 
           # TODO: move output binaries to artifacts folder.
 
