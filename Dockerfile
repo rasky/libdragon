@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Stage 1 - Build the toolchain
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 ARG N64_INST=/n64_toolchain
 ENV N64_INST=${N64_INST}
 
@@ -18,7 +18,7 @@ RUN ./build-toolchain.sh
 RUN rm -rf ${N64_INST}/share/locale/*
 
 # Stage 2 - Prepare minimal image
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 ARG N64_INST=/n64_toolchain
 ENV N64_INST=${N64_INST}
 ENV PATH="${N64_INST}/bin:$PATH"

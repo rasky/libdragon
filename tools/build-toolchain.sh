@@ -196,6 +196,7 @@ if [ "$BUILD" != "$HOST" ]; then
   #   $HOST
   # make -j "$JOBS"
   make install || sudo env PATH="$FOREIGN_INSTALL_PATH/bin" make install || su -c "env PATH=\"$FOREIGN_INSTALL_PATH/bin\" make install"
+  # make install DESTDIR=$FOREIGN_INSTALL_PATH || sudo make install  DESTDIR=$FOREIGN_INSTALL_PATH || su -c make install DESTDIR=$FOREIGN_INSTALL_PATH"
   make clean # Ensure we can build it again (newlib does not seem to handle `distclean`)
 
 

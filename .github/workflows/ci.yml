@@ -116,13 +116,13 @@ jobs:
           # zip binaries for upload
           zip -r -q libdragon-gcc-toolchain-mips64-win64.zip ./build/toolchain/windows/binaries/
       
-      # Until a better place can be used, lets use dropbox!
-      - name: Upload Artifact to Dropbox
-        uses: piotrpolak/github-action-upload-to-dropbox@v0.1
-        with:
-          accessToken: ${{ secrets.DROPBOX_ACCESS_TOKEN }}
-          destination: "/Libdragon"
-          files: "libdragon-gcc-toolchain-mips64-win64.zip"
+      # # Until a better place can be used, lets use dropbox!
+      # - name: Upload Artifact to Dropbox
+      #   uses: piotrpolak/github-action-upload-to-dropbox@v0.1
+      #   with:
+      #     accessToken: ${{ secrets.DROPBOX_ACCESS_TOKEN }}
+      #     destination: "/Libdragon"
+      #     files: "libdragon-gcc-toolchain-mips64-win64.zip"
 
 
   Compile-Test-Example-Roms-Docker:
