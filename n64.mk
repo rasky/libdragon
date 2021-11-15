@@ -1,3 +1,15 @@
+ifdef SystemRoot # We are running on windows
+  FIXPATH =$(subst /,\,$1)
+  MKDIR = mkdir
+  MV = move
+  RM = del /F /Q # force deletion quietly
+else # We are running on UNIX
+  FIXPATH = $1
+  MKDIR = mkdir -p # make parent directories as needed
+  MV = mv -f # ignore nonexistent files, never prompt
+  RM = rm -f # ignore nonexistent files, never prompt
+endif
+
 BUILD_DIR ?= .
 SOURCE_DIR ?= .
 
@@ -6,12 +18,12 @@ N64_ROM_SAVETYPE = # Supported savetypes: none eeprom4k eeprom16 sram256k sram76
 N64_ROM_RTC = # Set to true to enable the Joybus Real-Time Clock
 N64_ROM_REGIONFREE = # Set to true to allow booting on any console region
 
-N64_ROOTDIR = $(N64_INST)
-N64_BINDIR = $(N64_ROOTDIR)/bin
-N64_INCLUDEDIR = $(N64_ROOTDIR)/mips64-elf/include
-N64_LIBDIR = $(N64_ROOTDIR)/mips64-elf/lib
-N64_GCCPREFIX = $(N64_BINDIR)/mips64-elf-
-N64_HEADERPATH = $(N64_LIBDIR)/header
+N64_ROOTDIR = $(call FIXPATH,$(N64_INST))
+N64_BINDIR = $(call FIXPATH,$(N64_ROOTDIR)/bin)
+N64_INCLUDEDIR = $(call FIXPATH,$(N64_ROOTDIR)/mips64-elf/include)
+N64_LIBDIR = $(call FIXPATH,$(N64_ROOTDIR)/mips64-elf/lib)
+N64_GCCPREFIX = $(call FIXPATH,$(N64_BINDIR)/mips64-elf-)
+N64_HEADERPATH = $(call FIXPATH,$(N64_LIBDIR)/header)
 
 COMMA:=,
 
@@ -66,7 +78,7 @@ N64_CFLAGS += -std=gnu99
 %.z64: $(BUILD_DIR)/%.elf
 	@echo "    [Z64] $@"
 	$(N64_OBJCOPY) -O binary $< $<.bin
-	@rm -f $@
+	@$(RM) $@
 	DFS_FILE="$(filter %.dfs, $^)"; \
 	if [ -z "$$DFS_FILE" ]; then \
 		$(N64_TOOL) $(N64_TOOLFLAGS) --output $@ $<.bin; \
@@ -83,7 +95,7 @@ N64_CFLAGS += -std=gnu99
 	$(N64_OBJCOPY) -I binary -O binary --reverse-bytes=2 $< $@
 
 %.dfs:
-	@mkdir -p $(dir $@)
+	@$(MKDIR) $(dir $@)
 	@echo "    [DFS] $@"
 	$(N64_MKDFS) $@ $(<D) >/dev/null
 
@@ -91,7 +103,7 @@ N64_CFLAGS += -std=gnu99
 # using the prefix of the filename: if it starts with "rsp", it is RSP ucode, otherwise
 # it's a standard MIPS assembly file.
 $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.S
-	@mkdir -p $(dir $@)
+	@$(MKDIR) $(dir $@)
 	set -e; \
 	FILENAME="$(notdir $(basename $@))"; \
 	if case "$$FILENAME" in "rsp"*) true;; *) false;; esac; then \
@@ -116,24 +128,24 @@ $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.S
 				--rename-section .text=.data $$DATASECTION.bin $$DATASECTION.o; \
 		$(N64_SIZE) -G $@; \
 		$(N64_LD) -relocatable $$TEXTSECTION.o $$DATASECTION.o -o $@; \
-		rm $$TEXTSECTION.bin $$DATASECTION.bin $$TEXTSECTION.o $$DATASECTION.o; \
+		$(RM) $$TEXTSECTION.bin $$DATASECTION.bin $$TEXTSECTION.o $$DATASECTION.o; \
 	else \
 		echo "    [AS] $<"; \
 		$(CC) -c $(ASFLAGS) -o $@ $<; \
 	fi
 
 $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c 
-	@mkdir -p $(dir $@)
+	@$(MKDIR) $(dir $@)
 	@echo "    [CC] $<"
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.cpp
-	@mkdir -p $(dir $@)
+	@$(MKDIR) $(dir $@)
 	@echo "    [CXX] $<"
 	$(CXX) -c $(CXXFLAGS) -o $@ $<
 
 %.elf: $(N64_LIBDIR)/libdragon.a $(N64_LIBDIR)/libdragonsys.a $(N64_LIBDIR)/n64.ld
-	@mkdir -p $(dir $@)
+	@$(MKDIR) $(dir $@)
 	@echo "    [LD] $@"
 	# We always use g++ to link except for ucode because of the inconsistencies
 	# between ld when it comes to global ctors dtors. Also see __do_global_ctors
