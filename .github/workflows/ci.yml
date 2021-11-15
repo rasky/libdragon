@@ -108,7 +108,7 @@ jobs:
           cp ./tools/build-toolchain.sh ./build/toolchain/windows/build-toolchain.sh
 
           cd ./build/toolchain/windows
-          sudo ./build-toolchain.sh -xcw
+          sudo ./build-toolchain.sh  x86_64-w64-mingw32
 
       # publish windows toolchain artifacts:
       - name: Package-Artifacts

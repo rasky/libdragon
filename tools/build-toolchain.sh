@@ -19,7 +19,8 @@ set -e
 INSTALL_PATH="${N64_INST:-/usr/local}"
 
 # Check for cross compile script flag
-if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a parameter.
+# TODO: detect the flag `--host`
+if [ "$1" == "x86_64-w64-mingw32" ]; then # Windows cross compile flag is specified as a parameter.
   # This (probably) requires the toolchain to have already built and installed on the native (linux) system first!
   # This (may) also require the following (extra) package dependencies:
   # sudo apt-get install -yq mingw-w64 libgmp-dev bison libz-mingw-w64-dev autoconf
@@ -41,16 +42,7 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   MPFR_V=4.1.0
   MAKE_V=4.2.1
 
-else # We are compiling for the native system.
-  echo "building for native system"
-
-  # # Dependency source libs (Versions)
-  # BINUTILS_V=2.37
-  # GCC_V=11.2.0
-
-fi
-
-  # These "should" be the same as linux, but may be out of sync (as need to ensure working natively first).
+  # TODO: These "should" be the same as linux, but are out of sync.
   # Binutils fails with 2.37 on canadian cross
   BINUTILS_V=2.36.1 # so we are stuck with 2.36.1 for the moment
   
@@ -58,9 +50,23 @@ fi
   # see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100017
   # see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80196
   GCC_V=10.3.0 # so we are stuck with the 10.x branch for the moment.
+
+else # We are compiling for the native system.
+  echo "building for native system"
+  # Only define versions of optional dependencies if required (default empty).
+  GMP_V=
+  MPC_V=
+  MPFR_V=
+  MAKE_V=
+
+  # # Dependency source libs (Versions)
+  BINUTILS_V=2.37
+  GCC_V=11.2.0
+
+fi
+
   NEWLIB_V=4.1.0
-
-
+  
 # Determine how many parallel Make jobs to run based on CPU count
 JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN)}"
 JOBS="${JOBS:-1}" # If getconf returned nothing, default to 1
