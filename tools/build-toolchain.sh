@@ -209,6 +209,7 @@ rm -rf gcc_compile
 mkdir gcc_compile
 cd gcc_compile
 CFLAGS_FOR_TARGET="-O2" CXXFLAGS_FOR_TARGET=" -O2" ../"gcc-$GCC_V"/configure \
+  --prefix="$INSTALL_PATH" \
   --target=mips64-elf \
   --with-arch=vr4300 \
   --with-tune=vr4300 \
