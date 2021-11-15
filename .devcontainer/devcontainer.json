@@ -1,10 +1,9 @@
 {
 	"name": "libdragon",
-	// Adjust this file to chose the platform you want using the prebuild containers
-	// - Dockerfile.All = you can build anything but it's a very large container
-	// - Dockerfile.Toolchain = Includes libdragon toolchain only
+	// Adjust this file to chose the platform you want using the prebuild containers (only one currently available)
+	// - Dockerfile.Libdragon = you can build anything but it's a very large container
 	// If you prefer, you can use the source files and adjust them they are located, with the same names in ./sources. This will alow you to customize them and add anything you may need on top.
-	"dockerFile": "Dockerfile.All",
+	"dockerFile": "Dockerfile.Libdragon",
 	"context": ".",
 	"mounts": [
 		"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
@@ -31,12 +30,4 @@
         "twxs.cmake",
         "ms-vscode.cmake-tools"
 	],
-	// You can pull all the repos with the latest changes, this is only valid if you are using the ./sources/Dockerfile.All containers
-	// "postAttachCommand": "/usr/local/git-pull-repos.sh"
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
-	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "terraform --version",
-	// Uncomment to connect as a non-root user. See https: //aka.ms/vscode-remote/containers/non-root.
-	// ,"remoteUser": "vscode"
 }
