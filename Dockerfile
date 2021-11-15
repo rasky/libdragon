@@ -11,16 +11,13 @@ RUN apt-get update \
     && apt-get install -y \
     wget \
     bzip2 \
-    gcc \
-    g++ \
     make \
     file \
     libmpfr-dev \
     libmpc-dev \
     zlib1g-dev \
     texinfo \
-    git \
-    gcc-multilib
+    git
 
 ARG N64_INST=/n64_toolchain
 ENV N64_INST=${N64_INST}
