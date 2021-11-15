@@ -41,6 +41,15 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   MPFR_V=4.1.0
   MAKE_V=4.2.1
 
+else # We are compiling for the native system.
+  echo "building for native system"
+
+  # # Dependency source libs (Versions)
+  # BINUTILS_V=2.37
+  # GCC_V=11.2.0
+
+fi
+
   # These "should" be the same as linux, but may be out of sync (as need to ensure working natively first).
   # Binutils fails with 2.37 on canadian cross
   BINUTILS_V=2.36.1 # so we are stuck with 2.36.1 for the moment
@@ -49,16 +58,6 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
   # see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100017
   # see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80196
   GCC_V=10.3.0 # so we are stuck with the 10.x branch for the moment.
-
-else # We are compiling for the native system.
-  echo "building for native system"
-
-  # Dependency source libs (Versions)
-  BINUTILS_V=2.37
-  GCC_V=11.2.0
-
-fi
-
   NEWLIB_V=4.1.0
 
 
@@ -98,17 +97,17 @@ test -d "newlib-$NEWLIB_V"            || tar -xzf "newlib-$NEWLIB_V.tar.gz"
 if [ "$GMP_V" != "" ]; then
   test -f "gmp-$GMP_V.tar.xz"         || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
   test -d "gmp-$GMP_V"                || tar -xf "gmp-$GMP_V.tar.xz" # note no .gz download file currently available
-  cp -R "gmp-$GMP_V" "gcc-$GCC_V"/gmp #TODO: use symbolic link `ln -s` (cannot get to work)
+  cp -R "gmp-$GMP_V" "gcc-$GCC_V"/gmp #TODO: use symbolic link `ln -sf` (cannot get to work)
 fi
 if [ "$MPC_V" != "" ]; then
   test -f "mpc-$MPC_V.tar.gz"         || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
   test -d "mpc-$MPC_V"                || tar -xzf "mpc-$MPC_V.tar.gz"
-  cp -R "mpc-$MPC_V" "gcc-$GCC_V"/mpc #TODO: use symbolic link `ln -s` (cannot get to work)
+  cp -R "mpc-$MPC_V" "gcc-$GCC_V"/mpc #TODO: use symbolic link `ln -sf` (cannot get to work)
 fi
 if [ "$MPFR_V" != "" ]; then
   test -f "mpfr-$MPFR_V.tar.gz"       || download "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_V.tar.gz"
   test -d "mpfr-$MPFR_V"              || tar -xzf "mpfr-$MPFR_V.tar.gz"
-  cp -R "mpfr-$MPFR_V" "gcc-$GCC_V"/mpfr #TODO: use symbolic link `ln -s` (cannot get to work)
+  cp -R "mpfr-$MPFR_V" "gcc-$GCC_V"/mpfr #TODO: use symbolic link `ln -sf` (cannot get to work)
 fi
 # Certain platforms might require Makefile cross compiling
 if [ "$MAKE_V" != "" ]; then
@@ -184,19 +183,8 @@ if [ "$BUILD" != "$HOST" ]; then
   INSTALL_PATH="${FOREIGN_INSTALL_PATH}"
 
   echo "Installing newlib-$NEWLIB_V for foreign host"
-  # cd ../"newlib-$NEWLIB_V"
-  # CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
-  #   --target=mips64-elf \
-  #   --prefix="$INSTALL_PATH" \
-  #   --with-cpu=mips64vr4300 \
-  #   --disable-threads \
-  #   --disable-libssp \
-  #   --disable-werror \
-  #   $BUILD \
-  #   $HOST
-  # make -j "$JOBS"
-  make install || sudo env PATH="$FOREIGN_INSTALL_PATH/bin" make install || su -c "env PATH=\"$FOREIGN_INSTALL_PATH/bin\" make install"
-  # make install DESTDIR=$FOREIGN_INSTALL_PATH || sudo make install  DESTDIR=$FOREIGN_INSTALL_PATH || su -c make install DESTDIR=$FOREIGN_INSTALL_PATH"
+  # make install || sudo env PATH="$FOREIGN_INSTALL_PATH/bin" make install || su -c "env PATH=\"$FOREIGN_INSTALL_PATH/bin\" make install"
+  make install DESTDIR="$FOREIGN_INSTALL_PATH/bin" || sudo make install  DESTDIR="$FOREIGN_INSTALL_PATH/bin" || su -c "make install DESTDIR=\"$FOREIGN_INSTALL_PATH/bin\""
   make clean # Ensure we can build it again (newlib does not seem to handle `distclean`)
 
 

@@ -157,7 +157,6 @@ jobs:
       - name: Build image
         if: ${{ steps.path_diff.outputs.changed == 1 }}
         uses: docker/build-push-action@v2
-        # TODO: surely this might be related to the fork, as they might have an updated one!:
         with:
           context: .
           push: true
