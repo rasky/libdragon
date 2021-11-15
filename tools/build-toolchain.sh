@@ -36,9 +36,9 @@ if [ "$1" == "-xcw" ]; then # Windows cross compile flag is specified as a param
 
   # Dependency source libs (Versions)
   # This will have to build Make and download FP libs
-  # GMP_V=6.2.0
-  # MPC_V=1.2.1
-  # MPFR_V=4.1.0
+  GMP_V=6.2.0
+  MPC_V=1.2.1
+  MPFR_V=4.1.0
   MAKE_V=4.2.1
 
   # These "should" be the same as linux, but may be out of sync (as need to ensure working natively first).
