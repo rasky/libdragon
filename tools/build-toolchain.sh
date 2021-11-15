@@ -63,7 +63,7 @@ fi
 
 
 # Determine how many parallel Make jobs to run based on CPU count
-JOBS="${JOBS:-`getconf _NPROCESSORS_ONLN`}"
+JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN)}"
 JOBS="${JOBS:-1}" # If getconf returned nothing, default to 1
 
 
@@ -164,7 +164,7 @@ echo "Finished Compiling GCC-$GCC_V for MIPS N64 - (pass 1) outside of the sourc
 echo "Compiling newlib-$NEWLIB_V"
 cd ../"newlib-$NEWLIB_V"
 
-# Set PATH for newlib
+# Set PATH for newlib to compile using GCC for MIPS N64 (pass 1)
 export PATH="$PATH:$INSTALL_PATH/bin" #TODO: why is this export?!
 CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --target=mips64-elf \
@@ -172,7 +172,7 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --with-cpu=mips64vr4300 \
   --disable-threads \
   --disable-libssp \
-  --disable-werror \
+  --disable-werror
 make -j "$JOBS"
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install" # Perhaps use `checkinstall` instead?!
 # make distclean # Ensure we can build it again (newlib does not seem to handle `distclean`)
