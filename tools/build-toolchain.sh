@@ -63,7 +63,7 @@ fi
 
 
 # Determine how many parallel Make jobs to run based on CPU count
-JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN)}"
+JOBS="${JOBS:-`getconf _NPROCESSORS_ONLN`}"
 JOBS="${JOBS:-1}" # If getconf returned nothing, default to 1
 
 
@@ -196,7 +196,7 @@ if [ "$BUILD" != "$HOST" ]; then
   #   $HOST
   # make -j "$JOBS"
   make install || sudo env PATH="$FOREIGN_INSTALL_PATH/bin" make install || su -c "env PATH=\"$FOREIGN_INSTALL_PATH/bin\" make install"
-  make distclean # Ensure we can build it again (newlib does not seem to handle `distclean`)
+  make clean # Ensure we can build it again (newlib does not seem to handle `distclean`)
 
 
   echo "Compiling binutils-$BINUTILS_V for foreign host"
