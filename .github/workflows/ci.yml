@@ -150,7 +150,7 @@ jobs:
   #       id: meta
   #       uses: docker/metadata-action@v3
   #       with:
-  #         images: dragonminded/libdragon
+  #         images: ${GITHUB_REPOSITORY_LOWERCASE}/libdragon
 
   #     - name: Build image
   #       if: ${{ steps.path_diff.outputs.changed == 1 }}
@@ -181,7 +181,7 @@ jobs:
   #         docker run \
   #         --mount type=bind,source=$(pwd),target=/libdragon \
   #         --workdir=/libdragon \
-  #         ghcr.io/dragonminded/libdragon:${DOCKER_TAG} \
+  #         ghcr.io/${GITHUB_REPOSITORY_LOWERCASE}/libdragon:${DOCKER_TAG} \
   #         ./build.sh
 
   Compile-Tools-Windows:
