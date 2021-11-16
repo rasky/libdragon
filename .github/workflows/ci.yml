@@ -80,7 +80,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: "toolchain-linux"
-          path: "${{ github.workspace }}/lib-dragon64/**/*" #"libdragon-gcc-toolchain-mips64-win64.zip"
+          path: "${{ github.workspace }}/**/lib-dragon64/**/*" #"libdragon-gcc-toolchain-mips64-win64.zip"
 
   Compile-Toolchain-Windows:
     runs-on: ubuntu-latest
@@ -126,7 +126,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: "toolchain-win64"
-          path: ${{ github.workspace }}/binaries/**/* #"libdragon-gcc-toolchain-mips64-win64.zip"
+          path: ${{ github.workspace }}/**/binaries/**/* #"libdragon-gcc-toolchain-mips64-win64.zip"
 
   # #TODO: does not handle forks working on it very well, so commented out!
   # Compile-Test-Example-Roms-Docker:

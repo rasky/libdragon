@@ -31,7 +31,7 @@ if [ "$1" == "x86_64-w64-mingw32" ]; then # Windows cross compile (host) flag is
   FOREIGN_INSTALL_PATH="$THIS_SCRIPT_PATH/binaries"
 
   # This will require the extra flags (under certain libs)
-  BUILD="--build=x86_64-linux-gnu"
+  BUILD= # Probably never required but can use: --build=x86_64-linux-gnu
   HOST="--host=$1" 
 
   # Dependency source libs (Versions)
@@ -52,6 +52,10 @@ if [ "$1" == "x86_64-w64-mingw32" ]; then # Windows cross compile (host) flag is
 
 else # We are compiling for the native system.
   echo "building for native system"
+  # Only define optional build and host if required (default empty).
+  BUILD=
+  HOST=
+
   # Only define versions of optional dependencies if required (default empty).
   GMP_V=
   MPC_V=
@@ -189,7 +193,7 @@ if [ "$BUILD" != "$HOST" ]; then
 
   echo "Installing newlib-$NEWLIB_V for foreign host"
   # make install || sudo env PATH="$FOREIGN_INSTALL_PATH/bin" make install || su -c "env PATH=\"$FOREIGN_INSTALL_PATH/bin\" make install"
-  make install DESTDIR="$FOREIGN_INSTALL_PATH/bin" || sudo make install  DESTDIR="$FOREIGN_INSTALL_PATH/bin" || su -c "make install DESTDIR=\"$FOREIGN_INSTALL_PATH/bin\""
+  make install DESTDIR="$FOREIGN_INSTALL_PATH/mips64-elf" || sudo make install  DESTDIR="$FOREIGN_INSTALL_PATH/mips64-elf" || su -c "make install DESTDIR=\"$FOREIGN_INSTALL_PATH/mips64-elf\""
   make clean # Ensure we can build it again (newlib does not seem to handle `distclean`)
 
 
