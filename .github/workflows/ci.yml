@@ -84,7 +84,6 @@ jobs:
 
   Compile-Toolchain-Windows:
     runs-on: ubuntu-latest
-    #needs: Compile-Toolchain-Debian # We need to have the ability to target for mips64 elf packages, so build for linux first!
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -100,7 +99,7 @@ jobs:
           head: ${{ github.sha }}
 
       # Build the toolchain if toolchain files changed w.r.t default which is
-      - name: Build Toolchain Windows
+      - name: Build x86_64 Toolchain
         if: ${{ steps.path_diff.outputs.changed == 1 }}
         run: |
           # Install required dependencies
@@ -108,25 +107,17 @@ jobs:
           # Install Windows cross compile specific dependencies
           sudo apt-get install -yq mingw-w64 libz-mingw-w64-dev autoconf autoconf-archive
 
-          mkdir -p build/toolchain/windows
-          cp ./tools/build-toolchain.sh ./build/toolchain/windows/build-toolchain.sh
+          mkdir -p build/toolchain/windows-x86_64
+          cp ./tools/build-toolchain.sh ./build/toolchain/windows-x86_64/build-toolchain.sh
 
-          cd ./build/toolchain/windows
+          cd ./build/toolchain/windows-x86_64
           sudo ./build-toolchain.sh  x86_64-w64-mingw32
 
-      # # publish windows toolchain artifacts:
-      # - name: Package-Artifacts
-      #   run: |
-      #     # zip binaries for upload
-      #     zip -r -q libdragon-gcc-toolchain-mips64-win64.zip ./build/toolchain/windows/binaries/
-      #     ls
-      
-      # TODO: might not be the best place!
-      - name: Upload Artifact
+      - name: Upload Toolchain Artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: "toolchain-win64"
-          path: ${{ github.workspace }}/**/binaries/**/* #"libdragon-gcc-toolchain-mips64-win64.zip"
+          name: "windows-x86_64-toolchain"
+          path: ${{ github.workspace }}/**/binaries/**/*
 
   # #TODO: does not handle forks working on it very well, so commented out!
   # Compile-Test-Example-Roms-Docker:
@@ -196,8 +187,8 @@ jobs:
       fail-fast: false
       matrix:
        include: [
-         { sys: mingw64, arch: x86_64, build: tools},
-         { sys: mingw32, arch: i686,   build: tools}
+         { sys: mingw64, arch: x86_64, build: tools} #,
+         # { sys: mingw32, arch: i686,   build: tools} # i686 utilities are of limited use Uncomment if needed.
        ]
     steps:
      - uses: msys2/setup-msys2@v2
@@ -218,12 +209,12 @@ jobs:
        run: |
          sed -z 's/#else\n#define WINPTHREAD_API __declspec(dllimport)/#else\n#define WINPTHREAD_API/' /${{matrix.sys}}/${{ matrix.arch }}-w64-mingw32/include/pthread.h
 
-     - name: Build ${{ matrix.build }}
+     - name: Build ${{ matrix.build }} utilities
        shell: msys2 {0}
        run: |
          make ${{ matrix.build }}
 
-     - name: "Upload ${{ matrix.build }} executables"
+     - name: "Upload ${{ matrix.build }} utilities"
        uses: actions/upload-artifact@v2
        with:
          name: windows-${{ matrix.arch }}-${{ matrix.build }}
