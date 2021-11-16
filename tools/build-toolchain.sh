@@ -20,8 +20,7 @@ INSTALL_PATH="${N64_INST:-/usr/local}"
 
 # Check for cross compile script flag
 # TODO: detect the flag `--host`
-if [ "$1" == "x86_64-w64-mingw32" ]; then # Windows cross compile flag is specified as a parameter.
-  # This (probably) requires the toolchain to have already built and installed on the native (linux) system first!
+if [ "$1" == "x86_64-w64-mingw32" ]; then # Windows cross compile (host) flag is specified as a parameter.
   # This (may) also require the following (extra) package dependencies:
   # sudo apt-get install -yq mingw-w64 libgmp-dev bison libz-mingw-w64-dev autoconf
 
@@ -33,7 +32,7 @@ if [ "$1" == "x86_64-w64-mingw32" ]; then # Windows cross compile flag is specif
 
   # This will require the extra flags (under certain libs)
   BUILD="--build=x86_64-linux-gnu"
-  HOST="--host=x86_64-w64-mingw32" 
+  HOST="--host=$1" 
 
   # Dependency source libs (Versions)
   # This will have to build Make and download FP libs
@@ -131,7 +130,7 @@ cd "binutils-$BINUTILS_V"
   --with-cpu=mips64vr4300 \
   --disable-werror
 make -j "$JOBS"
-make install-strip || sudo make install-strip || su -c "make install-strip" # Perhaps use `checkinstall` instead?!
+make install-strip || sudo make install-strip || su -c "make install-strip"
 make distclean # Ensure we can build it again
 echo "Finished Compiling binutils-$BINUTILS_V"
 
@@ -179,9 +178,9 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --disable-libssp \
   --disable-werror
 make -j "$JOBS"
-make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install" # Perhaps use `checkinstall` instead?!
-# make distclean # Ensure we can build it again (newlib does not seem to handle `distclean`)
-# rm -f ./config.cache # alternative to `distclean`
+make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install"
+# make clean # Ensure we can build it again (newlib does not seem to handle `distclean`)
+# rm -f ./config.cache # alternative to `distclean` (or could build out of source tree!)
 echo "Finished Compiling newlib-$NEWLIB_V"
 
 
