@@ -40,6 +40,8 @@ jobs:
           sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
 
           # set N64INST to a local directory so we can make it into an install package?
+          N64_INST=/n64_toolchain
+          export N64_INST=${N64_INST}
           
           mkdir -p build/toolchain/linux
           cp ./tools/build-toolchain.sh ./build/toolchain/linux/build-toolchain.sh
@@ -71,12 +73,14 @@ jobs:
       #     # test install (locally)
       #     #sudo dpkg -i lib-dragon64.deb
 
-      #     # move to artifacts folder
 
       # publish package toolchain artifacts:
-      - name: Upload-Artifacts
-        run: |
-          echo "Requires artifact upload."
+      # TODO: might not be the best place!
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: "toolchain-linux"
+          path: "/usr/local" #"libdragon-gcc-toolchain-mips64-win64.zip"
 
   Compile-Toolchain-Windows:
     runs-on: ubuntu-latest
@@ -110,19 +114,19 @@ jobs:
           cd ./build/toolchain/windows
           sudo ./build-toolchain.sh  x86_64-w64-mingw32
 
-      # publish windows toolchain artifacts:
-      - name: Package-Artifacts
-        run: |
-          # zip binaries for upload
-          zip -r -q libdragon-gcc-toolchain-mips64-win64.zip ./build/toolchain/windows/binaries/
+      # # publish windows toolchain artifacts:
+      # - name: Package-Artifacts
+      #   run: |
+      #     # zip binaries for upload
+      #     zip -r -q libdragon-gcc-toolchain-mips64-win64.zip ./build/toolchain/windows/binaries/
+      #     ls
       
-      # # Until a better place can be used, lets use dropbox!
-      # - name: Upload Artifact to Dropbox
-      #   uses: piotrpolak/github-action-upload-to-dropbox@v0.1
-      #   with:
-      #     accessToken: ${{ secrets.DROPBOX_ACCESS_TOKEN }}
-      #     destination: "/Libdragon"
-      #     files: "libdragon-gcc-toolchain-mips64-win64.zip"
+      # TODO: might not be the best place!
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: "toolchain-win64"
+          path: ${{ github.workspace }}/binaries/**/* #"libdragon-gcc-toolchain-mips64-win64.zip"
 
   # #TODO: does not handle forks working on it very well, so commented out!
   # Compile-Test-Example-Roms-Docker:
