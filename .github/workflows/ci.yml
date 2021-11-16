@@ -31,6 +31,8 @@ jobs:
         with:
           base: ${{ format('refs/remotes/origin/{0}', github.event.repository.default_branch) }}
           head: ${{ github.sha }}
+          paths: ${{ github.workspace }}/tools/build-toolchain.sh
+
 
       # Build the toolchain if toolchain files changed w.r.t default which is
       - name: Build Toolchain Debian
@@ -80,7 +82,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: "toolchain-linux"
-          path: "${{ github.workspace }}/**/lib-dragon64/**/*" #"libdragon-gcc-toolchain-mips64-win64.zip"
+          path: "${{ github.workspace }}/**/lib-dragon64/binaries/**/*" #"libdragon-gcc-toolchain-mips64-win64.zip"
 
   Compile-Toolchain-Windows:
     runs-on: ubuntu-latest
@@ -97,6 +99,7 @@ jobs:
         with:
           base: ${{ format('refs/remotes/origin/{0}', github.event.repository.default_branch) }}
           head: ${{ github.sha }}
+          paths: ${{ github.workspace }}/tools/build-toolchain.sh
 
       # Build the toolchain if toolchain files changed w.r.t default which is
       - name: Build x86_64 Toolchain
@@ -188,7 +191,7 @@ jobs:
       matrix:
        include: [
          { sys: mingw64, arch: x86_64, build: tools} #,
-         # { sys: mingw32, arch: i686,   build: tools} # i686 utilities are of limited use Uncomment if needed.
+         # { sys: mingw32, arch: i686,   build: tools} # i686 tools are of limited use Uncomment if needed.
        ]
     steps:
      - uses: msys2/setup-msys2@v2
@@ -209,12 +212,12 @@ jobs:
        run: |
          sed -z 's/#else\n#define WINPTHREAD_API __declspec(dllimport)/#else\n#define WINPTHREAD_API/' /${{matrix.sys}}/${{ matrix.arch }}-w64-mingw32/include/pthread.h
 
-     - name: Build ${{ matrix.build }} utilities
+     - name: Build ${{ matrix.build }} tools
        shell: msys2 {0}
        run: |
          make ${{ matrix.build }}
 
-     - name: "Upload ${{ matrix.build }} utilities"
+     - name: "Upload ${{ matrix.build }} tools"
        uses: actions/upload-artifact@v2
        with:
          name: windows-${{ matrix.arch }}-${{ matrix.build }}
