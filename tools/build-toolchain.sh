@@ -41,15 +41,6 @@ if [ "$1" == "x86_64-w64-mingw32" ]; then # Windows cross compile (host) flag is
   MPFR_V=4.1.0
   MAKE_V=4.2.1
 
-  # TODO: These "should" be the same as linux, but are out of sync.
-  # Binutils fails with 2.37 on canadian cross
-  BINUTILS_V=2.36.1 # so we are stuck with 2.36.1 for the moment
-  
-  # GCC 11.x fails on canadian cross
-  # see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100017
-  # see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80196
-  GCC_V=10.3.0 # so we are stuck with the 10.x branch for the moment.
-
 else # We are compiling for the native system.
   echo "building for native system"
   # Only define optional build and host if required (default empty).
@@ -62,14 +53,20 @@ else # We are compiling for the native system.
   MPFR_V=
   MAKE_V=
 
-  # # Dependency source libs (Versions)
-  BINUTILS_V=2.37
-  GCC_V=11.2.0
-
 fi
 
-  NEWLIB_V=4.1.0
-  
+# TODO: These "should" be upgradable, but are stuck because of canadian cross compile!
+# BINUTILS 2.37 fails on canadian cross
+BINUTILS_V=2.36.1 # "2.37" works on native linux.
+
+# GCC 11.x fails on canadian cross
+# see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100017
+# see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80196
+GCC_V=10.3.0 # "11.2.0" works on native linux.
+
+NEWLIB_V=4.1.0
+
+
 # Determine how many parallel Make jobs to run based on CPU count
 JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN)}"
 JOBS="${JOBS:-1}" # If getconf returned nothing, default to 1
