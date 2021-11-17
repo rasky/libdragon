@@ -49,7 +49,7 @@ jobs:
 
           cd ./build/toolchain/linux
           sudo ./build-toolchain.sh
-          
+
           cd ${{ github.workspace }}
           tar -czvf libdragon-toolchain.tar.gz /usr/local
 
@@ -168,7 +168,7 @@ jobs:
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
+          username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build image
