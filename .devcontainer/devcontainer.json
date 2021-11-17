@@ -1,9 +1,9 @@
 {
 	"name": "libdragon",
 	// Adjust this file to chose the platform you want using the prebuild containers (only one currently available)
-	// - Dockerfile.Libdragon = you can build anything but it's a very large container
+	// - Dockerfile.libdragon-toolchain = you can build anything but it's a very large container
 	// If you prefer, you can use the source files and adjust them they are located, with the same names in ./sources. This will alow you to customize them and add anything you may need on top.
-	"dockerFile": "Dockerfile.Libdragon",
+	"dockerFile": "Dockerfile.libdragon-toolchain",
 	"context": ".",
 	"mounts": [
 		"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",

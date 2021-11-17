@@ -5,5 +5,5 @@ The available pre-build image is:
 * `ghcr.io/dragonminded/libdragon`: contains the toolchain elements to build a ROM. **Important**: this is the latest avaiable image built from the `dragonminded` `trunk` branch.
 
 The dev container folder consists of:
-* `Dockerfile.Libdragon` to use the pre-build container with all the elements to build libdragon based ROMs using the `latest` image.
-* `./sources/Dockerfile.Libdragon` to build the container from source with all the elements to build libdragon based ROMs after adjusting the toolchain locally.
+* `Dockerfile.libdragon-toolchain` to use the pre-build container with all the elements to build libdragon based ROMs using the `latest` image.
+* `./sources/Dockerfile.libdragon-toolchain` to build the container from source with all the elements to build libdragon based ROMs after adjusting the toolchain locally.

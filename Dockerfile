@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Stage 1 - Build the toolchain
-FROM ubuntu:20.04
+FROM debian:10.4-slim
 # Avoid warnings by switching to noninteractive
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -17,7 +17,9 @@ RUN apt-get update \
     libmpc-dev \
     zlib1g-dev \
     texinfo \
-    git
+    git \
+    gcc-multilib \
+    g++
 
 ARG N64_INST=/n64_toolchain
 ENV N64_INST=${N64_INST}
@@ -31,7 +33,7 @@ RUN ./build-toolchain.sh
 RUN rm -rf ${N64_INST}/share/locale/*
 
 # Stage 2 - Prepare minimal image
-FROM ubuntu:20.04
+FROM debian:10.4-slim
 # Avoid warnings by switching to noninteractive
 ENV DEBIAN_FRONTEND=noninteractive
 ARG N64_INST=/n64_toolchain
