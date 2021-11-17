@@ -49,6 +49,9 @@ jobs:
 
           cd ./build/toolchain/linux
           sudo ./build-toolchain.sh
+          
+          cd ${{ github.workspace }}
+          tar -czvf libdragon-toolchain.tar.gz /usr/local
 
       # - name: Create-Debian-Package
       #   run: |
@@ -75,13 +78,13 @@ jobs:
       #     #sudo dpkg -i lib-dragon64.deb
 
 
-      # # publish package toolchain artifacts:
-      # # TODO: might not be the best place!
-      # - name: Upload Artifact
-      #   uses: actions/upload-artifact@v2
-      #   with:
-      #     name: "toolchain-linux"
-      #     path: /usr/local/**/* #${{ github.workspace }}/**/lib-dragon64/binaries/**/* #"libdragon-gcc-toolchain-mips64-win64.zip"
+      # publish package toolchain artifacts:
+      # TODO: might not be the best place!
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: "toolchain-linux"
+          path: ./libdragon-toolchain.tar.gz #/usr/local/**/* #${{ github.workspace }}/**/lib-dragon64/binaries/**/* #"libdragon-gcc-toolchain-mips64-win64.zip"
 
   Compile-Toolchain-Windows:
     runs-on: ubuntu-latest
