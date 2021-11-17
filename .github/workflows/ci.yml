@@ -75,13 +75,13 @@ jobs:
       #     #sudo dpkg -i lib-dragon64.deb
 
 
-      # publish package toolchain artifacts:
-      # TODO: might not be the best place!
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: "toolchain-linux"
-          path: /usr/local/**/* #${{ github.workspace }}/**/lib-dragon64/binaries/**/* #"libdragon-gcc-toolchain-mips64-win64.zip"
+      # # publish package toolchain artifacts:
+      # # TODO: might not be the best place!
+      # - name: Upload Artifact
+      #   uses: actions/upload-artifact@v2
+      #   with:
+      #     name: "toolchain-linux"
+      #     path: /usr/local/**/* #${{ github.workspace }}/**/lib-dragon64/binaries/**/* #"libdragon-gcc-toolchain-mips64-win64.zip"
 
   Compile-Toolchain-Windows:
     runs-on: ubuntu-latest
@@ -124,11 +124,18 @@ jobs:
           name: "windows-x86_64-toolchain"
           path: ${{ github.workspace }}/**/binaries/**/*
 
-  Compile-Test-Example-Roms-Docker:
+  Compile-Library-Unit-Test-And-Example-ROMs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+
+      # Create a lower cased version of the repo name. This is required
+      # because Docker supports only lowercase names in the registry, while
+      # a repo name on GitHub can have uppercase letters.
+      - name: Downcase repository name
+        run: |
+          echo "GITHUB_REPOSITORY_LOWERCASE=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
 
       # We first compare the default branch to the event commit. In case this is
       # the default branch, this should return 0, skipping the build and using
@@ -151,7 +158,15 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: ${{env.GITHUB_REPOSITORY_LOWERCASE}}/libdragon
+          images: ${{ github.repository }}
+
+      - name: Log in to the container registry
+        if: ${{ steps.path_diff.outputs.changed == 1 }}
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build image
         if: ${{ steps.path_diff.outputs.changed == 1 }}
@@ -169,10 +184,11 @@ jobs:
         if: ${{ steps.path_diff.outputs.changed == 1 }}
         run: |
           echo "DOCKER_TAG=${{ steps.meta.outputs.tags }}" >>${GITHUB_ENV}
+
       - name: Export image tag (latest)
         if: ${{ steps.path_diff.outputs.changed == 0 }}
         run: |
-          echo "DOCKER_TAG=latest" >>${GITHUB_ENV}
+          echo "DOCKER_TAG=${GITHUB_REPOSITORY_LOWERCASE}:latest" >>${GITHUB_ENV}
 
       # As we have a tagged image now, we can use that to run build.sh
       # if it is built in the previous step. o/w it will be downloaded from the
@@ -182,10 +198,18 @@ jobs:
           docker run \
           --mount type=bind,source=$(pwd),target=/libdragon \
           --workdir=/libdragon \
-          ghcr.io/${env.GITHUB_REPOSITORY_LOWERCASE}/libdragon:${DOCKER_TAG} \
+          ghcr.io/${{env.DOCKER_TAG}} \
           ./build.sh
 
-  Compile-Tools-Windows:
+      - name: "Upload built ROMs to artifacts"
+        uses: actions/upload-artifact@v2
+        with:
+          name: roms
+          path: |
+            ${{ github.workspace }}/examples/**/*.z64
+            ${{ github.workspace }}/tests/*.z64
+
+  Build-Tools-Windows:
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -224,3 +248,21 @@ jobs:
          name: windows-${{ matrix.arch }}-${{ matrix.build }}
          path: ${{ github.workspace }}/**/tools/**/*.exe
 
+  # Build-Documentation:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v2
+
+  #     - name: Run Doxygen
+  #       uses: mattnotmitt/doxygen-action@v1
+  #       with:
+  #         doxyfile-path: 'doxygen-public.conf'
+
+  #     - name: Deploy
+  #       uses: peaceiris/actions-gh-pages@v3
+  #       if: ${{ github.ref == 'refs/heads/trunk' }}
+  #       with:
+  #         github_token: ${{ secrets.GITHUB_TOKEN }}
+  #         publish_dir: ./website
+  #         enable_jekyll: true
