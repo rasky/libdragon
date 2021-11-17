@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Stage 1 - Build the toolchain
-FROM debian:10.4-slim
+FROM debian:10.4-slim AS toolchain-builder
 # Avoid warnings by switching to noninteractive
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -9,7 +9,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
     && apt-get -y install --no-install-recommends apt-utils \
     && apt-get install -y \
-    wget \
+    curl \
     bzip2 \
     make \
     file \
@@ -18,7 +18,7 @@ RUN apt-get update \
     zlib1g-dev \
     texinfo \
     git \
-    gcc-multilib \
+    gcc \
     g++
 
 ARG N64_INST=/n64_toolchain
@@ -36,10 +36,13 @@ RUN rm -rf ${N64_INST}/share/locale/*
 FROM debian:10.4-slim
 # Avoid warnings by switching to noninteractive
 ENV DEBIAN_FRONTEND=noninteractive
+# Setup paths for the libgragon toolchain
 ARG N64_INST=/n64_toolchain
 ENV N64_INST=${N64_INST}
 ENV PATH="${N64_INST}/bin:$PATH"
 
+# Install dependencies for building libdragon tools and ROMS (using makefiles and CMake)
+# and (commented out) ability to use it as a vs-code devcontainer.
 RUN apt-get update && \
     apt-get -y install --no-install-recommends apt-utils dialog icu-devtools 2>&1 &&\
     apt-get install -yq \
@@ -49,12 +52,13 @@ RUN apt-get update && \
     libpng-dev \
     git \
     curl \
-    ninja-build \
-    rsync \
-    srecord \
-    zip
+    cmake \
+    ninja-build
+    # rsync \
+    # srecord \
+    # zip
 
-COPY --from=0 ${N64_INST} ${N64_INST}
+COPY --from=toolchain-builder ${N64_INST} ${N64_INST}
 
 # Clean up downloaded files
 RUN apt-get autoremove -y \

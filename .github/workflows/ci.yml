@@ -81,7 +81,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: "toolchain-linux"
-          path: /usr/local #${{ github.workspace }}/**/lib-dragon64/binaries/**/* #"libdragon-gcc-toolchain-mips64-win64.zip"
+          path: /usr/local/**/* #${{ github.workspace }}/**/lib-dragon64/binaries/**/* #"libdragon-gcc-toolchain-mips64-win64.zip"
 
   Compile-Toolchain-Windows:
     runs-on: ubuntu-latest
@@ -124,67 +124,66 @@ jobs:
           name: "windows-x86_64-toolchain"
           path: ${{ github.workspace }}/**/binaries/**/*
 
-  # #TODO: does not handle forks working on it very well, so commented out!
-  # Compile-Test-Example-Roms-Docker:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v2
+  Compile-Test-Example-Roms-Docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
 
-  #     # We first compare the default branch to the event commit. In case this is
-  #     # the default branch, this should return 0, skipping the build and using
-  #     # the latest image from "Docker Build"
-  #     - name: Compare files to default branch
-  #       uses: ./.github/actions/path-diff
-  #       id: path_diff
-  #       with:
-  #         base: ${{ format('refs/remotes/origin/{0}', github.event.repository.default_branch) }}
-  #         head: ${{ github.sha }}
+      # We first compare the default branch to the event commit. In case this is
+      # the default branch, this should return 0, skipping the build and using
+      # the latest image from "Docker Build"
+      - name: Compare files to default branch
+        uses: ./.github/actions/path-diff
+        id: path_diff
+        with:
+          base: ${{ format('refs/remotes/origin/{0}', github.event.repository.default_branch) }}
+          head: ${{ github.sha }}
 
-  #     # Build the toolchain if toolchain files changed w.r.t default which is
-  #     # where we release the images and we can use from registry o/w
-  #     - name: Set up Docker Build
-  #       if: ${{ steps.path_diff.outputs.changed == 1 }}
-  #       uses: docker/setup-buildx-action@v1
+      # Build the toolchain if toolchain files changed w.r.t default which is
+      # where we release the images and we can use from registry o/w
+      - name: Set up Docker Build
+        if: ${{ steps.path_diff.outputs.changed == 1 }}
+        uses: docker/setup-buildx-action@v1
 
-  #     - name: Docker meta
-  #       if: ${{ steps.path_diff.outputs.changed == 1 }}
-  #       id: meta
-  #       uses: docker/metadata-action@v3
-  #       with:
-  #         images: ${GITHUB_REPOSITORY_LOWERCASE}/libdragon
+      - name: Docker meta
+        if: ${{ steps.path_diff.outputs.changed == 1 }}
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: ${GITHUB_REPOSITORY_LOWERCASE}/libdragon
 
-  #     - name: Build image
-  #       if: ${{ steps.path_diff.outputs.changed == 1 }}
-  #       uses: docker/build-push-action@v2
-  #       with:
-  #         context: .
-  #         push: true
-  #         tags: ${{ steps.meta.outputs.tags }}
-  #         cache-from: type=gha
+      - name: Build image
+        if: ${{ steps.path_diff.outputs.changed == 1 }}
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
 
-  #     # Export in the environment the Docker tag that will be used for building
-  #     # libdragon. We use the image we last built if the toolchain has changed,
-  #     # or reuse the latest image (from trunk build) if changed.
-  #     - name: Export image tag (current branch)
-  #       if: ${{ steps.path_diff.outputs.changed == 1 }}
-  #       run: |
-  #         echo "DOCKER_TAG=${{ steps.meta.outputs.tags }}" >>${GITHUB_ENV}
-  #     - name: Export image tag (latest)
-  #       if: ${{ steps.path_diff.outputs.changed == 0 }}
-  #       run: |
-  #         echo "DOCKER_TAG=latest" >>${GITHUB_ENV}
+      # Export in the environment the Docker tag that will be used for building
+      # libdragon. We use the image we last built if the toolchain has changed,
+      # or reuse the latest image (from trunk build) if changed.
+      - name: Export image tag (current branch)
+        if: ${{ steps.path_diff.outputs.changed == 1 }}
+        run: |
+          echo "DOCKER_TAG=${{ steps.meta.outputs.tags }}" >>${GITHUB_ENV}
+      - name: Export image tag (latest)
+        if: ${{ steps.path_diff.outputs.changed == 0 }}
+        run: |
+          echo "DOCKER_TAG=latest" >>${GITHUB_ENV}
 
-  #     # As we have a tagged image now, we can use that to run build.sh
-  #     # if it is built in the previous step. o/w it will be downloaded from the
-  #     # registry. Then verify everything is building properly
-  #     - name: Build libdragon
-  #       run: |
-  #         docker run \
-  #         --mount type=bind,source=$(pwd),target=/libdragon \
-  #         --workdir=/libdragon \
-  #         ghcr.io/${GITHUB_REPOSITORY_LOWERCASE}/libdragon:${DOCKER_TAG} \
-  #         ./build.sh
+      # As we have a tagged image now, we can use that to run build.sh
+      # if it is built in the previous step. o/w it will be downloaded from the
+      # registry. Then verify everything is building properly
+      - name: Build libdragon
+        run: |
+          docker run \
+          --mount type=bind,source=$(pwd),target=/libdragon \
+          --workdir=/libdragon \
+          ghcr.io/${GITHUB_REPOSITORY_LOWERCASE}/libdragon:${DOCKER_TAG} \
+          ./build.sh
 
   Compile-Tools-Windows:
     runs-on: windows-latest
