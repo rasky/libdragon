@@ -151,7 +151,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: ${GITHUB_REPOSITORY_LOWERCASE}/libdragon
+          images: ${{GITHUB_REPOSITORY_LOWERCASE}}/libdragon
 
       - name: Build image
         if: ${{ steps.path_diff.outputs.changed == 1 }}
