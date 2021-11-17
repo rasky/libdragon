@@ -51,7 +51,7 @@ jobs:
         with:
           push: true
           tags: |
-            ghcr.io/${{GITHUB_REPOSITORY_LOWERCASE}}:${{ github.sha }}
-            ghcr.io/${{GITHUB_REPOSITORY_LOWERCASE}}:latest
+            ghcr.io/${{env.GITHUB_REPOSITORY_LOWERCASE}}:${{ github.sha }}
+            ghcr.io/${{env.GITHUB_REPOSITORY_LOWERCASE}}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
