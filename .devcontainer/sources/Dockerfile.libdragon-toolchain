@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM debian:10.4-slim AS toolchain_builder
+FROM debian:11.1-slim AS toolchain_builder
 # Avoid warnings by switching to noninteractive
 ENV DEBIAN_FRONTEND=noninteractive
 # Install required dependencies
@@ -38,7 +38,7 @@ RUN rm -rf ${N64_INST}/share/locale/*
 
 
 # Stage 2 - Prepare minimal image
-FROM debian:10.4-slim AS devcontainer
+FROM debian:11.1-slim AS devcontainer
 ARG DEBIAN_FRONTEND=noninteractive
 
 # You can set up non-root user

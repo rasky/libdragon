@@ -3,10 +3,10 @@
 # branch ci check.
 name: Docker Build
 
-on:
-  push:
-    branches:
-      - trunk
+# on:
+#   push:
+#     branches:
+#       - trunk
 
 jobs:
   Build-and-push-docker-image:
