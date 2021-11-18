@@ -5,8 +5,8 @@ name: Docker-Build
 
 on:
   push:
-    # branches:
-    #   - trunk
+    branches:
+      - trunk
 
 jobs:
   Build-and-push-docker-image:
