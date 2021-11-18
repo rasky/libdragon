@@ -1,7 +1,7 @@
 # Build and push a docker image whenever toolchain script is updated. It is
 # important that this workflow always runs to be able to trigger the default
 # branch ci check.
-name: Docker Build
+name: Docker-Build
 
 on:
   push:
@@ -28,7 +28,7 @@ jobs:
 
       - name: Set up Docker Buildx
         if: ${{ steps.path_diff.outputs.changed == 1 }}
-        uses: docker/setup-buildx-action@v1 #Also needs to check if docker image exists?!
+        uses: docker/setup-buildx-action@v1
 
       - name: Log in to the container registry
         if: ${{ steps.path_diff.outputs.changed == 1 }}

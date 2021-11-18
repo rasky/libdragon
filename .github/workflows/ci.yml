@@ -9,9 +9,9 @@ on:
   pull_request:
 
   workflow_run:
-    workflows: ["Docker Build"]
-    branches:
-      - trunk
+    workflows: ["Docker-Build"]
+    # branches:
+    #   - trunk
     types:
       - completed
 
@@ -179,7 +179,8 @@ jobs:
         with:
           context: .
           push: false
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: |
+            ghcr.io/${{env.GITHUB_REPOSITORY_LOWERCASE}}:${{ github.ref }}
           cache-from: type=gha
 
       # Export in the environment the Docker tag that will be used for building
@@ -193,7 +194,7 @@ jobs:
       - name: Export image tag (latest)
         if: ${{ steps.path_diff.outputs.changed == 0 }}
         run: |
-          echo "DOCKER_TAG=${GITHUB_REPOSITORY_LOWERCASE}:latest" >>${GITHUB_ENV}
+          echo "DOCKER_TAG=${GITHUB_REPOSITORY_LOWERCASE}:${{ github.ref }} >>${GITHUB_ENV}
 
       # As we have a tagged image now, we can use that to run build.sh
       # if it is built in the previous step. o/w it will be downloaded from the
