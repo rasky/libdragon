@@ -42,7 +42,7 @@ jobs:
           sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
 
           # set N64INST to a local directory so we can make it into an install package?
-          # export N64_INST=${{ github.workspace }}/lib-dragon64/binaries
+          export N64_INST=/tmp/lib-dragon64/binaries
           
           mkdir -p build/toolchain/linux
           cp ./tools/build-toolchain.sh ./build/toolchain/linux/build-toolchain.sh
@@ -51,7 +51,7 @@ jobs:
           sudo ./build-toolchain.sh
 
           cd ${{ github.workspace }}
-          tar -czvf libdragon-toolchain.tar.gz /usr/local
+          tar -czvf libdragon-toolchain.tar.gz $N64_INST
 
       # - name: Create-Debian-Package
       #   run: |
@@ -163,7 +163,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: ${{ github.repository }}
+          images: ${{ github.repository }}:${{ github.ref }}
 
       - name: Log in to the container registry
         if: ${{ steps.path_diff.outputs.changed == 1 }}
@@ -178,7 +178,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          push: false
+          push: true
           tags: |
             ghcr.io/${{env.GITHUB_REPOSITORY_LOWERCASE}}:${{ github.ref }}
           cache-from: type=gha
