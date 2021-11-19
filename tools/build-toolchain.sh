@@ -123,7 +123,7 @@ fi
 if [ "$BUILD" != "$HOST" ]; then
   echo "Stage: Patch step"
   
-  if [ "$GCC_V" = "11.2.0" ] || [ "$GCC_V" = "11.1.0" ] then
+  if [[ "$GCC_V" = "11.2.0" ] || [ "$GCC_V" = "11.1.0" ]]; then
     # GCC 11.x fails on canadian cross
     # see: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100017
     # see: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80196
@@ -131,7 +131,7 @@ if [ "$BUILD" != "$HOST" ]; then
     sed -z 's/RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET"/RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET -nostdinc++"/' ./"gcc-$GCC_V"/configure
   fi
 
-  if [$BINUTILS_V = "2.37"] then
+  if [$BINUTILS_V = "2.37"]; then
     # BINUTILS 2.37 fails on canadian cross
     # See: https://lists.gnu.org/archive/html/bug-binutils/2021-07/msg00133.html
     echo "Apply patch for BINUTILS 2.37 using SED:"
