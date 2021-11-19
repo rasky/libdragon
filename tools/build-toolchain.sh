@@ -11,9 +11,12 @@
 # sudo apt-get update && sudo apt-get upgrade
 # sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
 
-# Bash strict mode http://redsymbol.net/articles/unofficial-bash-strict-mode/
-set -euo pipefail
-IFS=$'\n\t'
+# # Bash strict mode http://redsymbol.net/articles/unofficial-bash-strict-mode/
+# set -euo pipefail
+# IFS=$'\n\t'
+
+# Exit script on error
+set -e
 
 # Ensure you set 'N64_INST' before calling the script to change the default installation directory path
   # by default it will presume 'usr/local/n64_toolchain'
