@@ -15,7 +15,7 @@
 set -e
 
 # Ensure you set 'N64_INST' before calling the script to change the default installation directory path
-  # by default it will presume 'usr/local'
+  # by default it will presume 'usr/local/n64_toolchain'
   INSTALL_PATH="${N64_INST:-/usr/local/n64_toolchain}"
 
 # Check for cross compile script flag
@@ -55,7 +55,6 @@ else # We are compiling for the native system.
 
 fi
 
-# TODO: These "should" be upgradable, but are stuck because of canadian cross compile!
 BINUTILS_V=2.37
 GCC_V=11.2.0
 NEWLIB_V=4.1.0
@@ -124,33 +123,21 @@ fi
 if [ "$BUILD" != "$HOST" ]; then
   echo "Stage: Patch step"
   
-  # GCC 11.x fails on canadian cross
-  # see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100017
-  # see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80196
-  # Download GCC specific patch and apply it.
-  cd "gcc-$GCC_V"
-  # test -f "GCC-11-2-cpp.patch"       || download "https://gcc.gnu.org/bugzilla/attachment.cgi?id=51747"  
-  # patch < GCC-11-2-cpp.patch
-  # # As this is not in a source repo, we might have to use sed.
-  # # -RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET"
-  # # +RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET -nostdinc++"
-  sed -z 's/RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET"/RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET -nostdinc++"/' ./configure
-  cd ..
+  if [[ "$GCC_V" = "11.2.0" ] || [ "$GCC_V" = "11.1.0" ]] then
+    # GCC 11.x fails on canadian cross
+    # see: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100017
+    # see: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80196
+    echo "Apply patch for GCC using SED:"
+    sed -z 's/RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET"/RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET -nostdinc++"/' ./"gcc-$GCC_V"/configure
+  fi
 
-  # BINUTILS 2.37 fails on canadian cross
-  # Patch in attachment, but not easy to download.
-  # https://lists.gnu.org/archive/html/bug-binutils/2021-07/msg00133.html
-  # Download Bintools specific patches and apply it.
-  cd "binutils-$BINUTILS_V"
-  # -  uint recursion;
-  # +  unsigned recursion;
-  sed -z 's/uint recursion;/unsigned recursion;/' ./libiberty/rust-demangle.c
-  #    /* Maximum number of times demangle_path may be called recursively.  */
-  #  #define RUST_MAX_RECURSION_COUNT  1024
-  # -#define RUST_NO_RECURSION_LIMIT   ((uint) -1)
-  # +#define RUST_NO_RECURSION_LIMIT   ((unsigned) -1)
-  sed -z 's/#define RUST_NO_RECURSION_LIMIT   ((uint) -1)/#define RUST_NO_RECURSION_LIMIT   ((unsigned) -1)/' ./libiberty/rust-demangle.c
-  cd ..
+  if [$BINUTILS_V = "2.37"] then
+    # BINUTILS 2.37 fails on canadian cross
+    # See: https://lists.gnu.org/archive/html/bug-binutils/2021-07/msg00133.html
+    echo "Apply patch for BINUTILS 2.37 using SED:"
+    sed -z 's/uint recursion;/unsigned recursion;/' ./"binutils-$BINUTILS_V"/libiberty/rust-demangle.c
+    sed -z 's/#define RUST_NO_RECURSION_LIMIT   ((uint) -1)/#define RUST_NO_RECURSION_LIMIT   ((unsigned) -1)/' ./"binutils-$BINUTILS_V"/libiberty/rust-demangle.c
+  fi
 
 fi
 
