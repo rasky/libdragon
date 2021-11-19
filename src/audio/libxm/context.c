@@ -635,6 +635,7 @@ int xm_context_load(xm_context_t** ctxp, FILE* in, uint32_t rate) {
 		if ((size_t)mempool & 7) mempool += 8 - ((size_t)mempool & 7);
 
 		uint8_t *cmp_data = (uint8_t*)p->slots + dec_size - cmp_size;
+		if (cmp_data < (uint8_t*)p->slots) cmp_data = (uint8_t*)p->slots;   // very rare case where data is uncompressible
 		RA(cmp_data, cmp_size);
 
 		// Decompress the slots
