@@ -888,6 +888,7 @@ static void xm_row(xm_context_t* ctx) {
 			int cmp_size = cur->slots_size;
 			int dec_size = sizeof(xm_pattern_slot_t) * cur->num_rows * ctx->module.num_channels;
 			uint8_t *cmp_data = (uint8_t*)ctx->slot_buffer + dec_size - cmp_size;
+			if (cmp_data < (uint8_t*)ctx->slot_buffer) cmp_data = (uint8_t*)ctx->slot_buffer;   // very rare case where data is uncompressible
 
 			fseek(ctx->fh, cur->slots_offset, SEEK_SET);
 			fread(cmp_data, cmp_size, 1, ctx->fh);
