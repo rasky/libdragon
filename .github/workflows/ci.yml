@@ -42,9 +42,9 @@ jobs:
           sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
 
           # set N64INST to a local directory so we can make it into an install package?
-          N64_INST=/tmp/n64_toolchain
-          export N64_INST=${N64_INST}
-          export "${N64_INST}/bin:$PATH"
+          #N64_INST=/tmp/n64_toolchain
+          #export N64_INST=${N64_INST}
+          #export "${N64_INST}/bin:$PATH"
           
           mkdir -p build/toolchain/linux
           cp ./tools/build-toolchain.sh ./build/toolchain/linux/build-toolchain.sh
@@ -53,7 +53,7 @@ jobs:
           sudo ./build-toolchain.sh
 
           cd ${{ github.workspace }}
-          tar -czvf libdragon-toolchain.tar.gz $N64_INST
+          tar -czvf libdragon-toolchain.tar.gz /usr/local/n64_toolchain #$N64_INST
 
       # - name: Create-Debian-Package
       #   run: |
