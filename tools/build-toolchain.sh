@@ -103,17 +103,23 @@ test -d "newlib-$NEWLIB_V"            || tar -xzf "newlib-$NEWLIB_V.tar.gz"
 if [ "$GMP_V" != "" ]; then
   test -f "gmp-$GMP_V.tar.xz"         || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
   test -d "gmp-$GMP_V"                || tar -xf "gmp-$GMP_V.tar.xz" # note no .gz download file currently available
-  cp -R "gmp-$GMP_V" "gcc-$GCC_V"/gmp #TODO: use symbolic link `ln -sf` (cannot get to work)
+  cd "gcc-$GCC_V"
+  ln -sf ../"gmp-$GMP_V" "gmp"
+  cd ..
 fi
 if [ "$MPC_V" != "" ]; then
   test -f "mpc-$MPC_V.tar.gz"         || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
   test -d "mpc-$MPC_V"                || tar -xzf "mpc-$MPC_V.tar.gz"
-  cp -R "mpc-$MPC_V" "gcc-$GCC_V"/mpc #TODO: use symbolic link `ln -sf` (cannot get to work)
+  cd "gcc-$GCC_V"
+  ln -sf ../"mpc-$MPC_V" "mpc"
+  cd ..
 fi
 if [ "$MPFR_V" != "" ]; then
   test -f "mpfr-$MPFR_V.tar.gz"       || download "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_V.tar.gz"
   test -d "mpfr-$MPFR_V"              || tar -xzf "mpfr-$MPFR_V.tar.gz"
-  cp -R "mpfr-$MPFR_V" "gcc-$GCC_V"/mpfr #TODO: use symbolic link `ln -sf` (cannot get to work)
+  cd "gcc-$GCC_V"
+  ln -sf ../"mpfr-$MPFR_V" "mpfr"
+  cd ..
 fi
 # Certain platforms might require Makefile cross compiling
 if [ "$MAKE_V" != "" ]; then
