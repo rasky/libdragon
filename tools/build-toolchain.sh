@@ -24,6 +24,7 @@ set -e
 
 # Check for cross compile script flag
 # TODO: detect the flag `--host`
+# TODO: does not reach bash strict as $1 could be null!
 if [ "$1" == "x86_64-w64-mingw32" ]; then # Windows cross compile (host) flag is specified as a parameter.
   # This (may) also require the following (extra) package dependencies:
   # sudo apt-get install -yq mingw-w64 libgmp-dev bison libz-mingw-w64-dev autoconf
@@ -59,7 +60,7 @@ else # We are compiling for the native system.
 
 fi
 
-BINUTILS_V=2.37 #2.36.1 # linux works fine with 2.37 (but is it worth the effort?)
+BINUTILS_V=2.36.1 # linux works fine with 2.37 (but is it worth the effort?)
 GCC_V=11.2.0
 NEWLIB_V=4.1.0
 
@@ -141,6 +142,7 @@ if [ "$BUILD" != "$HOST" ]; then
     # Also seems to involve more indepth patches... https://gcc.gnu.org/bugzilla/attachment.cgi?id=50777
     # BUT can try my changes...
     echo "Apply patch for BINUTILS 2.37 using SED:"
+    # Add something like: #define uint unsigned int
     sed -z 's/uint recursion;/unsigned int recursion;/' ./"binutils-$BINUTILS_V"/libiberty/rust-demangle.c
     sed -z 's/#define RUST_NO_RECURSION_LIMIT   ((uint) -1)/#define RUST_NO_RECURSION_LIMIT   ((unsigned int) -1)/' ./"binutils-$BINUTILS_V"/libiberty/rust-demangle.c
   fi
