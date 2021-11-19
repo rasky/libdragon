@@ -59,7 +59,7 @@ else # We are compiling for the native system.
 
 fi
 
-BINUTILS_V=2.36.1 # linux works fine with 2.37 (but is it worth the effort?)
+BINUTILS_V=2.37 #2.36.1 # linux works fine with 2.37 (but is it worth the effort?)
 GCC_V=11.2.0
 NEWLIB_V=4.1.0
 
