@@ -52,6 +52,6 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{env.GITHUB_REPOSITORY_LOWERCASE}}:${{ github.sha }}
-            ghcr.io/${{env.GITHUB_REPOSITORY_LOWERCASE}}:latest #!! this needs to be latest (if trunk, main, master) and/or the branch name !!
+            ghcr.io/${{env.GITHUB_REPOSITORY_LOWERCASE}}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
