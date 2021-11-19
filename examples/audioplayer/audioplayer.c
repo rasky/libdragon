@@ -239,10 +239,10 @@ enum Page page_song(void) {
 		graphics_draw_text(disp, 20, 70, sbuf);
 
 		if (song_type == SONG_XM) {
-			xm_pattern_t* pat = xm.ctx->module.patterns + xm.ctx->module.pattern_table[xm.ctx->current_table_index];
+			int patidx = xm.ctx->module.pattern_table[xm.ctx->current_table_index];
 			int pos, row;
 			xm64player_tell(&xm, &pos, &row, NULL);
-			sprintf(sbuf, "Pos: %02x/%02x Row: %02x/%02x\n", pos, xm_get_module_length(xm.ctx), row, pat->num_rows);
+			sprintf(sbuf, "Pos: %02x/%02x Row: %02x/%02x\n", pos, xm_get_module_length(xm.ctx), row, xm_get_number_of_rows(xm.ctx, patidx));
 			graphics_draw_text(disp, 280, 50, sbuf);			
 		} else if (song_type == SONG_YM) {
 			int pos, len;
