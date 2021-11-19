@@ -131,13 +131,13 @@ if [ "$BUILD" != "$HOST" ]; then
     sed -z 's/RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET"/RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET -nostdinc++"/' ./"gcc-$GCC_V"/configure
   #fi
 
-  #if [$BINUTILS_V = "2.37"]; then
+  if ["$BINUTILS_V" = "2.37"]; then
     # BINUTILS 2.37 fails on canadian cross
     # See: https://lists.gnu.org/archive/html/bug-binutils/2021-07/msg00133.html
     echo "Apply patch for BINUTILS 2.37 using SED:"
     sed -z 's/uint recursion;/unsigned recursion;/' ./"binutils-$BINUTILS_V"/libiberty/rust-demangle.c
     sed -z 's/#define RUST_NO_RECURSION_LIMIT   ((uint) -1)/#define RUST_NO_RECURSION_LIMIT   ((unsigned) -1)/' ./"binutils-$BINUTILS_V"/libiberty/rust-demangle.c
-  #fi
+  fi
 
 fi
 
