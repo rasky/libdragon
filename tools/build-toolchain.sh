@@ -15,9 +15,12 @@
 set -e
 
 # Ensure you set 'N64_INST' before calling the script to change the default installation directory path
-# by default it will presume 'usr/local'
-INSTALL_PATH="${N64_INST:-/usr/local}"
-
+if [-n "$N64_INST"] then
+  INSTALL_PATH=$N64_INST
+else
+  # by default it will presume 'usr/local'
+  INSTALL_PATH="${N64_INST:-/usr/local}"
+fi
 # Check for cross compile script flag
 # TODO: detect the flag `--host`
 if [ "$1" == "x86_64-w64-mingw32" ]; then # Windows cross compile (host) flag is specified as a parameter.

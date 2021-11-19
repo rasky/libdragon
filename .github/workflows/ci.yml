@@ -42,7 +42,9 @@ jobs:
           sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
 
           # set N64INST to a local directory so we can make it into an install package?
-          export N64_INST=/tmp/lib-dragon64/binaries
+          N64_INST=/tmp/n64_toolchain
+          export N64_INST=${N64_INST}
+          export "${N64_INST}/bin:$PATH"
           
           mkdir -p build/toolchain/linux
           cp ./tools/build-toolchain.sh ./build/toolchain/linux/build-toolchain.sh
@@ -163,7 +165,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: ${{ github.repository }}:${{ github.ref_name }}
+          images: ${{ github.repository }} #:${{ github.ref_name }}
 
       - name: Log in to the container registry
         if: ${{ steps.path_diff.outputs.changed == 1 }}
