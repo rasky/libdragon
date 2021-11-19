@@ -11,8 +11,9 @@
 # sudo apt-get update && sudo apt-get upgrade
 # sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
 
-# Exit script on error
-set -e
+# Bash strict mode http://redsymbol.net/articles/unofficial-bash-strict-mode/
+set -euo pipefail
+IFS=$'\n\t'
 
 # Ensure you set 'N64_INST' before calling the script to change the default installation directory path
   # by default it will presume 'usr/local/n64_toolchain'
@@ -200,8 +201,6 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --disable-werror
 make -j "$JOBS"
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install"
-# make clean # Ensure we can build it again (newlib does not seem to handle `distclean`)
-# rm -f ./config.cache # alternative to `distclean` (or could build out of source tree!)
 echo "Finished Compiling newlib-$NEWLIB_V"
 
 
@@ -211,7 +210,7 @@ if [ "$BUILD" != "$HOST" ]; then
   echo "Installing newlib-$NEWLIB_V for foreign host"
   # make install || sudo env PATH="$FOREIGN_INSTALL_PATH/bin" make install || su -c "env PATH=\"$FOREIGN_INSTALL_PATH/bin\" make install"
   make install DESTDIR="$FOREIGN_INSTALL_PATH/mips64-elf" || sudo make install  DESTDIR="$FOREIGN_INSTALL_PATH/mips64-elf" || su -c "make install DESTDIR=\"$FOREIGN_INSTALL_PATH/mips64-elf\""
-  make clean # Ensure we can build it again (newlib does not seem to handle `distclean`)
+  make clean
 
 
   echo "Compiling binutils-$BINUTILS_V for foreign host"
@@ -225,7 +224,7 @@ if [ "$BUILD" != "$HOST" ]; then
     $HOST
   make -j "$JOBS"
   make install-strip || sudo make install-strip || su -c "make install-strip"
-  make distclean # Ensure we can build it again
+  make distclean # Ensure we can build it again (distclean is used as we may use it again for a native target).
   echo "Finished Compiling foreign binutils-$BINUTILS_V"
 fi
 
