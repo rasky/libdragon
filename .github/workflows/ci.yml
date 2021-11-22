@@ -42,8 +42,8 @@ jobs:
           sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
 
           # set N64INST to a local directory so we can make it into an install package?
-          # N64_INST=/usr/loocal/n64_toolchain
-          # export N64_INST=${N64_INST}
+          # N64_INST="/usr/loocal/n64_toolchain"
+          # export N64_INST="${N64_INST}"
           
           mkdir -p build/toolchain/linux
           cp ./tools/build-toolchain.sh ./build/toolchain/linux/build-toolchain.sh
@@ -203,13 +203,12 @@ jobs:
           ghcr.io/${{env.DOCKER_TAG}} \
           ./build.sh
 
-      - name: "Upload built ROMs to artifacts"
+      - name: "Upload all built ROMs to artifacts"
         uses: actions/upload-artifact@v2
         with:
           name: roms
           path: |
-            ${{ github.workspace }}/examples/**/*.z64
-            ${{ github.workspace }}/tests/*.z64
+            ${{ github.workspace }}/**/*.z64
 
   Build-Tools-Windows:
     runs-on: windows-latest
