@@ -60,7 +60,7 @@ else # We are compiling for the native system.
 
 fi
 
-BINUTILS_V=2.36.1 # linux works fine with 2.37 (but is it worth the effort?)
+BINUTILS_V=2.37 #2.36.1 # linux works fine with 2.37 (but is it worth the effort?)
 GCC_V=11.2.0
 NEWLIB_V=4.1.0
 
@@ -143,8 +143,10 @@ if [ "$BUILD" != "$HOST" ]; then
     # BUT can try my changes...
     echo "Apply patch for BINUTILS 2.37 using SED:"
     # Add something like: #define uint unsigned int
-    sed -z 's/uint recursion;/unsigned int recursion;/' ./"binutils-$BINUTILS_V"/libiberty/rust-demangle.c
-    sed -z 's/#define RUST_NO_RECURSION_LIMIT   ((uint) -1)/#define RUST_NO_RECURSION_LIMIT   ((unsigned int) -1)/' ./"binutils-$BINUTILS_V"/libiberty/rust-demangle.c
+    nl=$'\n'
+    sed -z 's/uint recursion;/#define uint unsigned int'"\\${nl}"'uint recursion;/' ./"binutils-$BINUTILS_V"/libiberty/rust-demangle.c
+    #sed -z 's/uint recursion;/unsigned int recursion;/' ./"binutils-$BINUTILS_V"/libiberty/rust-demangle.c
+    #sed -z 's/#define RUST_NO_RECURSION_LIMIT   ((uint) -1)/#define RUST_NO_RECURSION_LIMIT   ((unsigned int) -1)/' ./"binutils-$BINUTILS_V"/libiberty/rust-demangle.c
   fi
 
 fi
