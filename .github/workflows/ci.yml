@@ -208,7 +208,7 @@ jobs:
         with:
           name: roms
           path: |
-            **/*.z64
+            ${{ github.workspace }}/**/**/*.z64
 
   Build-Tools-Windows:
     runs-on: windows-latest
