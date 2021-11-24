@@ -22,36 +22,35 @@ set -e
   # by default it will presume 'usr/local/n64_toolchain'
   INSTALL_PATH="${N64_INST:-/usr/local}"
 
+  # Defines the build system variables to allow cross compilation.
   BUILD=${BUILD:-x86_64-linux-gnu}
   HOST=${HOST:-x86_64-linux-gnu}
   TARGET=${TARGET:-mips64-elf}
+
+  # Dependency source libs (Versions)
+  # This will allow the optional use of FP lib source 
+  # (if not available for the host or build system)
+  # By default it uses the installed system versions.
+  GMP_V=${GMP_V:-""}
+  MPC_V=${MPC_V:-""}
+  MPFR_V=${MPFR_V:-""}
+  # This will allow the optional build of Make against a specific version
+  # (useful for cross compiling). 
+  MAKE_V=${MAKE_V:-""}
 
 # Check for cross compile script flag
 if [ "$BUILD" != "$HOST" ]; then # cross compile (host) flag is specified.
   # This (may) also require the following (extra) package dependencies:
   # sudo apt-get install -yq mingw-w64 libgmp-dev bison libz-mingw-w64-dev autoconf
-
   echo "Cross compiling for different host"
-  # Use the current-directory/binaries for the install path, as this is not for linux!
-  rm -rf binaries && mkdir binaries # always ensure the folder is clean (if rebuilding)
+  
+  # Use the current-directory/$HOST/n64_toolchain for the install path for non native parts, as these is not for the current system!
+  rm -rf $HOST/n64_toolchain && mkdir $HOST/n64_toolchain # always ensure the folder is clean (if rebuilding)
   THIS_SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-  FOREIGN_INSTALL_PATH="$THIS_SCRIPT_PATH/binaries"
-
-  # Dependency source libs (Versions)
-  # This will have to build Make and download FP libs
-  GMP_V=6.2.0
-  MPC_V=1.2.1
-  MPFR_V=4.1.0
-  MAKE_V=4.2.1
+  FOREIGN_INSTALL_PATH="$THIS_SCRIPT_PATH/$HOST/n64_toolchain"
 
 else # We are compiling for the native system.
   echo "building for native system"
-
-  # Only define versions of optional dependencies if required (default empty).
-  GMP_V=
-  MPC_V=
-  MPFR_V=
-  MAKE_V=
 
 fi
 
@@ -73,7 +72,7 @@ command_exists () {
 
 # Download the file URL using wget or curl (depending on which is installed)
 download () {
-  if   command_exists wget ; then wget --no-check-certificate -c  "$1"
+  if   command_exists wget ; then wget --no-check-certificate -c  "$1" # checking the certificate chain is not done by curl and requires extra dependencies.
   elif command_exists curl ; then curl -LO "$1"
   else
     echo "Install 'wget' or 'curl' to download toolchain sources" 1>&2
@@ -149,6 +148,9 @@ fi
 echo "Stage: Compile toolchain"
 
 echo "Compiling binutils-$BINUTILS_V"
+# TODO why do we bother if we already have a good (compatible) binutils installed?! 
+# e.g. we could use apt-install binutils-mips-linux-gnu if the host is debian?!
+# This would seriously decrease build time.
 cd "binutils-$BINUTILS_V"
 ./configure \
   --prefix="$INSTALL_PATH" \
@@ -157,12 +159,13 @@ cd "binutils-$BINUTILS_V"
   --disable-werror
 make -j "$JOBS"
 make install-strip || sudo make install-strip || su -c "make install-strip"
-make distclean # Ensure we can build it again
+make distclean # Cleanup to ensure we can build it again
 echo "Finished Compiling binutils-$BINUTILS_V"
 
 echo "Compiling native build of GCC-$GCC_V for MIPS N64 - (pass 1) outside of the source tree"
 # TODO why do we bother if we already have a good (compatible) compiler installed?! 
 # e.g. we could use ` whereis` ?! it does not need to be up-to-date as we have a second pass?!
+# This would seriously decrease build time.
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile

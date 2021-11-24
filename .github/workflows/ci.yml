@@ -117,6 +117,10 @@ jobs:
           cd ./build/toolchain/windows-x86_64
           sudo HOST=x86_64-w64-mingw32 \
           N64_INST=/usr/local/n64_toolchain \
+            GMP_V=6.2.0 \
+            MPC_V=1.2.1 \
+            MPFR_V=4.1.0 \
+            MAKE_V=4.2.1 \
           ./build-toolchain.sh
 
           # cd ${{ github.workspace }}
@@ -126,7 +130,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: "windows-x86_64-toolchain"
-          path: ${{ github.workspace }}/**/binaries/**/*
+          path: ${{ github.workspace }}/**/n64_toolchain/**/*
 
   Compile-Library-Unit-Test-And-Example-ROMs:
     runs-on: ubuntu-latest
