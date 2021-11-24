@@ -197,6 +197,7 @@ make install-strip-gcc || sudo make install-strip-gcc || su -c "make install-str
 make install-target-libgcc || sudo make install-target-libgcc || su -c "make install-target-libgcc"
 echo "Finished Compiling GCC-$GCC_V for MIPS N64 - (pass 1) outside of the source tree"
 if [ "$BUILD" != "$HOST" ]; then
+  echo "Installing GCC-$GCC_V  libgcc for foreign host"
   make install-target-libgcc DESTDIR="$FOREIGN_INSTALL_PATH" || sudo make install-target-libgcc DESTDIR="$FOREIGN_INSTALL_PATH" || su -c "make install-target-libgcc DESTDIR=\"$FOREIGN_INSTALL_PATH\""
 fi
 
