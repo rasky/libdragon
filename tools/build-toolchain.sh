@@ -45,8 +45,10 @@ if [ "$BUILD" != "$HOST" ]; then # cross compile (host) flag is specified.
   echo "Cross compiling for different host"
   
   # Use the current-directory/$HOST/n64_toolchain for the install path for non native parts, as these is not for the current system!
-  rm -rf $HOST/n64_toolchain && mkdir $HOST/n64_toolchain # always ensure the folder is clean (if rebuilding)
   THIS_SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+  # always ensure the folder is clean (if rebuilding)
+  rm -rf "$THIS_SCRIPT_PATH/$HOST/n64_toolchain"
+  mkdir -p "$THIS_SCRIPT_PATH/$HOST/n64_toolchain"
   FOREIGN_INSTALL_PATH="$THIS_SCRIPT_PATH/$HOST/n64_toolchain"
 
 else # We are compiling for the native system.
