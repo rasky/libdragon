@@ -20,12 +20,14 @@ set -e
 
 # Ensure you set 'N64_INST' before calling the script to change the default installation directory path
   # by default it will presume 'usr/local/n64_toolchain'
-  INSTALL_PATH="${N64_INST:-/usr/local/n64_toolchain}"
+  INSTALL_PATH="${N64_INST:-/usr/local}"
+
+  BUILD=${BUILD:-x86_64-linux-gnu}
+  HOST=${HOST:-x86_64-linux-gnu}
+  TARGET=${TARGET:-mips64-elf}
 
 # Check for cross compile script flag
-# TODO: detect the flag `--host`
-# TODO: does not reach bash strict as $1 could be null!
-if [ "$1" == "x86_64-w64-mingw32" ]; then # Windows cross compile (host) flag is specified as a parameter.
+if [ "$HOST" == "x86_64-w64-mingw32" ]; then # Windows cross compile (host) flag is specified as a parameter.
   # This (may) also require the following (extra) package dependencies:
   # sudo apt-get install -yq mingw-w64 libgmp-dev bison libz-mingw-w64-dev autoconf
 
@@ -34,10 +36,6 @@ if [ "$1" == "x86_64-w64-mingw32" ]; then # Windows cross compile (host) flag is
   rm -rf binaries && mkdir binaries # always ensure the folder is clean (if rebuilding)
   THIS_SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   FOREIGN_INSTALL_PATH="$THIS_SCRIPT_PATH/binaries"
-
-  # This will require the extra flags (under certain libs)
-  BUILD= # Probably never required but can use: --build=x86_64-linux-gnu
-  HOST="--host=$1" 
 
   # Dependency source libs (Versions)
   # This will have to build Make and download FP libs
@@ -157,7 +155,7 @@ echo "Compiling binutils-$BINUTILS_V"
 cd "binutils-$BINUTILS_V"
 ./configure \
   --prefix="$INSTALL_PATH" \
-  --target=mips64-elf \
+  --target="$TARGET" \
   --with-cpu=mips64vr4300 \
   --disable-werror
 make -j "$JOBS"
@@ -174,7 +172,7 @@ mkdir gcc_compile
 cd gcc_compile
 ../"gcc-$GCC_V"/configure \
   --prefix="$INSTALL_PATH" \
-  --target=mips64-elf \
+  --target="$TARGET" \
   --with-arch=vr4300 \
   --with-tune=vr4300 \
   --enable-languages=c,c++ \
@@ -202,7 +200,7 @@ cd ../"newlib-$NEWLIB_V"
 # Set PATH for newlib to compile using GCC for MIPS N64 (pass 1)
 export PATH="$PATH:$INSTALL_PATH/bin" #TODO: why is this export?!
 CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
-  --target=mips64-elf \
+  --target="$TARGET" \
   --prefix="$INSTALL_PATH" \
   --with-cpu=mips64vr4300 \
   --disable-threads \
@@ -226,7 +224,7 @@ if [ "$BUILD" != "$HOST" ]; then
   cd ../"binutils-$BINUTILS_V"
   ./configure \
     --prefix="$INSTALL_PATH" \
-    --target=mips64-elf \
+    --target="$TARGET" \
     --with-cpu=mips64vr4300 \
       --disable-werror \
     $BUILD \
@@ -244,7 +242,7 @@ mkdir gcc_compile
 cd gcc_compile
 CFLAGS_FOR_TARGET="-O2" CXXFLAGS_FOR_TARGET=" -O2" ../"gcc-$GCC_V"/configure \
   --prefix="$INSTALL_PATH" \
-  --target=mips64-elf \
+  --target="$TARGET" \
   --with-arch=vr4300 \
   --with-tune=vr4300 \
   --enable-languages=c,c++ \

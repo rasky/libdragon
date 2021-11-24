@@ -49,7 +49,7 @@ jobs:
           cp ./tools/build-toolchain.sh ./build/toolchain/linux/build-toolchain.sh
 
           cd ./build/toolchain/linux
-          sudo ./build-toolchain.sh
+          sudo N64_INST=/usr/local/n64_toolchain build-toolchain.sh
 
       # - name: Create-Debian-Package
       #   run: |
@@ -114,7 +114,9 @@ jobs:
           cp ./tools/build-toolchain.sh ./build/toolchain/windows-x86_64/build-toolchain.sh
 
           cd ./build/toolchain/windows-x86_64
-          sudo ./build-toolchain.sh x86_64-w64-mingw32
+          sudo HOST=x86_64-w64-mingw32 \
+          N64_INST=/usr/local/n64_toolchain \
+          build-toolchain.sh
 
           # cd ${{ github.workspace }}
           # make && make install
