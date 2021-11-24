@@ -1,3 +1,6 @@
+BUILD_DIR=build/
+include $(N64_INST)/include/n64.mk
+
 all: audioplayer cpptest ctest dfsdemo mixertest mptest mputest spritemap test timers vrutest vtest ucodetest
 clean: audioplayer-clean cpptest-clean ctest-clean dfsdemo-clean mixertest-clean mptest-clean mputest-clean spritemap-clean test-clean timers-clean vrutest-clean vtest-clean ucodetest-clean
 
