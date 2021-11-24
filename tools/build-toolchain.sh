@@ -21,6 +21,8 @@ set -e
 # Ensure you set 'N64_INST' before calling the script to change the default installation directory path
   # by default it will presume 'usr/local/n64_toolchain'
   INSTALL_PATH="${N64_INST:-/usr/local}"
+  # rm -rf "$INSTALL_PATH" # We should probably do a clean install?!
+  mkdir -p "$INSTALL_PATH" # But make sure the install path exists!
 
   # Defines the build system variables to allow cross compilation.
   BUILD=${BUILD:-x86_64-linux-gnu}
@@ -47,9 +49,9 @@ if [ "$BUILD" != "$HOST" ]; then # cross compile (host) flag is specified.
   # Use the current-directory/$HOST/n64_toolchain for the install path for non native parts, as these is not for the current system!
   THIS_SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   # always ensure the folder is clean (if rebuilding)
-  rm -rf "$THIS_SCRIPT_PATH/$HOST/n64_toolchain"
-  mkdir -p "$THIS_SCRIPT_PATH/$HOST/n64_toolchain"
-  FOREIGN_INSTALL_PATH="$THIS_SCRIPT_PATH/$HOST/n64_toolchain"
+  rm -rf "$THIS_SCRIPT_PATH/$HOST"
+  mkdir -p "$THIS_SCRIPT_PATH/$HOST"
+  FOREIGN_INSTALL_PATH="$THIS_SCRIPT_PATH/$HOST"
 
 else # We are compiling for the native system.
   echo "building for native system"
@@ -218,7 +220,7 @@ if [ "$BUILD" != "$HOST" ]; then
 
   echo "Installing newlib-$NEWLIB_V for foreign host"
   # make install || sudo env PATH="$FOREIGN_INSTALL_PATH/bin" make install || su -c "env PATH=\"$FOREIGN_INSTALL_PATH/bin\" make install"
-  make install DESTDIR="$FOREIGN_INSTALL_PATH/bin" || sudo make install DESTDIR="$FOREIGN_INSTALL_PATH/bin" || su -c "make install DESTDIR=\"$FOREIGN_INSTALL_PATH/bin\""
+  make install DESTDIR="$FOREIGN_INSTALL_PATH/mips64-elf/" || sudo make install DESTDIR="$FOREIGN_INSTALL_PATH/mips64-elf/" || su -c "make install DESTDIR=\"$FOREIGN_INSTALL_PATH/mips64-elf/\""
   make clean
 
 

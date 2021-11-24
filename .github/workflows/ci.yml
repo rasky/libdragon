@@ -126,7 +126,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: "windows-x86_64-toolchain"
-          path: ${{ github.workspace }}/build/toolchain/windows-x86_64/**/*
+          path: ${{ github.workspace }}/**/n64_toolchain/**/*
 
   #Check-Build-Toolchain-Docker:
   Compile-Library-Unit-Test-And-Example-ROMs:
