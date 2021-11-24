@@ -196,7 +196,9 @@ make all-target-libgcc -j "$JOBS"
 make install-strip-gcc || sudo make install-strip-gcc || su -c "make install-strip-gcc"
 make install-target-libgcc || sudo make install-target-libgcc || su -c "make install-target-libgcc"
 echo "Finished Compiling GCC-$GCC_V for MIPS N64 - (pass 1) outside of the source tree"
-
+if [ "$BUILD" != "$HOST" ]; then
+  make install-target-libgcc DESTDIR="$FOREIGN_INSTALL_PATH" || sudo make install-target-libgcc DESTDIR="$FOREIGN_INSTALL_PATH" || su -c "make install-target-libgcc DESTDIR=\"$FOREIGN_INSTALL_PATH\""
+fi
 
 echo "Compiling newlib-$NEWLIB_V"
 cd ../"newlib-$NEWLIB_V"
@@ -216,7 +218,7 @@ echo "Finished Compiling newlib-$NEWLIB_V"
 
 
 if [ "$BUILD" != "$HOST" ]; then
-  INSTALL_PATH="${FOREIGN_INSTALL_PATH}"
+  INSTALL_PATH="$FOREIGN_INSTALL_PATH"
 
   echo "Installing newlib-$NEWLIB_V for foreign host"
   # make install || sudo env PATH="$FOREIGN_INSTALL_PATH/bin" make install || su -c "env PATH=\"$FOREIGN_INSTALL_PATH/bin\" make install"

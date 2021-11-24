@@ -40,10 +40,10 @@ libdragon.a: $(BUILD_DIR)/n64sys.o $(BUILD_DIR)/interrupt.o \
 
 examples:
 	$(MAKE) -C examples
-# We are unable to clean examples built with n64.mk unless we
-# install it first
-examples-clean: install-mk
-	$(MAKE) -C examples clean
+# # We are unable to clean examples built with n64.mk unless we
+# # install it first
+# examples-clean: install-mk
+# 	$(MAKE) -C examples clean
 
 doxygen: doxygen.conf
 	mkdir -p doxygen/
