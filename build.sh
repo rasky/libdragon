@@ -31,8 +31,9 @@ makeWithParams install
 popd
 rm -Rf $LIBMIKMOD_DIR
 
-# Build all of the libdragon examples
-makeWithParams examples
+# Build examples- libdragon must be already installed at this point
+makeWithParams clobber
+makeWithParams -C ./examples
 
 # Build tests - libdragon must be already installed at this point
 makeWithParams clobber

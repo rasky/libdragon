@@ -38,12 +38,6 @@ libdragon.a: $(BUILD_DIR)/n64sys.o $(BUILD_DIR)/interrupt.o \
 	@echo "    [AR] $@"
 	$(AR) -rcs -o $@ $^
 
-examples:
-	$(MAKE) -C examples
-# We are unable to clean examples built with n64.mk unless we
-# install it first
-examples-clean: install-mk
-	$(MAKE) -C examples clean
 
 doxygen: doxygen.conf
 	mkdir -p doxygen/
@@ -108,9 +102,9 @@ clean:
 	rm -f *.o *.a
 	rm -rf $(CURDIR)/build
 
-clobber: clean doxygen-clean examples-clean tools-clean
+clobber: clean doxygen-clean tools-clean
 
-.PHONY : clobber clean doxygen-clean doxygen doxygen-api examples examples-clean tools tools-clean tools-install
+.PHONY : clobber clean doxygen-clean doxygen doxygen-api tools tools-clean tools-install
 
 # Automatic dependency tracking
 -include $(wildcard $(BUILD_DIR)/*.d) $(wildcard $(BUILD_DIR)/audio/*.d)
