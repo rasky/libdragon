@@ -11,9 +11,9 @@
 # sudo apt-get update && sudo apt-get upgrade
 # sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
 
-# # Bash strict mode http://redsymbol.net/articles/unofficial-bash-strict-mode/
-# set -euo pipefail
-# IFS=$'\n\t'
+# Bash strict mode http://redsymbol.net/articles/unofficial-bash-strict-mode/
+set -euo pipefail
+IFS=$'\n\t'
 
 # Exit script on error
 set -e
@@ -27,7 +27,7 @@ set -e
   TARGET=${TARGET:-mips64-elf}
 
 # Check for cross compile script flag
-if [ "$HOST" == "x86_64-w64-mingw32" ]; then # Windows cross compile (host) flag is specified as a parameter.
+if [ "$BUILD" != "$HOST" ]; then # cross compile (host) flag is specified.
   # This (may) also require the following (extra) package dependencies:
   # sudo apt-get install -yq mingw-w64 libgmp-dev bison libz-mingw-w64-dev autoconf
 
@@ -46,9 +46,6 @@ if [ "$HOST" == "x86_64-w64-mingw32" ]; then # Windows cross compile (host) flag
 
 else # We are compiling for the native system.
   echo "building for native system"
-  # Only define optional build and host if required (default empty).
-  BUILD=
-  HOST=
 
   # Only define versions of optional dependencies if required (default empty).
   GMP_V=
@@ -226,9 +223,9 @@ if [ "$BUILD" != "$HOST" ]; then
     --prefix="$INSTALL_PATH" \
     --target="$TARGET" \
     --with-cpu=mips64vr4300 \
-      --disable-werror \
-    $BUILD \
-    $HOST
+    --disable-werror \
+    --build="$BUILD" \
+    --host="$HOST"
   make -j "$JOBS"
   make install-strip || sudo make install-strip || su -c "make install-strip"
   make distclean # Ensure we can build it again (distclean is used as we may use it again for a native target).
@@ -257,8 +254,8 @@ CFLAGS_FOR_TARGET="-O2" CXXFLAGS_FOR_TARGET=" -O2" ../"gcc-$GCC_V"/configure \
   --disable-nls \
   --disable-werror \
   --with-system-zlib \
-  $BUILD \
-  $HOST
+  --build="$BUILD" \
+  --host="$HOST"
 make -j "$JOBS"
 make install-strip || sudo make install-strip || su -c "make install-strip"
 echo "Finished Compiling gcc-$GCC_V for MIPS N64 - (pass 2) outside of the source tree"
@@ -271,8 +268,8 @@ cd ../"make-$MAKE_V"
     --disable-largefile \
     --disable-nls \
     --disable-rpath \
-    $BUILD \
-    $HOST
+    --build="$BUILD" \
+    --host="$HOST"
 make -j "$JOBS"
 make install-strip || sudo make install-strip || su -c "make install-strip"
 make clean
