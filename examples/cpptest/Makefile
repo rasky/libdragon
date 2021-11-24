@@ -1,6 +1,6 @@
-BUILD_DIR=build
-SOURCE_DIR=.
+BUILD_DIR=build/
 include $(N64_INST)/include/n64.mk
+SOURCE_DIR=.
 
 all: cpptest.z64
 

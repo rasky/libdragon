@@ -40,17 +40,13 @@ jobs:
         run: |
           # install required dependencies
           sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
-
-          # set N64INST to a local directory so we can make it into an install package?
-          # N64_INST="/usr/loocal/n64_toolchain"
-          # export N64_INST="${N64_INST}"
           
           mkdir -p build/toolchain/linux
           cp ./tools/build-toolchain.sh ./build/toolchain/linux/build-toolchain.sh
 
           cd ./build/toolchain/linux
-          sudo N64_INST=/usr/local/n64_toolchain \
-          ./build-toolchain.sh
+          sudo  N64_INST=/usr/local/n64_toolchain \
+                ./build-toolchain.sh
 
       # - name: Create-Debian-Package
       #   run: |
@@ -130,8 +126,9 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: "windows-x86_64-toolchain"
-          path: ${{ github.workspace }}/**/n64_toolchain/**/*
+          path: ${{ github.workspace }}/build/toolchain/windows-x86_64/**/*
 
+  #Check-Build-Toolchain-Docker:
   Compile-Library-Unit-Test-And-Example-ROMs:
     runs-on: ubuntu-latest
     steps:
@@ -199,9 +196,14 @@ jobs:
         run: |
           echo "DOCKER_TAG=${GITHUB_REPOSITORY_LOWERCASE}:${{ github.ref_name }} >>${GITHUB_ENV}
 
-      # As we have a tagged image now, we can use that to run build.sh
-      # if it is built in the previous step. o/w it will be downloaded from the
-      # registry. Then verify everything is building properly
+  # Compile-Library-Unit-Test-And-Sample-ROMs:
+  #   runs-on: ubuntu-latest
+  #   needs: Check-Build-Toolchain-Docker
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v2
+  #     # build against latest docker image (possibily generated in this CI)
+  #     #TODO: also think about runs against native (win/linux) builds (as matrix?).
       - name: Build libdragon
         run: |
           docker run \

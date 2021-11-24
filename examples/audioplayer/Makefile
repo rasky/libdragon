@@ -1,4 +1,4 @@
-BUILD_DIR=build
+BUILD_DIR=build/
 include $(N64_INST)/include/n64.mk
 
 src = audioplayer.c
