@@ -215,7 +215,9 @@ jobs:
         with:
           name: roms
           path: |
-            ${{ github.workspace }}/**/**/*.z64
+            ${{ github.workspace }}/**/*.z64
+            /usr/local/**/*.z64
+            /libdragon/**/*.z64
 
   Build-Tools-Windows:
     runs-on: windows-latest

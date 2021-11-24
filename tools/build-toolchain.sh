@@ -44,13 +44,12 @@ if [ "$BUILD" != "$HOST" ]; then # cross compile (host) flag is specified.
   # sudo apt-get install -yq mingw-w64 libgmp-dev bison libz-mingw-w64-dev autoconf
   echo "Cross compiling for different host"
   
-  # # Use the current-directory/$HOST/n64_toolchain for the install path for non native parts, as these is not for the current system!
-  # THIS_SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-  # # always ensure the folder is clean (if rebuilding)
-  # rm -rf "$THIS_SCRIPT_PATH/$HOST/n64_toolchain"
-  # mkdir -p "$THIS_SCRIPT_PATH/$HOST/n64_toolchain"
-  # FOREIGN_INSTALL_PATH="$THIS_SCRIPT_PATH/$HOST/n64_toolchain"
-  FOREIGN_INSTALL_PATH=$INSTALL_PATH
+  # Use the current-directory/$HOST/n64_toolchain for the install path for non native parts, as these is not for the current system!
+  THIS_SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+  # always ensure the folder is clean (if rebuilding)
+  rm -rf "$THIS_SCRIPT_PATH/$HOST/n64_toolchain"
+  mkdir -p "$THIS_SCRIPT_PATH/$HOST/n64_toolchain"
+  FOREIGN_INSTALL_PATH="$THIS_SCRIPT_PATH/$HOST/n64_toolchain"
 
 else # We are compiling for the native system.
   echo "building for native system"
@@ -201,7 +200,7 @@ echo "Compiling newlib-$NEWLIB_V"
 cd ../"newlib-$NEWLIB_V"
 
 # Set PATH for newlib to compile using GCC for MIPS N64 (pass 1)
-#export PATH="$PATH:$INSTALL_PATH/bin" #TODO: why is this export?!
+export PATH="$PATH:$INSTALL_PATH/bin" #TODO: why is this export?!
 CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --target="$TARGET" \
   --prefix="$INSTALL_PATH" \
@@ -210,18 +209,17 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --disable-libssp \
   --disable-werror
 make -j "$JOBS"
-make install DESTDIR="$INSTALL_PATH/bin" || sudo make install DESTDIR="$INSTALL_PATH//bin" || su -c "make install DESTDIR=\"$INSTALL_PATH/bin\""
-make clean
+make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install"
 echo "Finished Compiling newlib-$NEWLIB_V"
 
 
 if [ "$BUILD" != "$HOST" ]; then
-  #INSTALL_PATH="${FOREIGN_INSTALL_PATH}"
+  INSTALL_PATH="${FOREIGN_INSTALL_PATH}"
 
-  #echo "Installing newlib-$NEWLIB_V for foreign host"
+  echo "Installing newlib-$NEWLIB_V for foreign host"
   # make install || sudo env PATH="$FOREIGN_INSTALL_PATH/bin" make install || su -c "env PATH=\"$FOREIGN_INSTALL_PATH/bin\" make install"
-  # make install DESTDIR="$FOREIGN_INSTALL_PATH//bin" || sudo make install  DESTDIR="$FOREIGN_INSTALL_PATH//bin" || su -c "make install DESTDIR=\"$FOREIGN_INSTALL_PATH//bin\""
-  # make clean
+  make install DESTDIR="$FOREIGN_INSTALL_PATH/bin" || sudo make install DESTDIR="$FOREIGN_INSTALL_PATH/bin" || su -c "make install DESTDIR=\"$FOREIGN_INSTALL_PATH/bin\""
+  make clean
 
 
   echo "Compiling binutils-$BINUTILS_V for foreign host"
