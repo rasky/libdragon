@@ -47,11 +47,11 @@ if [ "$BUILD" != "$HOST" ]; then # cross compile (host) flag is specified.
   echo "Cross compiling for different host"
   
   # Use the current-directory/$HOST/n64_toolchain for the install path for non native parts, as these is not for the current system!
-  THIS_SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+  # THIS_SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
   # always ensure the folder is clean (if rebuilding)
-  rm -rf "$THIS_SCRIPT_PATH/$HOST"
-  mkdir -p "$THIS_SCRIPT_PATH/$HOST"
-  FOREIGN_INSTALL_PATH="$THIS_SCRIPT_PATH/$HOST"
+  # rm -rf "$THIS_SCRIPT_PATH/$HOST"
+  # mkdir -p "$THIS_SCRIPT_PATH/$HOST"
+  # FOREIGN_INSTALL_PATH="$THIS_SCRIPT_PATH/$HOST"
 
 else # We are compiling for the native system.
   echo "building for native system"
@@ -196,10 +196,10 @@ make all-target-libgcc -j "$JOBS"
 make install-strip-gcc || sudo make install-strip-gcc || su -c "make install-strip-gcc"
 make install-target-libgcc || sudo make install-target-libgcc || su -c "make install-target-libgcc"
 echo "Finished Compiling GCC-$GCC_V for MIPS N64 - (pass 1) outside of the source tree"
-if [ "$BUILD" != "$HOST" ]; then
-  echo "Installing GCC-$GCC_V  libgcc for foreign host"
-  make install-target-libgcc DESTDIR="$FOREIGN_INSTALL_PATH" || sudo make install-target-libgcc DESTDIR="$FOREIGN_INSTALL_PATH" || su -c "make install-target-libgcc DESTDIR=\"$FOREIGN_INSTALL_PATH\""
-fi
+# if [ "$BUILD" != "$HOST" ]; then
+#   echo "Installing GCC-$GCC_V  libgcc for foreign host"
+#   make install-target-libgcc DESTDIR="$FOREIGN_INSTALL_PATH" || sudo make install-target-libgcc DESTDIR="$FOREIGN_INSTALL_PATH" || su -c "make install-target-libgcc DESTDIR=\"$FOREIGN_INSTALL_PATH\""
+# fi
 
 echo "Compiling newlib-$NEWLIB_V"
 cd ../"newlib-$NEWLIB_V"
@@ -219,11 +219,11 @@ echo "Finished Compiling newlib-$NEWLIB_V"
 
 
 if [ "$BUILD" != "$HOST" ]; then
-  INSTALL_PATH="$FOREIGN_INSTALL_PATH"
+  #INSTALL_PATH="$FOREIGN_INSTALL_PATH"
 
   echo "Installing newlib-$NEWLIB_V for foreign host"
   # make install || sudo env PATH="$FOREIGN_INSTALL_PATH/bin" make install || su -c "env PATH=\"$FOREIGN_INSTALL_PATH/bin\" make install"
-  make install DESTDIR="$FOREIGN_INSTALL_PATH/mips64-elf/" || sudo make install DESTDIR="$FOREIGN_INSTALL_PATH/mips64-elf/" || su -c "make install DESTDIR=\"$FOREIGN_INSTALL_PATH/mips64-elf/\""
+  # make install DESTDIR="$FOREIGN_INSTALL_PATH/mips64-elf/" || sudo make install DESTDIR="$FOREIGN_INSTALL_PATH/mips64-elf/" || su -c "make install DESTDIR=\"$FOREIGN_INSTALL_PATH/mips64-elf/\""
   make clean
 
 
