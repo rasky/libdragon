@@ -199,7 +199,7 @@ extern "C" {
 	#define debug_init_sdlog(fn,fmt)   ({ false; })
 	#define debug_init_sdfs(prefix,np) ({ false; })
 	#define debugf(msg, ...)           ({ })
-	#define assertf(expr, msg, ...)    ({ })
+	#define assertf(expr, msg, ...)    ({ (void)(expr); })
 #endif
 
 /** @brief Underlying implementation function for assert() and #assertf. */ 

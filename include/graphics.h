@@ -80,6 +80,8 @@ void graphics_draw_sprite_stride( display_context_t disp, int x, int y, sprite_t
 void graphics_draw_sprite_trans( display_context_t disp, int x, int y, sprite_t *sprite );
 void graphics_draw_sprite_trans_stride( display_context_t disp, int x, int y, sprite_t *sprite, int offset );
 
+sprite_t *sprite_load( const char *fn );
+
 #ifdef __cplusplus
 }
 #endif

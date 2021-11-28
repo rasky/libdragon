@@ -894,7 +894,7 @@ static void xm_row(xm_context_t* ctx) {
 			fread(cmp_data, cmp_size, 1, ctx->fh);
 
 			int sz = xm_context_decompress_pattern(cmp_data, cmp_size, ctx->slot_buffer);
-			assert(sz == dec_size);
+			assert(sz == dec_size); (void)sz;
 		}
 		ctx->slot_buffer_index = pat_idx;
 	}

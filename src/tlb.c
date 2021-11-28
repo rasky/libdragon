@@ -88,7 +88,7 @@ void tlb_map_area(unsigned int idx, uint32_t virt, uint32_t vsize, void* phys, b
 	case 0x07FFFF: C0_WRITE_PAGEMASK(0x3F << 13); dbl=true;  break;
 	case 0x0FFFFF: C0_WRITE_PAGEMASK(0xFF << 13); dbl=false; break;
 	case 0x1FFFFF: C0_WRITE_PAGEMASK(0xFF << 13); dbl=true;  break;
-	default: assertf(0, "unsupported virtual area size in tlb_map_area: %lx", vsize);
+	default: assertf(0, "unsupported virtual area size in tlb_map_area: %lx", vsize); return;
 	}
 
 	// Check whether the addresses are correctly aligned

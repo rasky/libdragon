@@ -2,7 +2,7 @@
  * @file debug.c
  * @brief Debugging Support
  */
-
+#undef NDEBUG
 #include <libdragon.h>
 #include <string.h>
 #include <fcntl.h>
