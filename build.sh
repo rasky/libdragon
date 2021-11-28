@@ -35,5 +35,4 @@ rm -Rf $LIBMIKMOD_DIR
 makeWithParams examples
 
 # Build tests - libdragon must be already installed at this point
-makeWithParams clobber
 makeWithParams -C ./tests

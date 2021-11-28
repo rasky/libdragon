@@ -396,7 +396,7 @@ static uint32_t varint_get(uint8_t **pp) {
 int xm_context_decompress_pattern(uint8_t *in, int sz, xm_pattern_slot_t *pat) {
 	uint8_t *in_end = in+sz;
 	uint8_t *out = (uint8_t*)pat;
-	bool direction = (out<=in);
+	bool direction = (out<=in); (void)direction;
 	while (in < in_end) {
 		int zeros = varint_get(&in);
 		int runs = zeros & 7; if (runs == 7) runs += varint_get(&in);

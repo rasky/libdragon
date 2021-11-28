@@ -7,6 +7,8 @@
 #include <malloc.h>
 #include <string.h>
 #include "libdragon.h"
+#include "rdp_commands.h"
+#include "graphicsinternal.h"
 
 /**
  * @defgroup rdp Hardware Display Interface
@@ -104,6 +106,10 @@ static uint32_t rdp_ringbuffer[RINGBUFFER_SIZE / 4];
 static uint32_t rdp_start = 0;
 /** @brief End of the command in the ringbuffer */
 static uint32_t rdp_end = 0;
+/** @brief Record whether the RDP has been properly initialized */
+static bool rdp_initialized = false;
+/** @brief Current state of RDP render mode */
+static uint64_t rdp_other_modes = 0;
 
 /** @brief The current cache flushing strategy */
 static flush_t flush_strategy = FLUSH_STRATEGY_AUTOMATIC;
@@ -194,7 +200,7 @@ static inline uint32_t __rdp_ringbuffer_size( void )
  * @param[in] data
  *            32 bits of data to be queued at the end of the current command
  */
-static void __rdp_ringbuffer_queue( uint32_t data )
+void __rdp_ringbuffer_queue( uint32_t data )
 {
     /* Only add commands if we have room */
     if( __rdp_ringbuffer_size() + sizeof(uint32_t) >= RINGBUFFER_SIZE ) { return; }
@@ -202,6 +208,19 @@ static void __rdp_ringbuffer_queue( uint32_t data )
     /* Add data to queue to be sent to RDP */
     rdp_ringbuffer[rdp_end / 4] = data;
     rdp_end += 4;
+}
+
+__attribute__((noinline))
+void __rdp_ringbuffer_queue64( uint64_t data )
+{
+    /* Only add commands if we have room */
+    if( __rdp_ringbuffer_size() + sizeof(uint64_t) >= RINGBUFFER_SIZE ) { return; }
+
+    /* Add data to queue to be sent to RDP */
+    uint32_t *buf = &rdp_ringbuffer[rdp_end / 4];
+    buf[0] = data >> 32;
+    buf[1] = data;
+    rdp_end += 8;
 }
 
 /**
@@ -212,7 +231,8 @@ static void __rdp_ringbuffer_queue( uint32_t data )
  * kicking off execution of the command in the RDP.  After calling this function, it is
  * safe to start writing to the ring buffer again.
  */
-static void __rdp_ringbuffer_send( void )
+__attribute__((noinline))
+void __rdp_ringbuffer_send( void )
 {
     /* Don't send nothingness */
     if( __rdp_ringbuffer_size() == 0 ) { return; }
@@ -274,6 +294,9 @@ void rdp_init( void )
     /* Set up interrupt for SYNC_FULL */
     register_DP_handler( __rdp_interrupt );
     set_DP_interrupt( 1 );
+
+    /* Record that a new RDP initialization is required. */
+    rdp_initialized = false;
 }
 
 /**
@@ -301,6 +324,22 @@ void rdp_close( void )
 void rdp_attach_display( display_context_t disp )
 {
     if( disp == 0 ) { return; }
+
+    if (!rdp_initialized) {
+       /* Send an initial batch of RDP commands. These are required because a
+          cold-initialized RDP has some invalid, random values in internal
+          registers that can cause soft freezes or surprising behaviors in case
+          they are not initialized. Moreover, this also makes the behavior
+          more consistent with emulators that don't reproduce these cold-boot
+          random values. */
+
+        /* Configure clipping once. A cold-booted RDP without any configured
+           clipping might either do no clipping, or do random clipping, or
+           soft-freeze. */
+        rdp_set_default_clipping();
+
+        rdp_initialized = true;
+    }
 
     /* Set the rasterization buffer */
     __rdp_ringbuffer_queue( 0xFF000000 | ((__bitdepth == 2) ? 0x00100000 : 0x00180000) | (__width - 1) );
@@ -406,8 +445,9 @@ void rdp_set_default_clipping( void )
 void rdp_enable_primitive_fill( void )
 {
     /* Set other modes to fill and other defaults */
-    __rdp_ringbuffer_queue( 0xEFB000FF );
-    __rdp_ringbuffer_queue( 0x00004000 );
+    rdp_other_modes = 0xEFB000FF00004000ull;
+    __rdp_ringbuffer_queue64( rdp_other_modes );
+    // __rdp_ringbuffer_queue64( RdpSetCombine() );
     __rdp_ringbuffer_send();
 }
 
@@ -418,8 +458,15 @@ void rdp_enable_primitive_fill( void )
  */
 void rdp_enable_blend_fill( void )
 {
-    __rdp_ringbuffer_queue( 0xEF0000FF );
-    __rdp_ringbuffer_queue( 0x80000000 );
+    /* Configure (FOG_RGB * FOG_A) + (MEM_RGB * (1-FOG_A)). For some reason,
+       there seems to be no way to use the blend register's alpha, so we
+       need to use the fog register for that. */
+    // #define BLEND_MODE_FOG1 ((3ull<<30) | (1ull<<26) | (1ull<<22) | (0ull<<18))
+    // #define BLEND_MODE_FOG2 ((3ull<<28) | (1ull<<24) | (1ull<<20) | (0ull<<16))
+
+    rdp_other_modes = RdpSetOtherModes(SOM_CYCLE_1 | SOM_BLENDING | SOM_FBREAD | SOM_ATOMIC |
+        SOM_BLENDER_1C((FOG_RGB, FOG_ALPHA, MEM_RGB, ONEMA)));
+    __rdp_ringbuffer_queue64( rdp_other_modes );
     __rdp_ringbuffer_send();
 }
 
@@ -431,10 +478,82 @@ void rdp_enable_blend_fill( void )
  */
 void rdp_enable_texture_copy( void )
 {
+    assertf(__bitdepth != 4, "RDP does not support copy mode on a 32-bit framebuffer");
     /* Set other modes to copy and other defaults */
-    __rdp_ringbuffer_queue( 0xEFA000FF );
-    __rdp_ringbuffer_queue( 0x00004001 );
+    rdp_other_modes = RdpSetOtherModes(SOM_CYCLE_COPY | SOM_BLENDING | SOM_ALPHA_COMPARE | SOM_ATOMIC);
+    __rdp_ringbuffer_queue64( rdp_other_modes );
+    __rdp_ringbuffer_queue64( RdpSetBlendColor( 0,0,0, 0x1 ) );  /* Use for alpha compare */
     __rdp_ringbuffer_send();
+}
+
+void rdp_enable_opaque_sprite( void )
+{
+    rdp_other_modes = RdpSetOtherModes(SOM_CYCLE_1 | SOM_ALPHA_COMPARE | SOM_ATOMIC);
+    __rdp_ringbuffer_queue64( rdp_other_modes );
+    __rdp_ringbuffer_queue64( RdpSetCombiner_1C((ZERO,ZERO,ZERO,TEX0), (ZERO,ZERO,ZERO,TEX0)) );
+    __rdp_ringbuffer_queue64( RdpSetBlendColor( 0,0,0, 0x1 ) );  /* Use for alpha compare */
+    __rdp_ringbuffer_send();
+}
+
+void rdp_enable_custom_mode(uint64_t rdp_rm, uint64_t rdp_cc) {
+    rdp_other_modes = rdp_rm;
+    __rdp_ringbuffer_queue64( rdp_other_modes );
+    __rdp_ringbuffer_queue64( rdp_cc );
+    __rdp_ringbuffer_send();
+}
+
+/**
+ * @brief Load a palette from RDRAM into RDP TMEM
+ *
+ * @param[in] texslot
+ *            The texture slot to use during loading. A texture slot is required
+ *            to perform palette loading, and then it is not needed anymore.
+ * @param[in] palslot
+ *            The palette slot to use in RDP TMEM. TMEM can contain up to 16
+ *            16-colors palette or just one 256-colors palette. This number must
+ *            be 0-15 for 16-colors palettes, or just 0 for 256-colors palettes.
+ * @param[in] palette
+ *            Pointer to palette data in RDRAM
+ * @param[in] ncolors
+ *            Number of colors in the palette. You can load multiple palettes
+ *            with a single command by specifying a higher number here (up to 256).
+ */
+void __rdp_load_palette( uint32_t texslot, int palslot, uint16_t *palette, int ncolors ) {
+    if (flush_strategy == FLUSH_STRATEGY_AUTOMATIC) {
+        data_cache_hit_writeback_invalidate(palette, ncolors*2);
+    }
+
+    __rdp_ringbuffer_queue64(
+        RdpSetTexImage(RDP_TILE_FORMAT_INDEX, RDP_TILE_SIZE_16BIT,
+            (uint32_t)palette, ncolors)
+    );
+
+    __rdp_ringbuffer_queue64(
+        RdpSetTile(RDP_TILE_FORMAT_INDEX, RDP_TILE_SIZE_4BIT, ncolors,
+            (0x800 + palslot*(16*2*4))/8, texslot)
+    );
+
+    __rdp_ringbuffer_queue64(
+        RdpLoadTlut(texslot, palslot*16, palslot*16+ncolors-1)
+    );
+
+    __rdp_ringbuffer_send();
+}
+
+void __rdp_enable_palette( void )
+{
+    if (!(rdp_other_modes & SOM_ENABLE_TLUT_RGB16)) {
+        rdp_other_modes |= SOM_ENABLE_TLUT_RGB16;
+        __rdp_ringbuffer_queue64(rdp_other_modes);
+    }
+}
+
+void __rdp_disable_palette( void )
+{
+    if (rdp_other_modes & SOM_ENABLE_TLUT_RGB16) {
+        rdp_other_modes &= ~SOM_ENABLE_TLUT_RGB16;
+        __rdp_ringbuffer_queue64(rdp_other_modes);
+    }
 }
 
 /**
@@ -462,19 +581,19 @@ void rdp_enable_texture_copy( void )
  *            The pixel offset T of the bottom right of the texture relative to sprite space
  *
  * @return The amount of texture memory in bytes that was consumed by this texture.
+ *         Notice that color-indexed textures also requires a palette to be uploaded,
+ *         which is not included in this count.
  */
 static uint32_t __rdp_load_texture( uint32_t texslot, uint32_t texloc, mirror_t mirror_enabled, sprite_t *sprite, int sl, int tl, int sh, int th )
 {
+    /* Upgrade the sprite to the new header format, if required. */
+    __sprite_upgrade(sprite);
+
     /* Invalidate data associated with sprite in cache */
     if( flush_strategy == FLUSH_STRATEGY_AUTOMATIC )
     {
-        data_cache_hit_writeback_invalidate( sprite->data, sprite->width * sprite->height * sprite->bitdepth );
+        data_cache_hit_writeback_invalidate( sprite->data, sprite->width * sprite->height * sprite->bitdepth / 8 );
     }
-
-    /* Point the RDP at the actual sprite data */
-    __rdp_ringbuffer_queue( 0xFD000000 | ((sprite->bitdepth == 2) ? 0x00100000 : 0x00180000) | (sprite->width - 1) );
-    __rdp_ringbuffer_queue( (uint32_t)sprite->data );
-    __rdp_ringbuffer_send();
 
     /* Figure out the s,t coordinates of the sprite we are copying out of */
     int twidth = sh - sl + 1;
@@ -486,18 +605,102 @@ static uint32_t __rdp_load_texture( uint32_t texslot, uint32_t texloc, mirror_t 
     uint32_t wbits = __rdp_log2( real_width );
     uint32_t hbits = __rdp_log2( real_height );
 
-    /* Because we are dividing by 8, we want to round up if we have a remainder */
-    int round_amount = (real_width % 8) ? 1 : 0;
+    /* Point the RDP at the actual sprite data */
+    int palslot = 0;
+    unsigned tile_format, tile_size, tile_bitdepth_shift, teximage_shift;
+    uint8_t *data = (uint8_t*)sprite->data;
+    switch (sprite->format) {
+        case FMT_RGBA32:
+            __rdp_disable_palette();
+            tile_format = RDP_TILE_FORMAT_RGBA;
+            tile_size = RDP_TILE_SIZE_32BIT;
+            tile_bitdepth_shift = 2;
+            teximage_shift = 0;
+            break;
+        case FMT_RGBA16: 
+            __rdp_disable_palette();
+            tile_format = RDP_TILE_FORMAT_RGBA;
+            tile_size = RDP_TILE_SIZE_16BIT;
+            tile_bitdepth_shift = 1;
+            teximage_shift = 0;
+            break;
+        case FMT_CI8:
+            __rdp_enable_palette();
+            __rdp_load_palette(texslot, palslot, (uint16_t*)data, 256);
+            data += 256 * sizeof(int16_t);
+
+            tile_format = RDP_TILE_FORMAT_INDEX;
+            tile_size = RDP_TILE_SIZE_8BIT;
+            tile_bitdepth_shift = 0;
+            teximage_shift = 0;
+            break;
+        case FMT_CI4: case FMT_I4:
+            if (sprite->format == FMT_CI4) {                
+                __rdp_enable_palette();
+                __rdp_load_palette(texslot, palslot, (uint16_t*)data, 16);
+                data += 16 * sizeof(int16_t);
+            } else {
+                __rdp_disable_palette();                
+            }
+
+            // Loading 4-bit pixel data is not supported by the hardware in
+            // RdpSetTexImage. So we need to load them as 8-bit pixel data.
+            // In fact, what will matter is that they're interpreted as 4-bit
+            // at drawing time, not loading time.
+            tile_format = sprite->format == FMT_CI4 ? RDP_TILE_FORMAT_INDEX : RDP_TILE_FORMAT_I;
+            tile_size = RDP_TILE_SIZE_8BIT;
+            tile_bitdepth_shift = 0;
+            teximage_shift = 1;
+            sl >>= 1; sh >>= 1;
+            break;
+        case FMT_IA8: case FMT_I8:
+            __rdp_disable_palette();
+            tile_format = sprite->format == FMT_IA8 ? RDP_TILE_FORMAT_IA : RDP_TILE_FORMAT_I;
+            tile_size = RDP_TILE_SIZE_8BIT;
+            tile_bitdepth_shift = 0;
+            teximage_shift = 0;
+            break;
+        default:
+            assertf(0, "sprite format not implemented: %d", sprite->format);
+            return 0;
+    }
+
+    __rdp_ringbuffer_queue64(
+        RdpSetTexImage(tile_format, tile_size, (uint32_t)data, sprite->width >> teximage_shift)
+    );
 
     /* Instruct the RDP to copy the sprite data out */
-    __rdp_ringbuffer_queue( 0xF5000000 | ((sprite->bitdepth == 2) ? 0x00100000 : 0x00180000) | 
-                                       (((((real_width / 8) + round_amount) * sprite->bitdepth) & 0x1FF) << 9) | ((texloc / 8) & 0x1FF) );
-    __rdp_ringbuffer_queue( ((texslot & 0x7) << 24) | (mirror_enabled != MIRROR_DISABLED ? 0x40100 : 0) | (hbits << 14 ) | (wbits << 4) );
-    __rdp_ringbuffer_send();
+    __rdp_ringbuffer_queue64(
+        RdpSetTile(tile_format, tile_size,
+            ((real_width+7)/8) << tile_bitdepth_shift,
+            (texloc / 8) & 0x1FF, texslot & 0x7) | 
+            (mirror_enabled != MIRROR_DISABLED ? 0x40100 : 0) | 
+            (hbits << 14) | (wbits << 4) | ((palslot*32) << 20)
+    );
 
     /* Copying out only a chunk this time */
-    __rdp_ringbuffer_queue( 0xF4000000 | (((sl << 2) & 0xFFF) << 12) | ((tl << 2) & 0xFFF) );
-    __rdp_ringbuffer_queue( (((sh << 2) & 0xFFF) << 12) | ((th << 2) & 0xFFF) );
+    __rdp_ringbuffer_queue64(
+        RdpLoadTileI(texslot&7, sl, tl, sh, th)
+    );
+
+    if (sprite->format == FMT_CI4 || sprite->format == FMT_I4) {
+        // Scale back coordinates by 2 and switch to 4-bit mode
+        wbits += 1;
+        sl *= 2;
+        __rdp_ringbuffer_queue64(
+            RdpSetTile(tile_format, RDP_TILE_SIZE_4BIT,
+                ((real_width+7)/8) << tile_bitdepth_shift,
+                (texloc / 8) & 0x1FF, texslot & 0x7) | 
+                (mirror_enabled != MIRROR_DISABLED ? 0x40100 : 0) | 
+                (hbits << 14) | (wbits << 4) | ((palslot*32) << 20)
+        );
+        __rdp_ringbuffer_queue64(
+            RdpSetTileSizeI(texslot & 7, sl, tl, sh, th)
+        );
+        twidth *= 2;
+        real_width *= 2;
+    }
+
     __rdp_ringbuffer_send();
 
     /* Save sprite width and height for managed sprite commands */
@@ -509,7 +712,7 @@ static uint32_t __rdp_load_texture( uint32_t texslot, uint32_t texloc, mirror_t 
     cache[texslot & 0x7].real_height = real_height;
     
     /* Return the amount of texture memory consumed by this texture */
-    return ((real_width / 8) + round_amount) * 8 * real_height * sprite->bitdepth;
+    return (((real_width + 7) / 8) * 8 * real_height) << tile_bitdepth_shift;
 }
 
 /**
@@ -613,6 +816,12 @@ void rdp_draw_textured_rectangle_scaled( uint32_t texslot, int tx, int ty, int b
     uint32_t width = cache[texslot & 0x7].width;
     uint32_t height = cache[texslot & 0x7].height;
    
+    assert(tx <= bx);
+    assert(ty <= by);
+
+    if (bx < 0 || by < 0)
+        return;
+
     /* Cant display < 0, so must clip size and move S,T coord accordingly */
     if( tx < 0 )
     {
@@ -638,8 +847,15 @@ void rdp_draw_textured_rectangle_scaled( uint32_t texslot, int tx, int ty, int b
             t += ( (height+1) + ((cache[texslot & 0x7].real_height-(height+1))<<1) ) << 5;	
     }	
 
+    /* Check whether we are in copy mode. Copy mode as inclusive bottom/right
+       coordinates, and copies 4 pixels at a time so the step must be multiple
+       by 4.0. */
+    bool mode_copy = (rdp_other_modes & SOM_CYCLE_MASK) == SOM_CYCLE_COPY;
+    if (!mode_copy) { bx++; by++; }
+    float xstep = mode_copy ? 4096.0f : 1024.0f;
+
     /* Calculate the scaling constants based on a 6.10 fixed point system */
-    int xs = (int)((1.0 / x_scale) * 4096.0);
+    int xs = (int)((1.0 / x_scale) * xstep);
     int ys = (int)((1.0 / y_scale) * 1024.0);
 
     /* Set up rectangle position in screen space */
@@ -751,8 +967,8 @@ void rdp_draw_sprite_scaled( uint32_t texslot, int x, int y, double x_scale, dou
 void rdp_set_primitive_color( uint32_t color )
 {
     /* Set packed color */
-    __rdp_ringbuffer_queue( 0xF7000000 );
-    __rdp_ringbuffer_queue( color );
+    __rdp_ringbuffer_queue64(RdpSetFillColor(color));
+    __rdp_ringbuffer_queue64(RdpSetPrimColor(color));
     __rdp_ringbuffer_send();
 }
 
@@ -768,6 +984,24 @@ void rdp_set_blend_color( uint32_t color )
 {
     __rdp_ringbuffer_queue( 0xF9000000 );
     __rdp_ringbuffer_queue( color );
+    __rdp_ringbuffer_queue( 0xF8000000 ); // also fog!
+    __rdp_ringbuffer_queue( color );
+    __rdp_ringbuffer_send();
+}
+
+void rdp_set_blend_fog_color( uint32_t blcolor, uint32_t fogcolor )
+{
+    __rdp_ringbuffer_queue( 0xF9000000 );
+    __rdp_ringbuffer_queue( blcolor );
+    __rdp_ringbuffer_queue( 0xF8000000 ); // also fog!
+    __rdp_ringbuffer_queue( fogcolor );
+    __rdp_ringbuffer_send();
+}
+
+void rdp_set_env_color( uint32_t color )
+{
+    __rdp_ringbuffer_queue( 0xFB000000 );
+    __rdp_ringbuffer_queue( color );   
     __rdp_ringbuffer_send();
 }
 

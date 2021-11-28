@@ -6,9 +6,11 @@
 #include <stdint.h>
 #include <malloc.h>
 #include <string.h>
+#include <stdio.h>
 #include "display.h"
 #include "graphics.h"
 #include "font.h"
+#include "graphicsinternal.h"
 
 /**
  * @defgroup graphics 2D Graphics
@@ -165,6 +167,40 @@ uint32_t graphics_convert_color( color_t color )
         return (color.r << 24) | (color.g << 16) | (color.b << 8) | (color.a);
     }
 }
+
+bool __sprite_upgrade( sprite_t *sprite )
+{
+    if (sprite->format == FMT_NONE) {
+        // Convert from old sprite format
+        if (sprite->bitdepth == 2)
+            sprite->format = FMT_RGBA16;
+        else
+            sprite->format = FMT_RGBA32;
+        sprite->bitdepth *= 8;
+        return true;
+    }
+    return false;
+}
+
+sprite_t *sprite_load( const char *fn )
+{
+    FILE *f = fopen(fn, "rb");
+    if (!f)
+        return NULL;
+    fseek(f, 0, SEEK_END);
+
+    int sz = ftell(f);
+    sprite_t *s = malloc(sz);
+
+    fseek(f, 0, SEEK_SET);
+    fread(s, 1, sz, f);
+    fclose(f);
+
+    __sprite_upgrade(s);
+
+    return s;
+}
+
 
 /**
  * @brief Set the current forecolor and backcolor for text operations
@@ -823,6 +859,7 @@ void graphics_draw_sprite_stride( display_context_t disp, int x, int y, sprite_t
     /* Sanity checking */
     if( disp == 0 ) { return; }
     if( sprite == 0 ) { return; }
+    __sprite_upgrade(sprite);
 
     /* For spritemaps */
     int tx = x;
@@ -891,7 +928,7 @@ void graphics_draw_sprite_stride( display_context_t disp, int x, int y, sprite_t
     }
 
     /* Only display sprite if it matches the bitdepth */
-    if( __bitdepth == 2 && sprite->bitdepth == 2 )
+    if( __bitdepth == 2 && sprite->bitdepth == 2*8 )
     {
         uint16_t *buffer = (uint16_t *)__get_buffer( disp );
         uint16_t *sp_data = (uint16_t *)sprite->data;
@@ -906,7 +943,7 @@ void graphics_draw_sprite_stride( display_context_t disp, int x, int y, sprite_t
             }
         }
     }
-    else if( __bitdepth == 4 && sprite->bitdepth == 4 )
+    else if( __bitdepth == 4 && sprite->bitdepth == 4*8 )
     {
         uint32_t *buffer = (uint32_t *)__get_buffer( disp );
         uint32_t *sp_data = (uint32_t *)sprite->data;
@@ -991,7 +1028,8 @@ void graphics_draw_sprite_trans_stride( display_context_t disp, int x, int y, sp
     /* Sanity checking */
     if( disp == 0 ) { return; }
     if( sprite == 0 ) { return; }
-    
+    __sprite_upgrade(sprite);
+
     /* For spritemaps */
     int tx = x;
     int ty = y;
@@ -1059,7 +1097,7 @@ void graphics_draw_sprite_trans_stride( display_context_t disp, int x, int y, sp
     }
 
     /* Only display sprite if it matches the bitdepth */
-    if( __bitdepth == 2 && sprite->bitdepth == 2 )
+    if( __bitdepth == 2 && sprite->bitdepth == 2*8 )
     {
         uint16_t *buffer = (uint16_t *)__get_buffer( disp );
         uint16_t *sp_data = (uint16_t *)sprite->data;
@@ -1078,7 +1116,7 @@ void graphics_draw_sprite_trans_stride( display_context_t disp, int x, int y, sp
             }
         }
     }
-    else if( __bitdepth == 4 && sprite->bitdepth == 4 )
+    else if( __bitdepth == 4 && sprite->bitdepth == 4*8 )
     {
         uint32_t *buffer = (uint32_t *)__get_buffer( disp );
         uint32_t *sp_data = (uint32_t *)sprite->data;

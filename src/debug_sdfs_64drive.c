@@ -36,7 +36,6 @@ static DRESULT fat_disk_read_64drive(BYTE* buff, LBA_t sector, UINT count)
 		io_write(D64_CIBASE_ADDRESS + D64_REGISTER_COMMAND, D64_COMMAND_SD_READ);
 		if (usb_64drive_wait() != 0)
 		{
-			debugf("[debug] fat_disk_read_64drive: wait timeout\n");
 			// Operation is taking too long. Probably SD was not inserted.
 			// Send a COMMAND_ABORT and SD_RESET, and return I/O error.
 			// Note that because of a 64drive firmware bug, this is not
@@ -46,6 +45,7 @@ static DRESULT fat_disk_read_64drive(BYTE* buff, LBA_t sector, UINT count)
 			usb_64drive_wait();
 			io_write(D64_CIBASE_ADDRESS + D64_REGISTER_COMMAND, D64_COMMAND_SD_RESET);
 			usb_64drive_wait();
+			debugf("[debug] fat_disk_read_64drive: wait timeout\n");
 			return FR_DISK_ERR;
 		}
 
@@ -87,7 +87,6 @@ static DRESULT fat_disk_write_64drive(const BYTE* buff, LBA_t sector, UINT count
 		io_write(D64_CIBASE_ADDRESS + D64_REGISTER_COMMAND, D64_COMMAND_SD_WRITE);
 		if (usb_64drive_wait() != 0)
 		{
-			debugf("[debug] fat_disk_write_64drive: wait timeout\n");
 			// Operation is taking too long. Probably SD was not inserted.
 			// Send a COMMAND_ABORT and SD_RESET, and return I/O error.
 			// Note that because of a 64drive firmware bug, this is not
@@ -97,6 +96,7 @@ static DRESULT fat_disk_write_64drive(const BYTE* buff, LBA_t sector, UINT count
 			usb_64drive_wait();
 			io_write(D64_CIBASE_ADDRESS + D64_REGISTER_COMMAND, D64_COMMAND_SD_RESET);
 			usb_64drive_wait();
+			debugf("[debug] fat_disk_write_64drive: wait timeout\n");
 			return FR_DISK_ERR;
 		}
 
