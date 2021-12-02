@@ -242,6 +242,13 @@ static int waveform_wrap_wpos(int wpos, int len, int loop_len) {
 	return ((wpos - len) % loop_len) + (len - loop_len);
 }
 
+// Similar to waveform_wrap_wpos, but with 64-bit positions
+static int64_t waveform_wrap_wpos64(int64_t wpos, int64_t len, int64_t loop_len) {
+	assert(loop_len != 0);
+	assert(wpos >= len);
+	return ((wpos - len) % loop_len) + (len - loop_len);
+}
+
 // A wrapper for a waveform's read function that handles loops.
 // Sample buffers are not aware of loops. The way the mixer handles
 // loops is by unrolling them in the sample buffer: that is, the sample
@@ -357,7 +364,16 @@ void mixer_ch_set_pos(int ch, float pos) {
 float mixer_ch_get_pos(int ch) {
 	mixer_channel_t *c = &Mixer.channels[ch];
 	assertf(!(c->flags & CH_FLAGS_STEREO_SUB), "mixer_ch_get_pos: cannot call on secondary stereo channel %d", ch);
-	uint32_t pos = c->pos >> (c->flags & CH_FLAGS_BPS_SHIFT);
+
+	int bps = c->flags & CH_FLAGS_BPS_SHIFT;
+	int64_t pos = c->pos >> bps;
+
+	// If the the waveform is looping and the current position is beyond the
+	// length, wrap it through the loop back to a [0..len[ position.
+	if (c->loop_len != 0 && c->pos >= c->len) {
+		pos = waveform_wrap_wpos64(c->pos, c->len, c->loop_len) >> bps;
+	}
+
 	return (float)pos / (float)(1<<MIXER_FX64_FRAC);
 }
 
