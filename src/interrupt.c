@@ -601,6 +601,42 @@ __attribute__((constructor)) void __init_interrupts()
 }
 
 /**
+ * @brief Disable interrupts when certain bits in a hardware register are turned off
+ * 
+ * This function implements the correct code pattern to disable interrupts
+ * when a certain hardware resource become available, to exclusively acquire
+ * access to it. A typical example would be waiting for a PI DMA to finish
+ * before starting a new one: this requires waiting for any previous transfer
+ * to be finished, and then disabling interrupts to start a new one (without
+ * risking that an interrupt races and schedules a new transfer).
+ * 
+ * This function keeps interrupts enabled for all the waiting time, so not to
+ * gratuitously increase interrupt latency.
+ * 
+ * @note This function is not public API yet, pending a better understanding
+ *       on how it would work in a multithreading context.
+ */
+void disable_interrupts_when(volatile uint32_t* reg, uint32_t mask) {
+    while (1) {
+        // Wait until the specified bits are turned off in the register. Keep
+        // the interrupts enabled meanwhile
+        while (*reg & mask) {}
+
+        // Now disable interrupts
+        disable_interrupts();
+
+        // If the resource is still free, we're done.
+        if (!(*reg & mask))
+            return;
+
+        // The resource has become busy while we were disabling the interrupts.
+        // An interrupt or a thread has raced with us and won the race, stealing
+        // the resource. Enable interrupts and try again.
+        enable_interrupts();
+    }
+}
+
+/**
  * @brief Disable interrupts systemwide
  *
  * @note If interrupts are already disabled on the system or interrupts have not

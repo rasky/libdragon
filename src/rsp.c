@@ -4,7 +4,14 @@
  * @ingroup rsp
  */
 
-#include "libdragon.h"
+#include <stddef.h>
+#include <stdint.h>
+#include <assert.h>
+#include "rsp.h"
+#include "n64sys.h"
+#include "dma.h"
+#include "interrupt.h"
+#include "interruptinternal.h"
 #include "regsinternal.h"
 
 /** @brief Static structure to address SP registers */
@@ -41,8 +48,7 @@ void rsp_load_code(void* start, unsigned long size, unsigned int imem_offset)
     assert(((uint32_t)start % 8) == 0);
     assert((imem_offset % 8) == 0);
 
-    disable_interrupts();
-    __SP_DMA_wait();
+    disable_interrupts_when(&SP_regs->status, SP_STATUS_DMA_BUSY | SP_STATUS_IO_BUSY);
 
     SP_regs->DRAM_addr = start;
     MEMORY_BARRIER();
@@ -51,8 +57,8 @@ void rsp_load_code(void* start, unsigned long size, unsigned int imem_offset)
     SP_regs->rsp_read_length = size - 1;
     MEMORY_BARRIER();
 
-    __SP_DMA_wait();
     enable_interrupts();
+    __SP_DMA_wait();
 }
 
 void rsp_load_data(void* start, unsigned long size, unsigned int dmem_offset)
@@ -60,8 +66,7 @@ void rsp_load_data(void* start, unsigned long size, unsigned int dmem_offset)
     assert(((uint32_t)start % 8) == 0);
     assert((dmem_offset % 8) == 0);
 
-    disable_interrupts();
-    __SP_DMA_wait();
+    disable_interrupts_when(&SP_regs->status, SP_STATUS_DMA_BUSY | SP_STATUS_IO_BUSY);
 
     SP_regs->DRAM_addr = start;
     MEMORY_BARRIER();
@@ -70,8 +75,8 @@ void rsp_load_data(void* start, unsigned long size, unsigned int dmem_offset)
     SP_regs->rsp_read_length = size - 1;
     MEMORY_BARRIER();
 
-    __SP_DMA_wait();
     enable_interrupts();
+    __SP_DMA_wait();
 }
 
 void rsp_read_code(void* start, unsigned long size, unsigned int imem_offset)
@@ -80,8 +85,7 @@ void rsp_read_code(void* start, unsigned long size, unsigned int imem_offset)
     assert((imem_offset % 8) == 0);
     data_cache_hit_writeback_invalidate(start, size);
 
-    disable_interrupts();
-    __SP_DMA_wait();
+    disable_interrupts_when(&SP_regs->status, SP_STATUS_DMA_BUSY | SP_STATUS_IO_BUSY);
 
     SP_regs->DRAM_addr = start;
     MEMORY_BARRIER();
@@ -89,9 +93,9 @@ void rsp_read_code(void* start, unsigned long size, unsigned int imem_offset)
     MEMORY_BARRIER();
     SP_regs->rsp_write_length = size - 1;
     MEMORY_BARRIER();
-    __SP_DMA_wait();
 
     enable_interrupts();
+    __SP_DMA_wait();
 }
 
 
@@ -101,8 +105,7 @@ void rsp_read_data(void* start, unsigned long size, unsigned int dmem_offset)
     assert((dmem_offset % 8) == 0);
     data_cache_hit_writeback_invalidate(start, size);
 
-    disable_interrupts();
-    __SP_DMA_wait();
+    disable_interrupts_when(&SP_regs->status, SP_STATUS_DMA_BUSY | SP_STATUS_IO_BUSY);
 
     SP_regs->DRAM_addr = start;
     MEMORY_BARRIER();
@@ -110,9 +113,9 @@ void rsp_read_data(void* start, unsigned long size, unsigned int dmem_offset)
     MEMORY_BARRIER();
     SP_regs->rsp_write_length = size - 1;
     MEMORY_BARRIER();
-    __SP_DMA_wait();
 
     enable_interrupts();
+    __SP_DMA_wait();
 }
 
 void rsp_run_async(void)

@@ -6,7 +6,11 @@
 #include <stdint.h>
 #include <malloc.h>
 #include <string.h>
-#include "libdragon.h"
+#include "rdp.h"
+#include "interrupt.h"
+#include "interruptinternal.h"
+#include "regsinternal.h"
+#include "n64sys.h"
 
 /**
  * @defgroup rdp Hardware Display Interface
@@ -50,6 +54,9 @@
  * never use #SYNC_FULL.
  * @{
  */
+
+/** @brief Static structure to address DP registers */
+static volatile struct DP_regs_s * const DP_regs = (struct DP_regs_s *)0xa4100000;
 
 /**
  * @brief Grab the texture buffer given a display context
@@ -219,27 +226,18 @@ static void __rdp_ringbuffer_send( void )
 
     /* Ensure the cache is fixed up */
     data_cache_hit_writeback_invalidate(&rdp_ringbuffer[rdp_start / 4], __rdp_ringbuffer_size());
-    
-    /* Best effort to be sure we can write once we disable interrupts */
-    while( (((volatile uint32_t *)0xA4100000)[3] & 0x600) ) ;
 
-    /* Make sure another thread doesn't attempt to render */
-    disable_interrupts();
+    /* Wait for the RDP to be able to enqueue a new transfer */    
+    disable_interrupts_when(&DP_regs->status, DP_STATUS_START_VALID | DP_STATUS_END_VALID);
 
     /* Clear XBUS/Flush/Freeze */
-    ((uint32_t *)0xA4100000)[3] = 0x15;
-    MEMORY_BARRIER();
-
-    /* Don't saturate the RDP command buffer.  Another command could have been written
-     * since we checked before disabling interrupts, but it is unlikely, so we probably
-     * won't stall in this critical section long. */
-    while( (((volatile uint32_t *)0xA4100000)[3] & 0x600) ) ;
+    DP_regs->status = DP_WSTATUS_CLEAR_XBUS | DP_WSTATUS_CLEAR_FREEZE | DP_WSTATUS_CLEAR_FLUSH;
 
     /* Send start and end of buffer location to kick off the command transfer */
     MEMORY_BARRIER();
-    ((volatile uint32_t *)0xA4100000)[0] = ((uint32_t)rdp_ringbuffer | 0xA0000000) + rdp_start;
+    DP_regs->cmd_start = (void*)(((uint32_t)rdp_ringbuffer | 0xA0000000) + rdp_start);
     MEMORY_BARRIER();
-    ((volatile uint32_t *)0xA4100000)[1] = ((uint32_t)rdp_ringbuffer | 0xA0000000) + rdp_end;
+    DP_regs->cmd_end   = (void*)(((uint32_t)rdp_ringbuffer | 0xA0000000) + rdp_end);
     MEMORY_BARRIER();
 
     /* We are good now */

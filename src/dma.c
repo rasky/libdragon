@@ -3,7 +3,13 @@
  * @brief DMA Controller
  * @ingroup dma
  */
-#include "libdragon.h"
+
+#include <stdint.h>
+#include <assert.h>
+#include "dma.h"
+#include "n64sys.h"
+#include "interrupt.h"
+#include "interruptinternal.h"
 #include "regsinternal.h"
 
 /**
@@ -81,9 +87,8 @@ void dma_read_raw_async(void * ram_address, unsigned long pi_address, unsigned l
 {
     assert(len > 0);
 
-    disable_interrupts();
+    disable_interrupts_when(&PI_regs->status, PI_STATUS_DMA_BUSY | PI_STATUS_IO_BUSY);
 
-    while (__dma_busy()) ;
     MEMORY_BARRIER();
     PI_regs->ram_address = ram_address;
     MEMORY_BARRIER();
@@ -117,9 +122,8 @@ void dma_write_raw_async(const void * ram_address, unsigned long pi_address, uns
 {
     assert(len > 0);
 
-    disable_interrupts();
+    disable_interrupts_when(&PI_regs->status, PI_STATUS_DMA_BUSY | PI_STATUS_IO_BUSY);
 
-    while (__dma_busy()) ;
     MEMORY_BARRIER();
     PI_regs->ram_address = (void*)ram_address;
     MEMORY_BARRIER();
@@ -339,8 +343,10 @@ uint32_t io_read(uint32_t pi_address)
 {
     uint32_t retval;
 
-    disable_interrupts();
+    disable_interrupts_when(&PI_regs->status, PI_STATUS_DMA_BUSY | PI_STATUS_IO_BUSY);
+
     retval = __io_read32(pi_address | 0xA0000000);
+
     enable_interrupts();
 
     return retval;
@@ -358,9 +364,8 @@ void io_write(uint32_t pi_address, uint32_t data)
 {
     volatile uint32_t *uncached_address = (uint32_t *)(pi_address | 0xa0000000);
 
-    disable_interrupts();
+    disable_interrupts_when(&PI_regs->status, PI_STATUS_DMA_BUSY | PI_STATUS_IO_BUSY);
 
-    while (__dma_busy()) ;
     MEMORY_BARRIER();
     *uncached_address = data;
     MEMORY_BARRIER();

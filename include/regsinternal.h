@@ -166,4 +166,42 @@ typedef struct SP_regs_s {
     uint32_t rsp_semaphore;
 } SP_regs_t;
 
+/**
+ * @brief Register definition for the SP interface
+ * @ingroup lowlevel
+ */
+typedef struct DP_regs_s {
+    /** @brief DMEM/RDRAM command start pointer */
+    void * cmd_start;
+    /** @brief DMEM/RDRAM command end pointer */
+    void * cmd_end;
+    /** @brief DMEM/RDRAM command current pointer */
+    void * cmd_current;
+    /** @brief Status register */
+    uint32_t status;
+    /** @brief Clock counter */
+    uint32_t clock;
+    /** @brief Command buffer clock counter */
+    uint32_t cmd_busy_clock;
+    /** @brief Pipeline clock counter */
+    uint32_t pipe_busy_clock;
+    /** @brief TMEM clock counter */
+    uint32_t tmem_clock;
+} DP_regs_t;
+
+
+#define DP_STATUS_XBUS           (1<<0)
+#define DP_STATUS_FREEZE         (1<<1)
+#define DP_STATUS_FLUSH          (1<<2)
+#define DP_STATUS_DMA_BUSY       (1<<8)
+#define DP_STATUS_END_VALID      (1<<9)
+#define DP_STATUS_START_VALID    (1<<10)
+
+#define DP_WSTATUS_CLEAR_XBUS    (1<<0)
+#define DP_WSTATUS_SET_XBUS      (1<<1)
+#define DP_WSTATUS_CLEAR_FREEZE  (1<<2)
+#define DP_WSTATUS_SET_FREEZE    (1<<3)
+#define DP_WSTATUS_CLEAR_FLUSH   (1<<4)
+#define DP_WSTATUS_SET_FLUSH     (1<<5)
+
 #endif
