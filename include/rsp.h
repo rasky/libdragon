@@ -7,7 +7,13 @@
 /**
  * @defgroup rsp RSP interface
  * @ingroup lowlevel
- * @brief RSP basic library
+ * @brief RSP basic library and command queue
+ * 
+ * This module is made of two libraries:
+ * 
+ *  * rsp.h and rsp.c: low-level routines to manipulate the RSP
+ *  * rspq.h and rspq.c: RSP command queue for efficient task processing by
+ *    multiple libraries
  * 
  * This library offers very low-level support for RSP programming. The goal
  * is to provide access to the hardware by exposing macros for all
