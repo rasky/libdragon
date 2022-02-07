@@ -9,6 +9,7 @@
 #include "libdragon.h"
 #include "regsinternal.h"
 #include "n64sys.h"
+#include "utils.h"
 
 /**
  * @defgroup audio Audio Subsystem
@@ -31,18 +32,35 @@
  *
  * Code attempting to output audio on the N64 should initialize the
  * audio subsystem at the desired frequency and with the desired number
- * of buffers using #audio_init.  More audio buffers allows for smaller
+ * of buffers using #audio_init.  More audio buffers allow for smaller
  * chances of audio glitches but means that there will be more latency
- * in sound output.  When new data is available to be output, code should
- * check to see if there is room in the output buffers using
- * #audio_can_write.  Code can probe the current frequency and buffer
- * size using #audio_get_frequency and #audio_get_buffer_length respectively.
- * When there is additional room, code can add new data to the output
- * buffers using #audio_write.  Be careful as this is a blocking operation,
- * so if code doesn't check for adequate room first, this function will
- * not return until there is room and the samples have been written.
- * When all audio has been written, code should call #audio_close to shut
- * down the audio subsystem cleanly.
+ * in sound output. 
+ * 
+ * When new data is available to be output, code should
+ * call #audio_push, which is the simplest, highest-level way to put
+ * samples into the audio buffers. #audio_push can either block until all
+ * samples have been written (potentially waiting for the AI to playback
+ * and release some buffers), or copy as many samples as possible and
+ * exit without blocking, returning the number of copied samples to the
+ * caller. This API is very easy to use, but it forces all samples to
+ * be copied once into the audio buffers.
+ * 
+ * Alternatively, a lower-level set of APIs is available, which is
+ * harder to use, but allows for more performance. It is possible
+ * to call #audio_write_begin to acquire a pointer to an internal audio
+ * buffer, that must be then fully filled with samples (the size of
+ * the buffers can be read with #audio_get_buffer_length). This means
+ * that the calling code will have to call the function only when at
+ * least those number of samples are available to be written.
+ * When the samples have been written, code must call #audio_write_end
+ * to notify the audio library that the buffer is now ready for playback.
+ * To achieve higher performance, calling code can arrange to generate
+ * samples directly within the audio buffer returned by #audio_write_begin,
+ * to avoid having to copy them, reducing memory bandwidth.
+ * #audio_write_begin will block until a buffer is available. It is possible
+ * to call #audio_can_write to probe whether at least one buffer is
+ * available.
+ * 
  * @{
  */
 
@@ -350,69 +368,33 @@ void audio_pause(bool pause) {
 }
 
 /**
- * @brief Write a chunk of audio data
- *
- * This function takes a chunk of audio data and writes it to an internal
- * buffer which will be played back by the audio system as soon as room
- * becomes available in the AI.  The buffer should contain stereo interleaved
- * samples and be exactly #audio_get_buffer_length stereo samples long.
- * 
- * To improve performance and avoid the memory copy, use #audio_write_begin
- * and #audio_write_end instead.
- *
- * @note This function will block until there is room to write an audio sample.
- *       If you do not want to block, check to see if there is room by calling
- *       #audio_can_write.
- *
- * @param[in] buffer
- *            Buffer containing stereo samples to be played
- */
-void audio_write(const short * const buffer)
-{
-    if(!buffers)
-    {
-        return;
-    }
-
-    disable_interrupts();
-
-    /* check for empty buffer */
-    int next = (now_writing + 1) % _num_buf;
-    while (buf_full & (1<<next))
-    {
-        // buffers full
-        audio_callback();
-        enable_interrupts();
-        disable_interrupts();
-    }
-
-    /* Copy buffer into local buffers */
-    buf_full |= (1<<next);
-    now_writing = next;
-    memcpy(buffers[now_writing], buffer, _buf_size * 2 * sizeof(short));
-    audio_callback();
-    enable_interrupts();
-}
-
-/**
  * @brief Start writing to the first free internal buffer.
  * 
- * This function is similar to #audio_write but instead of taking samples
- * and copying them to an internal buffer, it returns the pointer to the
- * internal buffer. This allows generating the samples directly in the buffer
- * that will be sent via DMA to AI, without any subsequent memory copy.
+ * This function returns a pointer to the start of the first free
+ * internal buffer, where samples can be written for playback.
  * 
  * The buffer should be filled with stereo interleaved samples, and
- * exactly #audio_get_buffer_length samples should be written.
+ * exactly #audio_get_buffer_length samples should be written. Most
+ * code will need to call memcpy to copy samples from a source
+ * buffer into the buffer returned by this function. For
+ * maximum performance, the caller code can arrange for samples to
+ * be generated directly within this buffer, to avoid the memcpy call.
  * 
- * After you have written the samples, call audio_write_end() to notify
- * the library that the buffer is ready to be sent to AI.
+ * After you have written that exact number of samples, call
+ * audio_write_end() to notify the library that the buffer is
+ * ready to be sent to AI.
+ * 
+ * If you need to be able to write any number of samples into audio
+ * buffers, see #audio_push that offers a simpler API, though it might
+ * be less performant because it always requires to copy samples.
  * 
  * @note This function will block until there is room to write an audio sample.
  *       If you do not want to block, check to see if there is room by calling
  *       #audio_can_write.
  * 
  * @return  Pointer to the internal memory buffer where to write samples.
+ * 
+ * @see #audio_push
  */
 short* audio_write_begin(void) 
 {
@@ -443,10 +425,9 @@ short* audio_write_begin(void)
 /**
  * @brief Complete writing to an internal buffer.
  * 
- * This function is meant to be used in pair with audio_write_begin().
+ * This function is meant to be used in pair with #audio_write_begin.
  * Call this once you have generated the samples, so that the audio
  * system knows the buffer has been filled and can be played back.
- * 
  */
 void audio_write_end(void)
 {
@@ -454,6 +435,74 @@ void audio_write_end(void)
     buf_full |= (1<<now_writing);
     audio_callback();
     enable_interrupts();
+}
+
+/**
+ * @brief Write samples into the audio buffers.
+ *
+ * This function is the highest level way of pushing samples into the audio
+ * library. It accepts a buffer of samples (of any length), and handles
+ * internally the copy into the low-level fixed-size audio buffers.
+ * 
+ * Since the function might internally buffer some samples not yet played
+ * back, you can use `audio_push(NULL, 0, true)` to flush the buffered
+ * samples when you are done with the playback. Silence will be added if
+ * required (to pad the audio buffers).
+ * 
+ * @param[in] buffer
+ *            Buffer containing stereo samples to be played back. If NULL,
+ *            silence will be inserted into the audio buffers for the specified
+ *            number of samples. If NULL, and nsamples is 0, any internal buffer
+ *            will be flushed and padded with silence (use this at the end
+ *            of playback).
+ *
+ * @param[in] nsamples
+ *            Number of samples in buffer, to be played back.
+ *
+ * @param[in] blocking
+ *            If true, the function will block until the specified samples 
+ *            are written into the audio buffers. If false, the function will
+ *            write as many samples as possible and exit, returning the number
+ *            of written samples.
+ *
+ * @return    The number of written samples. If blocking is true, this will
+ *            always be equal to nsamples, as the function will block until
+ *            all samples have been written.
+ */
+int audio_push(short *buffer, int nsamples, bool blocking)
+{
+    static short *dst = NULL; static int dst_sz = 0;
+    int written = 0;
+
+    if (!buffer && !nsamples)
+        nsamples = dst_sz;
+
+    while (nsamples > 0 && (blocking || dst || audio_can_write())) {
+        if (!dst) {
+            dst = audio_write_begin();
+            dst_sz = audio_get_buffer_length();
+        }
+
+        int ns = MIN(nsamples, dst_sz);
+        if (!buffer)
+            memset(dst, 0, ns * 2 * sizeof(short));
+        else {
+            memcpy(dst, buffer, ns * 2 * sizeof(short));
+            buffer += ns*2;
+        }
+
+        dst += ns*2;
+        nsamples -= ns;
+        dst_sz -= ns;
+        written += ns;
+
+        if (dst_sz == 0) {
+            audio_write_end();
+            dst = NULL;
+        }
+    }
+
+    return written;
 }
 
 /**
@@ -465,32 +514,15 @@ void audio_write_end(void)
  * @note This function will block until there is room to write an audio sample.
  *       If you do not want to block, check to see if there is room by calling
  *       #audio_can_write.
+ *       
+ * @see #audio_write_begin
+ * @see #audio_push
  */
-void audio_write_silence()
+void audio_write_silence(void)
 {
-    if(!buffers)
-    {
-        return;
-    }
-
-    disable_interrupts();
-
-    /* check for empty buffer */
-    int next = (now_writing + 1) % _num_buf;
-    while (buf_full & (1<<next))
-    {
-        // buffers full
-        audio_callback();
-        enable_interrupts();
-        disable_interrupts();
-    }
-
-    /* Copy silence into local buffers */
-    buf_full |= (1<<next);
-    now_writing = next;
-    memset(buffers[now_writing], 0, _buf_size * 2 * sizeof(short));
-    audio_callback();
-    enable_interrupts();
+    short *dst = audio_write_begin();
+    memset(dst, 0, _buf_size * 2 * sizeof(short));
+    audio_write_end();
 }
 
 /**
@@ -534,5 +566,15 @@ int audio_get_buffer_length()
 {
     return _buf_size;
 }
+
+/// @cond
+// Older APIs. Do not use in new code. Not explicitly deprecated yet.
+void audio_write(const short * const buffer)
+{
+    short* dst = audio_write_begin();
+    memcpy(dst, buffer, _buf_size * 2 * sizeof(short));
+    audio_write_end();
+}
+/// @endcond
 
 /** @} */ /* audio */

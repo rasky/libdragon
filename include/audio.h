@@ -28,15 +28,22 @@ typedef void(*audio_fill_buffer_callback)(short *buffer, size_t numsamples);
 void audio_init(const int frequency, int numbuffers);
 void audio_set_buffer_callback(audio_fill_buffer_callback fill_buffer_callback);
 void audio_pause(bool pause);
-void audio_write(const short * const buffer);
 volatile int audio_can_write();
-void audio_write_silence();
+int audio_push(short *buffer, int nsamples, bool blocking);
 void audio_close();
 int audio_get_frequency();
 int audio_get_buffer_length();
 
 short* audio_write_begin(void);
 void audio_write_end(void);
+
+/// @cond
+__attribute__((deprecated("use audio_push(buffer, audio_get_buffer_length(), true) instead")))
+void audio_write(const short * const buffer);
+
+__attribute__((deprecated("use audio_push(NULL, audio_get_buffer_length(), true) instead")))
+void audio_write_silence(void);
+/// @endcond
 
 #ifdef __cplusplus
 }
