@@ -129,6 +129,8 @@ struct {
 /** @brief Count of ticks spent in mixer RSP, used for debugging purposes. */
 int64_t __mixer_profile_rsp = 0;
 
+static uint8_t __mixer_overlay_id;
+
 static inline int mixer_initialized(void) { return Mixer.num_channels != 0; }
 
 void mixer_init(int num_channels) {
@@ -149,7 +151,7 @@ void mixer_init(int num_channels) {
 	data_cache_hit_writeback(mixer_state, MIXER_STATE_SIZE);
 
 	rspq_init();
-    rspq_overlay_register(&rsp_mixer, 1);
+    __mixer_overlay_id = rspq_overlay_register(&rsp_mixer);
 }
 
 static void mixer_init_samplebuffers(void) {
@@ -197,6 +199,9 @@ void mixer_set_vol(float vol) {
 
 void mixer_close(void) {
 	assert(mixer_initialized());
+
+	rspq_overlay_unregister(__mixer_overlay_id);
+	__mixer_overlay_id = 0;
 
 	if (Mixer.ch_buf_mem) {
 		free_uncached(Mixer.ch_buf_mem);
@@ -585,7 +590,7 @@ void mixer_exec(int32_t *out, int num_samples) {
 	uint32_t t0 = TICKS_READ();
 
 	rspq_highpri_begin();
-	rspq_write(0x10,
+	rspq_write(__mixer_overlay_id, 0,
 		(((uint32_t)MIXER_FX16(Mixer.vol)) & 0xFFFF),
 		(num_samples << 16) | Mixer.num_channels,
 		PhysicalAddr(out),
