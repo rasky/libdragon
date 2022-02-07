@@ -31,11 +31,15 @@
     .short (\function - _start) | ((\size) & 0x3C) << 10
 .endm
 
-.macro RSPQ_OverlayHeader stateStart, stateEnd, cmdBase
+.macro RSPQ_OverlayHeader stateStart, stateEnd
     OVERLAY_HEADER:
     .long \stateStart
     .short (\stateEnd - \stateStart) - 1
-    .short (\cmdBase << 1)
+    .short 0
+.endm
+
+.macro RSPQ_EndCommandTable
+    .short 0
 .endm
 
 #endif

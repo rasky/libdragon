@@ -306,6 +306,8 @@ _Static_assert((RSPQ_CMD_TEST_WRITE_STATUS & 1) == 0);
     ptr += 3; \
 })
 
+#define rspq_int_write(cmd_id, ...) rspq_write(0, cmd_id, ##__VA_ARGS__)
+
 static void rspq_crash_handler(rsp_snapshot_t *state);
 static void rspq_assert_handler(rsp_snapshot_t *state, uint16_t assert_code);
 
@@ -324,6 +326,7 @@ typedef struct rspq_overlay_header_t {
     uint32_t state_start;       ///< Start of the portion of DMEM used as "state"
     uint16_t state_size;        ///< Size of the portion of DMEM used as "state"
     uint16_t command_base;      ///< Primary overlay ID used for this overlay
+    uint16_t commands[];
 } rspq_overlay_header_t;
 
 /** @brief A pre-built block of commands */
@@ -421,8 +424,8 @@ volatile uint32_t *rspq_cur_sentinel;   ///< Copy of the current write sentinel 
 /** @brief RSP queue data in DMEM. */
 static rsp_queue_t rspq_data;
 
-/** @brief Number of registered overlays. */
-static uint8_t rspq_overlay_count = 0;
+/** @brief True if the queue system has been initialized. */
+static bool rspq_initialized = 0;
 
 /** @brief Pointer to the current block being built, or NULL. */
 static rspq_block_t *rspq_block;
@@ -628,7 +631,7 @@ static void rspq_close_context(rspq_ctx_t *ctx)
 void rspq_init(void)
 {
     // Do nothing if rspq_init has already been called
-    if (rspq_overlay_count > 0) 
+    if (rspq_initialized)
         return;
 
     rspq_ctx = NULL;
@@ -657,7 +660,6 @@ void rspq_init(void)
     rspq_data.tables.overlay_descriptors[0].state = PhysicalAddr(&dummy_overlay_state);
     rspq_data.tables.overlay_descriptors[0].data_size = sizeof(uint64_t);
     rspq_data.current_ovl = 0;
-    rspq_overlay_count = 1;
     
     // Init syncpoints
     rspq_syncpoints_genid = 0;
@@ -670,6 +672,8 @@ void rspq_init(void)
     // Activate SP interrupt (used for syncpoints)
     register_SP_handler(rspq_sp_interrupt);
     set_SP_interrupt(1);
+
+    rspq_initialized = 1;
 
     rspq_start();
 }
@@ -688,7 +692,7 @@ void rspq_close(void)
 {
     rspq_stop();
     
-    rspq_overlay_count = 0;
+    rspq_initialized = 0;
 
     rspq_close_context(&highpri);
     rspq_close_context(&lowpri);
@@ -703,49 +707,53 @@ void* rspq_overlay_get_state(rsp_ucode_t *overlay_ucode)
     return overlay_ucode->data + (overlay_header->state_start & 0xFFF) - RSPQ_OVL_DATA_ADDR;
 }
 
-void rspq_overlay_register(rsp_ucode_t *overlay_ucode, uint8_t id)
+uint32_t rspq_overlay_get_command_count(rspq_overlay_header_t *header)
 {
-    assertf(rspq_overlay_count > 0, "rspq_overlay_register must be called after rspq_init!");
-    assert(overlay_ucode);
-    assertf(id < RSPQ_OVERLAY_TABLE_SIZE, "Tried to register id: %d", id);
-
-    // The RSPQ ucode is always linked into overlays for now, so we need to load the overlay from an offset.
-    uint32_t rspq_ucode_size = rsp_queue_text_end - rsp_queue_text_start;
-
-    assertf(memcmp(rsp_queue_text_start, overlay_ucode->code, rspq_ucode_size) == 0, "Common code of overlay does not match!");
-
-    uint32_t overlay_code = PhysicalAddr(overlay_ucode->code + rspq_ucode_size);
-
-    uint8_t overlay_index = 0;
-
-    // Check if the overlay has been registered already
-    for (uint32_t i = 1; i < rspq_overlay_count; i++)
+    for (uint32_t i = 0; i < RSPQ_MAX_OVERLAY_COMMAND_COUNT + 1; i++)
     {
-        if (rspq_data.tables.overlay_descriptors[i].code == overlay_code)
-        {
-            overlay_index = i;
-            break;
+        if (header->commands[i] == 0) {
+            return i;
         }
     }
 
-    // If the overlay has not been registered before, add it to the descriptor table first
-    if (overlay_index == 0)
+    assertf(0, "Overlays can only define up to %d commands!", RSPQ_MAX_OVERLAY_COMMAND_COUNT);
+}
+
+uint8_t rspq_find_new_overlay_index()
+{
+    for (uint8_t i = 1; i < RSPQ_MAX_OVERLAY_COUNT; i++)
     {
-        assertf(rspq_overlay_count < RSPQ_MAX_OVERLAY_COUNT, "Only up to %d overlays are supported!", RSPQ_MAX_OVERLAY_COUNT);
-
-        overlay_index = rspq_overlay_count++;
-
-        rspq_overlay_t *overlay = &rspq_data.tables.overlay_descriptors[overlay_index];
-        overlay->code = overlay_code;
-        overlay->data = PhysicalAddr(overlay_ucode->data);
-        overlay->state = PhysicalAddr(rspq_overlay_get_state(overlay_ucode));
-        overlay->code_size = ((uint8_t*)overlay_ucode->code_end - overlay_ucode->code) - rspq_ucode_size - 1;
-        overlay->data_size = ((uint8_t*)overlay_ucode->data_end - overlay_ucode->data) - 1;
+        if (rspq_data.tables.overlay_descriptors[i].code == 0) {
+            return i;
+        }
     }
 
-    // Let the specified id point at the overlay
-    rspq_data.tables.overlay_table[id] = overlay_index * sizeof(rspq_overlay_t);
+    return 0;
+}
 
+uint8_t rspq_find_new_overlay_id(uint32_t slot_count)
+{
+    uint32_t free_slot_count = 0;
+
+    for (uint8_t i = 1; i <= RSPQ_OVERLAY_ID_COUNT - slot_count; i++)
+    {
+        if (rspq_data.tables.overlay_table[i] != 0) {
+            free_slot_count = 0;
+            continue;
+        }
+
+        ++free_slot_count;
+
+        if (free_slot_count == slot_count) {
+            return i - slot_count + 1;
+        }
+    }
+    
+    return 0;
+}
+
+void rspq_update_tables()
+{
     // Issue a DMA request to update the overlay tables in DMEM.
     // Note that we don't use rsp_load_data() here and instead use the dma command,
     // so we don't need to synchronize with the RSP. All commands queued after this
@@ -754,6 +762,108 @@ void rspq_overlay_register(rsp_ucode_t *overlay_ucode, uint8_t id)
     rspq_highpri_begin();
     rspq_dma_to_dmem(0, &rspq_data.tables, sizeof(rspq_overlay_tables_t), false);
     rspq_highpri_end();
+}
+
+uint8_t rspq_overlay_register_internal(rsp_ucode_t *overlay_ucode, uint8_t static_id)
+{
+    assertf(rspq_initialized, "rspq_overlay_register must be called after rspq_init!");
+    assert(overlay_ucode);
+
+    // The RSPQ ucode is always linked into overlays for now, so we need to load the overlay from an offset.
+    uint32_t rspq_ucode_size = rsp_queue_text_end - rsp_queue_text_start;
+
+    assertf(memcmp(rsp_queue_text_start, overlay_ucode->code, rspq_ucode_size) == 0, "Common code of overlay does not match!");
+
+    uint32_t overlay_code = PhysicalAddr(overlay_ucode->code + rspq_ucode_size);
+
+    // Check if the overlay has been registered already
+    for (uint32_t i = 0; i < RSPQ_MAX_OVERLAY_COUNT; i++)
+    {
+        assertf(rspq_data.tables.overlay_descriptors[i].code != overlay_code, "Overlay %s is already registered!", overlay_ucode->name);
+    }
+
+    uint8_t overlay_index = rspq_find_new_overlay_index();
+    assertf(overlay_index != 0, "Only up to %d unique overlays are supported!", RSPQ_MAX_OVERLAY_COUNT);
+
+    // determine number of commands and try to allocate ID(s) accordingly
+    rspq_overlay_header_t *overlay_header = (rspq_overlay_header_t*)overlay_ucode->data;
+    uint32_t command_count = rspq_overlay_get_command_count(overlay_header);
+    uint32_t slot_count = (command_count + 15) / 16;
+
+    uint8_t id = 0;
+    if (static_id != 0) {
+        for (uint8_t i = 0; i < slot_count; i++)
+        {
+            assertf(rspq_data.tables.overlay_table[static_id + i] == 0, "Overlay ID %d is already occupied (base ID %d)!", static_id + i, static_id);
+        }
+        id = static_id;
+    } else {
+        id = rspq_find_new_overlay_id(slot_count);
+        assertf(id != 0, "Could not find enough consecutive free slots for new overlay with %ld commands!", command_count);
+    }
+
+    // Write overlay info into descriptor table
+    rspq_overlay_t *overlay = &rspq_data.tables.overlay_descriptors[overlay_index];
+    overlay->code = overlay_code;
+    overlay->data = PhysicalAddr(overlay_ucode->data);
+    overlay->state = PhysicalAddr(rspq_overlay_get_state(overlay_ucode));
+    overlay->code_size = ((uint8_t*)overlay_ucode->code_end - overlay_ucode->code) - rspq_ucode_size - 1;
+    overlay->data_size = ((uint8_t*)overlay_ucode->data_end - overlay_ucode->data) - 1;
+
+    // Let the assigned ids point at the overlay
+    for (uint8_t i = 0; i < slot_count; i++)
+    {
+        rspq_data.tables.overlay_table[id + i] = overlay_index * sizeof(rspq_overlay_t);
+    }
+
+    // Set the command base in the overlay header
+    overlay_header->command_base = id << 5;
+    data_cache_hit_writeback_invalidate(overlay_header, sizeof(rspq_overlay_header_t));
+
+    rspq_update_tables();
+
+    return id;
+}
+
+uint8_t rspq_overlay_register(rsp_ucode_t *overlay_ucode)
+{
+    return rspq_overlay_register_internal(overlay_ucode, 0);
+}
+
+void rspq_overlay_register_static(rsp_ucode_t *overlay_ucode, uint8_t id)
+{
+    rspq_overlay_register_internal(overlay_ucode, id);
+}
+
+void rspq_overlay_unregister(uint8_t overlay_id)
+{
+    uint8_t overlay_index = rspq_data.tables.overlay_table[overlay_id] / sizeof(rspq_overlay_t);
+    if (overlay_index == 0) {
+        return;
+    }
+
+    rspq_overlay_t *overlay = &rspq_data.tables.overlay_descriptors[overlay_index];
+    // Do nothing?
+    assertf(overlay->code != 0, "No overlay is registered at id %d!", overlay_id);
+
+    rspq_overlay_header_t *overlay_header = (rspq_overlay_header_t*)(overlay->data | 0x80000000);
+    uint32_t command_count = rspq_overlay_get_command_count(overlay_header);
+    uint32_t slot_count = (command_count + 15) / 16;
+
+    // Reset the overlay descriptor
+    memset(overlay, 0, sizeof(rspq_overlay_t));
+
+    // Remove all registered ids
+    for (uint8_t i = overlay_id; i < slot_count; i++)
+    {
+        rspq_data.tables.overlay_table[i] = 0;
+    }
+
+    // Reset the command base in the overlay header
+    overlay_header->command_base = 0;
+    data_cache_hit_writeback_invalidate(overlay_header, sizeof(rspq_overlay_header_t));
+
+    rspq_update_tables();
 }
 
 /**
@@ -1000,7 +1110,7 @@ void rspq_block_run(rspq_block_t *block)
     // Write the CALL op. The second argument is the nesting level
     // which is used as stack slot in the RSP to save the current
     // pointer position.
-    rspq_write(RSPQ_CMD_CALL, PhysicalAddr(block->cmds), block->nesting_level << 2);
+    rspq_int_write(RSPQ_CMD_CALL, PhysicalAddr(block->cmds), block->nesting_level << 2);
 
     // If this is CALL within the creation of a block, update
     // the nesting level. A block's nesting level must be bigger
@@ -1014,13 +1124,13 @@ void rspq_block_run(rspq_block_t *block)
 
 void rspq_noop()
 {
-    rspq_write(RSPQ_CMD_NOOP);
+    rspq_int_write(RSPQ_CMD_NOOP);
 }
 
 rspq_syncpoint_t rspq_syncpoint(void)
 {   
     assertf(!rspq_block, "cannot create syncpoint in a block");
-    rspq_write(RSPQ_CMD_TEST_WRITE_STATUS, 
+    rspq_int_write(RSPQ_CMD_TEST_WRITE_STATUS, 
         SP_WSTATUS_SET_INTR | SP_WSTATUS_SET_SIG_SYNCPOINT,
         SP_STATUS_SIG_SYNCPOINT);
     return ++rspq_syncpoints_genid;
@@ -1056,12 +1166,12 @@ void rspq_signal(uint32_t signal)
     const uint32_t allowed_mask = SP_WSTATUS_CLEAR_SIG0|SP_WSTATUS_SET_SIG0|SP_WSTATUS_CLEAR_SIG1|SP_WSTATUS_SET_SIG1;
     assertf((signal & allowed_mask) == signal, "rspq_signal called with a mask that contains bits outside SIG0-1: %lx", signal);
 
-    rspq_write(RSPQ_CMD_WRITE_STATUS, signal);
+    rspq_int_write(RSPQ_CMD_WRITE_STATUS, signal);
 }
 
 static void rspq_dma(void *rdram_addr, uint32_t dmem_addr, uint32_t len, uint32_t flags)
 {
-    rspq_write(RSPQ_CMD_DMA, PhysicalAddr(rdram_addr), dmem_addr, len, flags);
+    rspq_int_write(RSPQ_CMD_DMA, PhysicalAddr(rdram_addr), dmem_addr, len, flags);
 }
 
 void rspq_dma_to_rdram(void *rdram_addr, uint32_t dmem_addr, uint32_t len, bool is_async)

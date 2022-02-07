@@ -4,18 +4,19 @@
 
     .section .data.overlay
 
-    RSPQ_OverlayHeader OVL_TEST_SAVED_DATA_START, OVL_TEST_SAVED_DATA_END, 0xF0
+    RSPQ_OverlayHeader OVL_TEST_SAVED_DATA_START, OVL_TEST_SAVED_DATA_END
 
     .align 1
 COMMAND_TABLE:
-    RSPQ_DefineCommand command_test, 4           # 0xF0
-    RSPQ_DefineCommand command_test, 8           # 0xF1
-    RSPQ_DefineCommand command_test, 16          # 0xF2
-    RSPQ_DefineCommand command_wait, 8           # 0xF3
-    RSPQ_DefineCommand command_output, 8         # 0xF4
-    RSPQ_DefineCommand command_reset, 4          # 0xF5
-    RSPQ_DefineCommand command_test_high, 4      # 0xF6
-    RSPQ_DefineCommand command_reset_log, 4      # 0xF7
+    RSPQ_DefineCommand command_test, 4           # 0x00
+    RSPQ_DefineCommand command_test, 8           # 0x01
+    RSPQ_DefineCommand command_test, 16          # 0x02
+    RSPQ_DefineCommand command_wait, 8           # 0x03
+    RSPQ_DefineCommand command_output, 8         # 0x04
+    RSPQ_DefineCommand command_reset, 4          # 0x05
+    RSPQ_DefineCommand command_test_high, 4      # 0x06
+    RSPQ_DefineCommand command_reset_log, 4      # 0x07
+	RSPQ_EndCommandTable
 
     .align 3
 OVL_TEST_SAVED_DATA_START:

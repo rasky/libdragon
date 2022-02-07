@@ -12,6 +12,8 @@
 
 /** Maximum number of overlays that can be registered (affects DMEM table size) */
 #define RSPQ_MAX_OVERLAY_COUNT         8
+#define RSPQ_OVERLAY_ID_COUNT          16
+#define RSPQ_MAX_OVERLAY_COMMAND_COUNT ((RSPQ_MAX_OVERLAY_COUNT - 1) * 16)
 
 /** Minimum / maximum size of a block's chunk (contiguous memory buffer) */
 #define RSPQ_BLOCK_MIN_SIZE            64

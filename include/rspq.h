@@ -218,21 +218,41 @@ void rspq_close(void);
  * 
  * Each command in the queue starts with a 8-bit ID, in which the
  * upper 4 bits are the overlay ID and the lower 4 bits are the command ID.
- * The ID specified with this function is the overlay ID to associated with
- * the ucode. For instance, calling this function with ID 0x3 means that 
+ * The ID returned by this function is the overlay ID to associated with
+ * the ucode. For instance, if this function returns ID 0x3 it means that 
  * the overlay will be associated with commands 0x30 - 0x3F. The overlay ID
- * 0 is reserved to the queue engine.
+ * 0 will never be returned as it is reserved to the queue engine.
  * 
- * Notice that it is possible to call this function multiple times with the
+ * Notice that it is possible to occupy multiple consecutive IDs with the
  * same ucode in case the ucode exposes more than 16 commands. For instance,
- * an ucode that handles up to 32 commands could be registered twice with
- * IDs 0x6 and 0x7, so that the whole range 0x60-0x7F is assigned to it.
- * When calling multiple times, consecutive IDs must be used.
+ * registering a ucode that handles up to 32 commands could return ID 0x6, 
+ * and the whole range 0x60-0x7F would be assigned to it.
+ * Note that, when unregistering with #rspq_overlay_unregister, the original 
+ * base ID that was returned by this function must be used.
  *             
  * @param      overlay_ucode  The ucode to register
- * @param[in]  id             The overlay ID that will be associated to this ucode.
+ *
+ * @return     The overlay ID that has been assigned to the ucode.
  */
-void rspq_overlay_register(rsp_ucode_t *overlay_ucode, uint8_t id);
+uint8_t rspq_overlay_register(rsp_ucode_t *overlay_ucode);
+
+void rspq_overlay_register_static(rsp_ucode_t *overlay_ucode, uint8_t id);
+
+/**
+ * @brief Unregister a ucode overlay from the RSP queue engine.
+ * 
+ * This function removes a ucode overlay that has previously been registered
+ * with #rspq_overlay_register from the queue engine. After calling this 
+ * function, the specified overlay ID (and consecutive IDs in case the overlay
+ * occupied multpiple slots) is no longer valid and must not be used to write
+ * new commands into the queue.
+ * 
+ * Note that when new overlays are registered, the queue engine may recycle 
+ * IDs from previously unregistered overlays.
+ *             
+ * @param      overlay_id  The ID of the ucode (as returned by #rspq_overlay_register) to unregister.
+ */
+void rspq_overlay_unregister(uint8_t overlay_id);
 
 /**
  * @brief Return a pointer to the overlay state (in RDRAM)
@@ -294,8 +314,8 @@ void* rspq_overlay_get_state(rsp_ucode_t *overlay_ucode);
  * @hideinitializer
  */
 
-#define rspq_write(cmd_id, ...) \
-    __PPCAT(_rspq_write, __HAS_VARARGS(__VA_ARGS__)) (cmd_id, ##__VA_ARGS__)
+#define rspq_write(ovl_id, cmd_id, ...) \
+    __PPCAT(_rspq_write, __HAS_VARARGS(__VA_ARGS__)) (ovl_id, cmd_id, ##__VA_ARGS__)
 
 /// @cond
 
@@ -314,17 +334,17 @@ void* rspq_overlay_get_state(rsp_ucode_t *overlay_ucode);
 #define _rspq_write_arg(arg) \
     *ptr++ = (arg);
 
-#define _rspq_write0(cmd_id) ({ \
+#define _rspq_write0(ovl_id, cmd_id) ({ \
     _rspq_write_prolog(); \
-    rspq_cur_pointer[0] = (cmd_id)<<24; \
+    rspq_cur_pointer[0] = ((ovl_id<<4) + (cmd_id))<<24; \
     rspq_cur_pointer += 1; \
     _rspq_write_epilog(); \
 })
 
-#define _rspq_write1(cmd_id, arg0, ...) ({ \
+#define _rspq_write1(ovl_id, cmd_id, arg0, ...) ({ \
     _rspq_write_prolog(); \
     __CALL_FOREACH(_rspq_write_arg, ##__VA_ARGS__); \
-    rspq_cur_pointer[0] = ((cmd_id)<<24) | (arg0); \
+    rspq_cur_pointer[0] = (((ovl_id<<4) + (cmd_id))<<24) | (arg0); \
     rspq_cur_pointer += 1 + __COUNT_VARARGS(__VA_ARGS__); \
     _rspq_write_epilog(); \
 })

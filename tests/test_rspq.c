@@ -24,30 +24,39 @@ DEFINE_RSP_UCODE(rsp_test,
 
 DEFINE_RSP_UCODE(rsp_test2);
 
+static uint8_t test_ovl_id;
+static uint8_t test2_ovl_id;
+
 void test_ovl_init()
 {   
     void *test_ovl_state = rspq_overlay_get_state(&rsp_test);
     memset(test_ovl_state, 0, sizeof(uint32_t) * 2);
 
     rspq_init();
-    rspq_overlay_register(&rsp_test, 0xF);
-    rspq_overlay_register(&rsp_test2, 0xE);
+    test_ovl_id = rspq_overlay_register(&rsp_test);
+    test2_ovl_id = rspq_overlay_register(&rsp_test2);
+}
+
+void test_ovl_close()
+{
+    rspq_overlay_unregister(test2_ovl_id);
+    rspq_overlay_unregister(test_ovl_id);
 }
 
 void rspq_test_4(uint32_t value)
 {
-    rspq_write(0xF0, value & 0x00FFFFFF);
+    rspq_write(test_ovl_id, 0x0, value & 0x00FFFFFF);
 }
 
 void rspq_test_8(uint32_t value)
 {
-    rspq_write(0xF1, value & 0x00FFFFFF,
+    rspq_write(test_ovl_id, 0x1, value & 0x00FFFFFF,
         0x02000000 | SP_WSTATUS_SET_SIG0);
 }
 
 void rspq_test_16(uint32_t value)
 {
-    rspq_write(0xF2, value & 0x00FFFFFF, 
+    rspq_write(test_ovl_id, 0x2, value & 0x00FFFFFF, 
         0x02000000 | SP_WSTATUS_SET_SIG0,
         0x02000000 | SP_WSTATUS_SET_SIG1,
         0x02000000 | SP_WSTATUS_SET_SIG0);
@@ -55,32 +64,32 @@ void rspq_test_16(uint32_t value)
 
 void rspq_test_wait(uint32_t length)
 {
-    rspq_write(0xF3, 0, length);
+    rspq_write(test_ovl_id, 0x3, 0, length);
 }
 
 void rspq_test_output(uint64_t *dest)
 {
-    rspq_write(0xF4, 0, PhysicalAddr(dest));
+    rspq_write(test_ovl_id, 0x4, 0, PhysicalAddr(dest));
 }
 
 void rspq_test_reset(void)
 {
-    rspq_write(0xF5);
+    rspq_write(test_ovl_id, 0x5);
 }
 
 void rspq_test_high(uint32_t value)
 {
-    rspq_write(0xF6, value & 0x00FFFFFF);
+    rspq_write(test_ovl_id, 0x6, value & 0x00FFFFFF);
 }
 
 void rspq_test_reset_log(void)
 {
-    rspq_write(0xF7);
+    rspq_write(test_ovl_id, 0x7);
 }
 
 void rspq_test2(uint32_t v0, uint32_t v1)
 {
-    rspq_write(0xE0, v0, v1);
+    rspq_write(test2_ovl_id, 0x0, v0, v1);
 }
 
 #define RSPQ_LOG_STATUS(step) debugf("STATUS: %#010lx, PC: %#010lx (%s)\n", *SP_STATUS, *SP_PC, step)
@@ -189,6 +198,7 @@ void test_rspq_high_load(TestContext *ctx)
     TEST_RSPQ_PROLOG();
 
     test_ovl_init();
+    DEFER(test_ovl_close());
 
     uint64_t expected_sum = 0;
 
@@ -227,6 +237,7 @@ void test_rspq_flush(TestContext *ctx)
     TEST_RSPQ_PROLOG();
 
     test_ovl_init();
+    DEFER(test_ovl_close());
 
     uint32_t t0 = TICKS_READ();
     while (TICKS_DISTANCE(t0, TICKS_READ()) < TICKS_FROM_MS(10000)) {
@@ -249,6 +260,7 @@ void test_rspq_rapid_flush(TestContext *ctx)
     TEST_RSPQ_PROLOG();
     
     test_ovl_init();
+    DEFER(test_ovl_close());
 
     uint64_t actual_sum[2] __attribute__((aligned(16))) = {0};
     data_cache_hit_writeback_invalidate(actual_sum, 16);
@@ -309,6 +321,7 @@ void test_rspq_load_overlay(TestContext *ctx)
     TEST_RSPQ_PROLOG();
     
     test_ovl_init();
+    DEFER(test_ovl_close());
 
     rspq_test_4(0);
 
@@ -324,6 +337,7 @@ void test_rspq_switch_overlay(TestContext *ctx)
     TEST_RSPQ_PROLOG();
     
     test_ovl_init();
+    DEFER(test_ovl_close());
 
     rspq_test2(0x123456, 0x87654321);
     rspq_test_16(0);
@@ -333,7 +347,7 @@ void test_rspq_switch_overlay(TestContext *ctx)
     uint8_t *test2_state = UncachedAddr(rspq_overlay_get_state(&rsp_test2));
 
     uint32_t expected_state[] = {
-        0xe0123456,
+        (test2_ovl_id<<28) | 0x123456,
         0x87654321
     };
 
@@ -344,6 +358,7 @@ void test_rspq_multiple_flush(TestContext *ctx)
 {
     TEST_RSPQ_PROLOG();
     test_ovl_init();
+    DEFER(test_ovl_close());
 
     rspq_test_8(1);
     rspq_test_8(1);
@@ -372,6 +387,7 @@ void test_rspq_sync(TestContext *ctx)
     TEST_RSPQ_PROLOG();
     
     test_ovl_init();
+    DEFER(test_ovl_close());
 
     for (uint32_t i = 0; i < 100; i++)
     {
@@ -413,6 +429,7 @@ void test_rspq_block(TestContext *ctx)
 {
     TEST_RSPQ_PROLOG();
     test_ovl_init();
+    DEFER(test_ovl_close());
 
     rspq_block_begin();
     for (uint32_t i = 0; i < 512; i++)
@@ -500,6 +517,7 @@ void test_rspq_highpri_basic(TestContext *ctx)
 {
     TEST_RSPQ_PROLOG();
     test_ovl_init();
+    DEFER(test_ovl_close());
 
     uint64_t actual_sum[2] __attribute__((aligned(16))) = {0};
     data_cache_hit_writeback_invalidate(actual_sum, 16);
@@ -563,6 +581,7 @@ void test_rspq_highpri_multiple(TestContext *ctx)
 {
     TEST_RSPQ_PROLOG();
     test_ovl_init();
+    DEFER(test_ovl_close());
 
     uint64_t actual_sum[2] __attribute__((aligned(16)));
     actual_sum[0] = actual_sum[1] = 0;
@@ -651,6 +670,7 @@ void test_rspq_highpri_overlay(TestContext *ctx)
 {
     TEST_RSPQ_PROLOG();
     test_ovl_init();
+    DEFER(test_ovl_close());
 
     uint64_t actual_sum[2] __attribute__((aligned(16)));
     actual_sum[0] = actual_sum[1] = 0;
