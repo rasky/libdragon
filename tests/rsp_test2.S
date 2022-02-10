@@ -2,12 +2,9 @@
 
     .section .data.overlay
 
-    RSPQ_OverlayHeader TEST2_STATE_START, TEST2_STATE_END
-
-    .align 1
-COMMAND_TABLE:
+    RSPQ_BeginOverlayHeader TEST2_STATE_START, TEST2_STATE_END
     RSPQ_DefineCommand Test2Cmd_test, 8           # 0x00
-	RSPQ_EndCommandTable
+	RSPQ_EndOverlayHeader
 
     .align 3
 TEST2_STATE_START:

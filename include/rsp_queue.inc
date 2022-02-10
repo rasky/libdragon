@@ -10,6 +10,15 @@
 
 #define OVERLAY_HEADER_SIZE 0x8
 
+.macro RSPQ_BeginOverlayHeader stateStart, stateEnd
+RSPQ_OVERLAY_HEADER:
+    .long \stateStart
+    .short (\stateEnd - \stateStart) - 1
+    .short 0
+	.align 1
+RSPQ_OVERLAY_COMMAND_TABLE:
+.endm
+
 .macro RSPQ_DefineCommand function size
     .ifne ((\size) % 4)
         .error "Invalid size - must be multiple of 4"
@@ -31,14 +40,7 @@
     .short (\function - _start) | ((\size) & 0x3C) << 10
 .endm
 
-.macro RSPQ_OverlayHeader stateStart, stateEnd
-    OVERLAY_HEADER:
-    .long \stateStart
-    .short (\stateEnd - \stateStart) - 1
-    .short 0
-.endm
-
-.macro RSPQ_EndCommandTable
+.macro RSPQ_EndOverlayHeader
     .short 0
 .endm
 

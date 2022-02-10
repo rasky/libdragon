@@ -24,8 +24,8 @@ DEFINE_RSP_UCODE(rsp_test,
 
 DEFINE_RSP_UCODE(rsp_test2);
 
-static uint8_t test_ovl_id;
-static uint8_t test2_ovl_id;
+static uint32_t test_ovl_id;
+static uint32_t test2_ovl_id;
 
 void test_ovl_init()
 {   
@@ -347,7 +347,7 @@ void test_rspq_switch_overlay(TestContext *ctx)
     uint8_t *test2_state = UncachedAddr(rspq_overlay_get_state(&rsp_test2));
 
     uint32_t expected_state[] = {
-        (test2_ovl_id<<28) | 0x123456,
+        test2_ovl_id | 0x123456,
         0x87654321
     };
 

@@ -234,9 +234,21 @@ void rspq_close(void);
  *
  * @return     The overlay ID that has been assigned to the ucode.
  */
-uint8_t rspq_overlay_register(rsp_ucode_t *overlay_ucode);
+uint32_t rspq_overlay_register(rsp_ucode_t *overlay_ucode);
 
-void rspq_overlay_register_static(rsp_ucode_t *overlay_ucode, uint8_t id);
+/**
+ * @brief Register a ucode overlay into the RSP queue engine assigning it a static ID.
+ * 
+ * See #rspq_overlay_register for details on how overlay registration works.
+ * This function works similarly, except it will attempt to assign the specified ID
+ * to the overlay instead of automatically choosing one. Note that if the ID (or a
+ * consecutive IDs) is already used by another overlay, this function will crash,
+ * so careful usage is advised.
+ * 
+ * @param      overlay_ucode  The ucode to register
+ * @param      overlay_id     The ID to register the overlay with
+ */
+void rspq_overlay_register_static(rsp_ucode_t *overlay_ucode, uint32_t overlay_id);
 
 /**
  * @brief Unregister a ucode overlay from the RSP queue engine.
@@ -252,7 +264,7 @@ void rspq_overlay_register_static(rsp_ucode_t *overlay_ucode, uint8_t id);
  *             
  * @param      overlay_id  The ID of the ucode (as returned by #rspq_overlay_register) to unregister.
  */
-void rspq_overlay_unregister(uint8_t overlay_id);
+void rspq_overlay_unregister(uint32_t overlay_id);
 
 /**
  * @brief Return a pointer to the overlay state (in RDRAM)
@@ -336,7 +348,7 @@ void* rspq_overlay_get_state(rsp_ucode_t *overlay_ucode);
 
 #define _rspq_write0(ovl_id, cmd_id) ({ \
     _rspq_write_prolog(); \
-    rspq_cur_pointer[0] = ((ovl_id<<4) + (cmd_id))<<24; \
+    rspq_cur_pointer[0] = (ovl_id) + ((cmd_id)<<24); \
     rspq_cur_pointer += 1; \
     _rspq_write_epilog(); \
 })
@@ -344,7 +356,7 @@ void* rspq_overlay_get_state(rsp_ucode_t *overlay_ucode);
 #define _rspq_write1(ovl_id, cmd_id, arg0, ...) ({ \
     _rspq_write_prolog(); \
     __CALL_FOREACH(_rspq_write_arg, ##__VA_ARGS__); \
-    rspq_cur_pointer[0] = (((ovl_id<<4) + (cmd_id))<<24) | (arg0); \
+    rspq_cur_pointer[0] = ((ovl_id) + ((cmd_id)<<24)) | (arg0); \
     rspq_cur_pointer += 1 + __COUNT_VARARGS(__VA_ARGS__); \
     _rspq_write_epilog(); \
 })
