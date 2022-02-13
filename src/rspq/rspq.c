@@ -175,7 +175,7 @@
 #include <string.h>
 #include <libdragon.h>
 #include <malloc.h>
-#include "rspq_internal.h"
+#include <rspq_constants.h>
 #include "utils.h"
 
 /**

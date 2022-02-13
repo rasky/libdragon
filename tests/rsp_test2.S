@@ -1,4 +1,7 @@
-#include "../src/rspq/rsp_queue.S"
+#include <rsp_queue.inc>
+
+    .set noreorder
+    .set at
 
     .data
 

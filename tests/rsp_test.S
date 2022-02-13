@@ -1,6 +1,9 @@
-#include "../src/rspq/rsp_queue.S"
+#include <rsp_queue.inc>
 
 #define ASSERT_GP_BACKWARD           0xF001   // Also defined in test_rsqp.c
+
+    .set noreorder
+    .set at
 
     .data
 

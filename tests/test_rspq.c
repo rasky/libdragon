@@ -2,8 +2,7 @@
 #include <string.h>
 
 #include <rspq.h>
-
-#include "../src/rspq/rspq_internal.h"
+#include <rspq_constants.h>
 
 #define ASSERT_GP_BACKWARD           0xF001   // Also defined in rsp_test.S
 
