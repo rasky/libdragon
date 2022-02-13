@@ -40,11 +40,6 @@ libdragon.a: $(BUILD_DIR)/n64sys.o $(BUILD_DIR)/interrupt.o \
 	@echo "    [AR] $@"
 	$(AR) -rcs -o $@ $^
 
-$(BUILD_DIR)/rspq/rspq_symbols.h: $(SOURCE_DIR)/rspq/rspq_symbols.h.template $(BUILD_DIR)/rspq/rsp_queue.o
-	sed -e "s/:OVL_DATA_ADDR:/$(shell $(N64_NM) $(BUILD_DIR)/rspq/rsp_queue.elf | awk '/_ovl_data_start/ {print $$1}')/g" $< > $@
-
-$(BUILD_DIR)/rspq/rspq.o: $(BUILD_DIR)/rspq/rspq_symbols.h
-
 examples:
 	$(MAKE) -C examples
 # We are unable to clean examples built with n64.mk unless we

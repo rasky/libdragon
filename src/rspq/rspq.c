@@ -177,7 +177,6 @@
 #include <malloc.h>
 #include "rspq_internal.h"
 #include "utils.h"
-#include "../../build/rspq/rspq_symbols.h"
 
 /**
  * RSPQ internal commands (overlay 0)
@@ -584,7 +583,8 @@ static void rspq_start(void)
         .command_base = 0
     };
 
-    rsp_load_data(&dummy_header, sizeof(dummy_header), RSPQ_OVL_DATA_ADDR);
+    uint32_t rspq_data_size = rsp_queue_data_end - rsp_queue_data_start;
+    rsp_load_data(&dummy_header, sizeof(dummy_header), rspq_data_size);
 
     MEMORY_BARRIER();
 
@@ -705,9 +705,8 @@ void rspq_close(void)
 void* rspq_overlay_get_state(rsp_ucode_t *overlay_ucode)
 {
     uint32_t rspq_data_size = rsp_queue_data_end - rsp_queue_data_start;
-    void *overlay_data = overlay_ucode->data + rspq_data_size;
-    rspq_overlay_header_t *overlay_header = (rspq_overlay_header_t*)(overlay_data);
-    return overlay_data + (overlay_header->state_start & 0xFFF) - RSPQ_OVL_DATA_ADDR;
+    rspq_overlay_header_t *overlay_header = (rspq_overlay_header_t*)(overlay_ucode->data + rspq_data_size);
+    return overlay_ucode->data + (overlay_header->state_start & 0xFFF);
 }
 
 uint32_t rspq_overlay_get_command_count(rspq_overlay_header_t *header)
