@@ -103,7 +103,10 @@
 	#
 	####################################################################
 
-#include "../rspq/rsp_queue.S"
+#include <rsp_queue.inc>
+
+.set noreorder
+.set at
 
 # Maximum number of channels supported by this ucode. You can't really increase
 # this without modifying the code.
