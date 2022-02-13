@@ -40,8 +40,6 @@ libdragon.a: $(BUILD_DIR)/n64sys.o $(BUILD_DIR)/interrupt.o \
 	@echo "    [AR] $@"
 	$(AR) -rcs -o $@ $^
 
-$(BUILD_DIR)/audio/rsp_mixer.o: IS_OVERLAY=1
-
 $(BUILD_DIR)/rspq/rspq_symbols.h: $(SOURCE_DIR)/rspq/rspq_symbols.h.template $(BUILD_DIR)/rspq/rsp_queue.o
 	sed -e "s/:OVL_DATA_ADDR:/$(shell $(N64_NM) $(BUILD_DIR)/rspq/rsp_queue.elf | awk '/_ovl_data_start/ {print $$1}')/g" $< > $@
 

@@ -168,7 +168,7 @@
 	#define k_8000        v_shift8,8
 
 
-	.section .data.overlay
+	.data
 
 	RSPQ_BeginOverlayHeader MIXER_STATE_START, MIXER_STATE_END
 		RSPQ_DefineCommand command_exec, 16
@@ -204,7 +204,7 @@ XVOL_L:                   .dcb.w MAX_CHANNELS
 XVOL_R:                   .dcb.w MAX_CHANNELS
 MIXER_STATE_END:
 
-	.section .bss.overlay
+	.bss
 
 ############################################################################
 # UCODE INPUT DATA
@@ -260,7 +260,7 @@ CHANNEL_BUFFER:  .dcb.w (MAX_SAMPLES_PER_LOOP * MAX_CHANNELS)
 	.align 4  # for human visual debugging, 3 would be sufficient (for DMA)
 OUTPUT_AREA:     .dcb.w MAX_SAMPLES_PER_LOOP*2
 
-	.text 1
+	.text
 
 	# Number of samples that will be processed in the current loop.
 	#define num_samples     k1
