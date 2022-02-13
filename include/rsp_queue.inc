@@ -12,9 +12,15 @@
 
 .macro RSPQ_BeginOverlayHeader stateStart, stateEnd
 RSPQ_OVERLAY_HEADER:
-    .long \stateStart
+    # state start
+    .short \stateStart - _data_start
+    # state size
     .short (\stateEnd - \stateStart) - 1
+    # command base (filled in by C code)
     .short 0
+    # unused padding
+    .short 0
+    
 	.align 1
 RSPQ_OVERLAY_COMMAND_TABLE:
 .endm

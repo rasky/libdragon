@@ -37,13 +37,5 @@ SECTIONS
 
     .bss  : { *(.bss)  } > ram_data AT > rom_dmem
 
-    . = ALIGN(8);
-
-    .data.overlay : { *(.data.overlay) } > ram_data AT > rom_dmem
-
-    . = ALIGN(8);
-
-    .bss.overlay  : { *(.bss.overlay)  } > ram_data AT > rom_dmem
-
     /DISCARD/ : { *(.MIPS.abiflags) }
 }

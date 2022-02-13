@@ -17,6 +17,7 @@
     .set at
 
     .data
+_data_start:
 
 # Overlay tables. See rsp_overlay_t in rsp.c
 RSPQ_OVERLAY_TABLE:           .ds.b RSPQ_OVERLAY_TABLE_SIZE
@@ -54,8 +55,6 @@ RSPQ_LOG_IDX:                .long 0
 RSPQ_LOG:                    .ds.l 16
 RSPQ_LOG_END:                .long 0xFFFFFFFF
 #endif
-
-    .bss
 
     .align 3
 RSPQ_DMEM_BUFFER:            .ds.b RSPQ_DMEM_BUFFER_SIZE
@@ -162,12 +161,12 @@ RSPQ_Loop:
     #endif
     # Check if the requested overlay is already in memory
     beq ovl_index, t1, rspq_overlay_loaded
-    lhu t0, %lo(_ovl_data_start) + 0x4
+    lhu t0, %lo(_ovl_data_start) + 0x2
 
     # Save current overlay state
     lw s0, %lo(RSPQ_OVERLAY_DESCRIPTORS) + 0x8 (t1)
     jal DMAOutAsync
-    lw s4, %lo(_ovl_data_start) + 0x0
+    lhu s4, %lo(_ovl_data_start) + 0x0
 
     # Load overlay data (saved state is included)
     lhu t0, %lo(RSPQ_OVERLAY_DESCRIPTORS) + 0xE (ovl_index)
@@ -186,7 +185,7 @@ RSPQ_Loop:
 
 rspq_overlay_loaded:
     # Subtract the command base to determine the final offset into the command table.
-    lhu t0, %lo(_ovl_data_start) + 0x6
+    lhu t0, %lo(_ovl_data_start) + 0x4
     sub cmd_index, t0
 
     # Load command descriptor from overlay command table

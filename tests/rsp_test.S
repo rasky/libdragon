@@ -2,7 +2,7 @@
 
 #define ASSERT_GP_BACKWARD           0xF001   // Also defined in test_rsqp.c
 
-    .section .data.overlay
+    .data
 
     RSPQ_BeginOverlayHeader OVL_TEST_SAVED_DATA_START, OVL_TEST_SAVED_DATA_END
         RSPQ_DefineCommand command_test, 4           # 0x00
@@ -29,7 +29,7 @@ BIG_LOG_PTR: .long 0
     .align 10
 BIG_LOG:  .ds.b 2048
 
-    .text 1
+    .text
 
 command_test:
     lw t0, %lo(TEST_VARIABLE)

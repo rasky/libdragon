@@ -323,9 +323,10 @@ DEFINE_RSP_UCODE(rsp_queue,
  * RSPQ_OverlayHeader macros (defined in rsp_queue.inc).
  */
 typedef struct rspq_overlay_header_t {
-    uint32_t state_start;       ///< Start of the portion of DMEM used as "state"
+    uint16_t state_start;       ///< Start of the portion of DMEM used as "state"
     uint16_t state_size;        ///< Size of the portion of DMEM used as "state"
     uint16_t command_base;      ///< Primary overlay ID used for this overlay
+    uint16_t reserved;          ///< Unused
     uint16_t commands[];
 } rspq_overlay_header_t;
 
@@ -703,8 +704,10 @@ void rspq_close(void)
 
 void* rspq_overlay_get_state(rsp_ucode_t *overlay_ucode)
 {
-    rspq_overlay_header_t *overlay_header = (rspq_overlay_header_t*)overlay_ucode->data;
-    return overlay_ucode->data + (overlay_header->state_start & 0xFFF) - RSPQ_OVL_DATA_ADDR;
+    uint32_t rspq_data_size = rsp_queue_data_end - rsp_queue_data_start;
+    void *overlay_data = overlay_ucode->data + rspq_data_size;
+    rspq_overlay_header_t *overlay_header = (rspq_overlay_header_t*)(overlay_data);
+    return overlay_data + (overlay_header->state_start & 0xFFF) - RSPQ_OVL_DATA_ADDR;
 }
 
 uint32_t rspq_overlay_get_command_count(rspq_overlay_header_t *header)
@@ -769,24 +772,27 @@ uint32_t rspq_overlay_register_internal(rsp_ucode_t *overlay_ucode, uint32_t sta
     assertf(rspq_initialized, "rspq_overlay_register must be called after rspq_init!");
     assert(overlay_ucode);
 
-    // The RSPQ ucode is always linked into overlays for now, so we need to load the overlay from an offset.
-    uint32_t rspq_ucode_size = rsp_queue_text_end - rsp_queue_text_start;
+    // The RSPQ ucode is always linked into overlays, so we need to load the overlay from an offset.
+    uint32_t rspq_text_size = rsp_queue_text_end - rsp_queue_text_start;
+    uint32_t rspq_data_size = rsp_queue_data_end - rsp_queue_data_start;
 
-    assertf(memcmp(rsp_queue_text_start, overlay_ucode->code, rspq_ucode_size) == 0, "Common code of overlay does not match!");
+    assertf(memcmp(rsp_queue_text_start, overlay_ucode->code, rspq_text_size) == 0, "Common code of overlay does not match!");
+    assertf(memcmp(rsp_queue_data_start, overlay_ucode->data, rspq_data_size) == 0, "Common data of overlay does not match!");
 
-    uint32_t overlay_code = PhysicalAddr(overlay_ucode->code + rspq_ucode_size);
+    void *overlay_code = overlay_ucode->code + rspq_text_size;
+    void *overlay_data = overlay_ucode->data + rspq_data_size;
 
     // Check if the overlay has been registered already
     for (uint32_t i = 0; i < RSPQ_MAX_OVERLAY_COUNT; i++)
     {
-        assertf(rspq_data.tables.overlay_descriptors[i].code != overlay_code, "Overlay %s is already registered!", overlay_ucode->name);
+        assertf(rspq_data.tables.overlay_descriptors[i].code != PhysicalAddr(overlay_code), "Overlay %s is already registered!", overlay_ucode->name);
     }
 
     uint32_t overlay_index = rspq_find_new_overlay_index();
     assertf(overlay_index != 0, "Only up to %d unique overlays are supported!", RSPQ_MAX_OVERLAY_COUNT);
 
     // determine number of commands and try to allocate ID(s) accordingly
-    rspq_overlay_header_t *overlay_header = (rspq_overlay_header_t*)overlay_ucode->data;
+    rspq_overlay_header_t *overlay_header = (rspq_overlay_header_t*)overlay_data;
     uint32_t command_count = rspq_overlay_get_command_count(overlay_header);
     uint32_t slot_count = (command_count + 15) / 16;
 
@@ -803,11 +809,11 @@ uint32_t rspq_overlay_register_internal(rsp_ucode_t *overlay_ucode, uint32_t sta
 
     // Write overlay info into descriptor table
     rspq_overlay_t *overlay = &rspq_data.tables.overlay_descriptors[overlay_index];
-    overlay->code = overlay_code;
-    overlay->data = PhysicalAddr(overlay_ucode->data);
+    overlay->code = PhysicalAddr(overlay_code);
+    overlay->data = PhysicalAddr(overlay_data);
     overlay->state = PhysicalAddr(rspq_overlay_get_state(overlay_ucode));
-    overlay->code_size = ((uint8_t*)overlay_ucode->code_end - overlay_ucode->code) - rspq_ucode_size - 1;
-    overlay->data_size = ((uint8_t*)overlay_ucode->data_end - overlay_ucode->data) - 1;
+    overlay->code_size = ((uint8_t*)overlay_ucode->code_end - overlay_ucode->code) - rspq_text_size - 1;
+    overlay->data_size = ((uint8_t*)overlay_ucode->data_end - overlay_ucode->data) - rspq_data_size - 1;
 
     // Let the assigned ids point at the overlay
     for (uint32_t i = 0; i < slot_count; i++)
