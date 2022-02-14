@@ -218,7 +218,7 @@ RSPQ_Loop:
     lhu t0, %lo(RSPQ_OVERLAY_DESCRIPTORS) + 0xC (ovl_index)
     lw s0, %lo(RSPQ_OVERLAY_DESCRIPTORS) + 0x0 (ovl_index)
     jal DMAIn
-    li s4, %lo(_ovl_text_start) + 0x1000
+    li s4, %lo(_ovl_text_start - _start) + 0x1000
 
     # Remember loaded overlay
     sh ovl_index, %lo(RSPQ_CURRENT_OVL)

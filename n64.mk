@@ -22,14 +22,12 @@ N64_LD = $(N64_GCCPREFIX)ld
 N64_OBJCOPY = $(N64_GCCPREFIX)objcopy
 N64_OBJDUMP = $(N64_GCCPREFIX)objdump
 N64_SIZE = $(N64_GCCPREFIX)size
-N64_NM = $(N64_GCCPREFIX)nm
 
 N64_CHKSUM = $(N64_BINDIR)/chksum64
 N64_ED64ROMCONFIG = $(N64_BINDIR)/ed64romconfig
 N64_MKDFS = $(N64_BINDIR)/mkdfs
 N64_TOOL = $(N64_BINDIR)/n64tool
 N64_AUDIOCONV = $(N64_BINDIR)/audioconv64
-N64_MKSPRITE = $(N64_BINDIR)/mksprite
 
 N64_CFLAGS =  -march=vr4300 -mtune=vr4300 -I$(N64_INCLUDEDIR)
 N64_CFLAGS += -falign-functions=32 -ffunction-sections -fdata-sections
@@ -101,8 +99,7 @@ $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.S
 		TEXTSECTION="$(basename $@).text"; \
 		DATASECTION="$(basename $@).data"; \
 		echo "    [RSP] $<"; \
-		$(N64_CC) $(ASFLAGS) -nostartfiles -Wl,-Trsp.ld -o $@ $<; \
-		cp $@ $(subst .o,.elf,$@); \
+		$(N64_CC) $(ASFLAGS) -nostartfiles -Wl,-Ttext=0x1000 -Wl,-Tdata=0x0 -Wl,-e0x1000 -o $@ $<; \
 		$(N64_OBJCOPY) -O binary -j .text $@ $$TEXTSECTION.bin; \
 		$(N64_OBJCOPY) -O binary -j .data $@ $$DATASECTION.bin; \
 		$(N64_OBJCOPY) -I binary -O elf32-bigmips -B mips4300 \
