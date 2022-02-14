@@ -381,7 +381,7 @@ void* rspq_overlay_get_state(rsp_ucode_t *overlay_ucode);
  * 
  * This function does not block: it just make sure that the RSP will run the 
  * full command queue written until now. If you need to actively wait until the
- * last written command has been executed, use #rspq_sync.
+ * last written command has been executed, use #rspq_wait.
  * 
  * It is suggested to call rspq_flush every time a new "batch" of commands
  * has been written. In general, it is not a problem to call it often because
@@ -433,7 +433,7 @@ void rspq_flush(void);
  * (eg: to access data that was processed by RSP) prefer using #rspq_syncpoint /
  * #rspq_wait_syncpoint which allows for more granular synchronization.
  */
-#define rspq_sync() ({ \
+#define rspq_wait() ({ \
     rspq_wait_syncpoint(rspq_syncpoint()); \
 })
 

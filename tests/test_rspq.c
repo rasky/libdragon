@@ -245,7 +245,7 @@ void test_rspq_flush(TestContext *ctx)
 
         wait_ticks(90);
 
-        //rspq_sync();
+        //rspq_wait();
         rspq_syncpoint_t sp = rspq_syncpoint();
         rspq_flush();
         ASSERT(wait_for_syncpoint(sp, 100), "syncpoint was not flushed!, PC:%03lx, STATUS:%04lx", *SP_PC, *SP_STATUS);
@@ -305,7 +305,7 @@ void test_rspq_rapid_flush(TestContext *ctx)
 
             rspq_flush();
             rspq_test_output(actual_sum);
-            rspq_sync();
+            rspq_wait();
 
             ASSERT_EQUAL_UNSIGNED(actual_sum[1], expected_sum, "Sum is incorrect! (diff: %lld)", expected_sum - actual_sum[1]);
             data_cache_hit_invalidate(actual_sum, 16);
@@ -381,7 +381,7 @@ void test_rspq_multiple_flush(TestContext *ctx)
 }
 
 
-void test_rspq_sync(TestContext *ctx)
+void test_rspq_wait(TestContext *ctx)
 {
     TEST_RSPQ_PROLOG();
     
@@ -392,7 +392,7 @@ void test_rspq_sync(TestContext *ctx)
     {
         rspq_test_8(1);
         rspq_test_wait(0x8000);
-        rspq_sync();
+        rspq_wait();
     }
 
     uint64_t actual_sum[2] __attribute__((aligned(16))) = {0};
@@ -456,7 +456,7 @@ void test_rspq_block(TestContext *ctx)
     rspq_test_reset();
     rspq_block_run(b512);
     rspq_test_output(actual_sum);
-    rspq_sync();
+    rspq_wait();
     ASSERT_EQUAL_UNSIGNED(*actual_sum, 512, "sum #1 is not correct");
     data_cache_hit_invalidate(actual_sum, 16);
 
@@ -464,21 +464,21 @@ void test_rspq_block(TestContext *ctx)
     rspq_test_reset();
     rspq_block_run(b512);
     rspq_test_output(actual_sum);
-    rspq_sync();
+    rspq_wait();
     ASSERT_EQUAL_UNSIGNED(*actual_sum, 512, "sum #2 is not correct");
     data_cache_hit_invalidate(actual_sum, 16);
 
     rspq_test_reset();
     rspq_block_run(b2048);
     rspq_test_output(actual_sum);
-    rspq_sync();
+    rspq_wait();
     ASSERT_EQUAL_UNSIGNED(*actual_sum, 2048, "sum #3 is not correct");
     data_cache_hit_invalidate(actual_sum, 16);
 
     rspq_test_reset();
     rspq_block_run(b3072);
     rspq_test_output(actual_sum);
-    rspq_sync();
+    rspq_wait();
     ASSERT_EQUAL_UNSIGNED(*actual_sum, 3072, "sum #4 is not correct");
     data_cache_hit_invalidate(actual_sum, 16);
 
@@ -489,7 +489,7 @@ void test_rspq_block(TestContext *ctx)
     rspq_block_run(b2048);
     rspq_test_8(1);
     rspq_test_output(actual_sum);
-    rspq_sync();
+    rspq_wait();
     ASSERT_EQUAL_UNSIGNED(*actual_sum, 5123, "sum #5 is not correct");
 
     TEST_RSPQ_EPILOG(0, rspq_timeout);
@@ -533,7 +533,7 @@ void test_rspq_highpri_basic(TestContext *ctx)
 
     // Initialize the test ucode
     rspq_test_reset();
-    rspq_sync();
+    rspq_wait();
 
     // Run the block in standard queue
     rspq_block_run(b4096);
@@ -567,7 +567,7 @@ void test_rspq_highpri_basic(TestContext *ctx)
     data_cache_hit_invalidate(actual_sum, 16);
 
     // Wait for the end of lowpri
-    rspq_sync();
+    rspq_wait();
 
     // Verify result of both queues
     ASSERT_EQUAL_UNSIGNED(actual_sum[0], 4096, "lowpri sum is not correct");
@@ -680,7 +680,7 @@ void test_rspq_highpri_overlay(TestContext *ctx)
         rspq_test_high(123);
         rspq_test_output(actual_sum);
     rspq_highpri_end();
-    rspq_sync();
+    rspq_wait();
         
     ASSERT_EQUAL_UNSIGNED(actual_sum[1], 123, "highpri sum is not correct");
     TEST_RSPQ_EPILOG(0, rspq_timeout);
