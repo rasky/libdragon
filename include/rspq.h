@@ -47,8 +47,9 @@
  * Higher-level libraries that come with their RSP ucode can be designed to
  * use the RSP command queue to efficiently coexist with all other RSP libraries
  * provided by libdragon. In fact, by using the overlay mechanism, each library
- * can register its own overlay ID, and enqueue commands to be executed by the
- * RSP through the same unique queue.
+ * can obtain its own overlay ID, and enqueue commands to be executed by the
+ * RSP through the same unique queue. Overlay IDs are allocated dynamically by
+ * rspq in registration order, to avoid conflicts between libraries.
  * 
  * End-users can then use all these libraries at the same time, without having
  * to arrange for complex RSP synchronization, asynchronous execution or plan for
@@ -63,7 +64,7 @@
  *   * Call #rspq_init at initialization. The function can be called multiple
  *     times by different libraries, with no side-effect.
  *   * Call #rspq_overlay_register to register a #rsp_ucode_t as RSP command
- *     queue overlay, assigning an overlay ID to it.
+ *     queue overlay, obtaining an overlay ID to use.
  *   * Provide higher-level APIs that, when required, call #rspq_write
  *     and #rspq_flush to enqueue commands for the RSP. For
  *     instance, a matrix library might provide a "matrix_mult" function that
@@ -207,53 +208,55 @@ void rspq_close(void);
 
 
 /**
- * @brief Register a ucode overlay into the RSP queue engine.
+ * @brief Register a rspq overlay into the RSP queue engine.
  * 
- * This function registers a ucode overlay into the queue engine.
- * An overlay is a ucode that has been written to be compatible with the
+ * This function registers a rspq overlay into the queue engine.
+ * An overlay is a RSP ucode that has been written to be compatible with the
  * queue engine (see rsp_queue.inc) and is thus able to execute commands
- * that are enqueued in the queue. An overlay doesn't have an entry point:
+ * that are enqueued in the queue. An overlay doesn't have a single entry point:
  * it exposes multiple functions bound to different commands, that will be
  * called by the queue engine when the commands are enqueued.
  * 
- * Each command in the queue starts with a 8-bit ID, in which the
- * upper 4 bits are the overlay ID and the lower 4 bits are the command ID.
- * The ID returned by this function is the overlay ID to associated with
- * the ucode. For instance, if this function returns ID 0x3 it means that 
- * the overlay will be associated with commands 0x30 - 0x3F. The overlay ID
- * 0 will never be returned as it is reserved to the queue engine.
+ * The function returns the overlay ID, which is the ID to use to enqueue
+ * commands for this overlay. The overlay ID must be passed to #rspq_write
+ * when adding new commands. rspq allows up to 16 overlays to be registered
+ * simultaneously, as the overlay ID occupies the top 4 bits of each command.
  * 
  * Notice that it is possible to occupy multiple consecutive IDs with the
- * same ucode in case the ucode exposes more than 16 commands. For instance,
- * registering a ucode that handles up to 32 commands could return ID 0x6, 
- * and the whole range 0x60-0x7F would be assigned to it.
- * Note that, when unregistering with #rspq_overlay_unregister, the original 
- * base ID that was returned by this function must be used.
+ * same overlay in case the overlay exposes more than 16 commands. For instance,
+ * registering an overlay that handles up to 32 commands could return ID 0x6, 
+ * meaning that the whole range of command IDs 0x60-0x7F would be assigned to it.
  *             
- * @param      overlay_ucode  The ucode to register
+ * @param      overlay_ucode  The overlay to register
  *
- * @return     The overlay ID that has been assigned to the ucode.
+ * @return     The overlay ID that has been assigned to the overlay. Note that
+ *             this value will be preshifted by 28 (eg: 0x60000000 for ID 6),
+ *             as this is the expected format used by #rspq_write.
  */
 uint32_t rspq_overlay_register(rsp_ucode_t *overlay_ucode);
 
 /**
- * @brief Register a ucode overlay into the RSP queue engine assigning it a static ID.
+ * @brief Register an overlay into the RSP queue engine assigning a static ID to it
  * 
- * See #rspq_overlay_register for details on how overlay registration works.
- * This function works similarly, except it will attempt to assign the specified ID
- * to the overlay instead of automatically choosing one. Note that if the ID (or a
- * consecutive IDs) is already used by another overlay, this function will crash,
- * so careful usage is advised.
+ * This function works similar to #rspq_overlay_register, except it will
+ * attempt to assign the specified ID to the overlay instead of automatically
+ * choosing one. Note that if the ID (or a consecutive IDs) is already used
+ * by another overlay, this function will assert, so careful usage is advised.
+ * 
+ * Assigning a static ID can mostly be useful for debugging purposes.
  * 
  * @param      overlay_ucode  The ucode to register
- * @param      overlay_id     The ID to register the overlay with
+ * @param      overlay_id     The ID to register the overlay with. This ID
+ *                            must be preshifted by 28 (eg: 0x40000000).
+ * 
+ * @see #rspq_overlay_register
  */
 void rspq_overlay_register_static(rsp_ucode_t *overlay_ucode, uint32_t overlay_id);
 
 /**
  * @brief Unregister a ucode overlay from the RSP queue engine.
  * 
- * This function removes a ucode overlay that has previously been registered
+ * This function removes an overlay that has previously been registered
  * with #rspq_overlay_register from the queue engine. After calling this 
  * function, the specified overlay ID (and consecutive IDs in case the overlay
  * occupied multpiple slots) is no longer valid and must not be used to write
@@ -262,7 +265,8 @@ void rspq_overlay_register_static(rsp_ucode_t *overlay_ucode, uint32_t overlay_i
  * Note that when new overlays are registered, the queue engine may recycle 
  * IDs from previously unregistered overlays.
  *             
- * @param      overlay_id  The ID of the ucode (as returned by #rspq_overlay_register) to unregister.
+ * @param      overlay_id  The ID of the ucode (as returned by
+ *                         #rspq_overlay_register) to unregister.
  */
 void rspq_overlay_unregister(uint32_t overlay_id);
 
@@ -288,39 +292,54 @@ void* rspq_overlay_get_state(rsp_ucode_t *overlay_ucode);
  * 
  * This macro is the main entry point to add a command to the RSP queue. It can
  * be used as a variadic argument function, in which the first argument is
- * the command ID, and the other arguments are the command arguments (additional
- * 32-bit words).
+ * the overlay ID, the second argument is the command index within the overlay,
+ * and the other arguments are the command arguments (additional 32-bit words).
  * 
- * As explained in the top-level documentation, the command ID is one byte and
- * is encoded in the most significant byte of the first word. So the first
- * argument word, if provided, must have the upper MSB empty, to leave space
+ * @code{.c}
+ *      // This example adds to the queue a command called CMD_SPRITE with 
+ *      // index 0xA, with its arguments, for a total of three words. The overlay
+ *      // was previously registered via #rspq_register_overlay.
+ *      
+ *      #define CMD_SPRITE  0xA
+ *      
+ *      rspq_write(gfx_overlay_id, CMD_SPRITE,
+ *                 sprite_num, 
+ *                 (x0 << 16) | y0,
+ *                 (x1 << 16) | y1);
+ * @endcode
+ * 
+ * As explained in the top-level documentation, the overlay ID (4 bits) and the
+ * command index (4 bits) are composed to form the command ID, and are stored
+ * in the most significant byte of the first word. So, the first command argument
+ * word, if provided, must have the upper MSB empty, to leave space
  * for the command ID itself.
  * 
- * For instance, `rspq_write(0x12, 0x00FF2233)` is a correct call, which
- * writes `0x12FF2233` into the RSP queue. `rspq_write(0x12, 0x11FF2233)`
- * is an invalid call because the MSB of the first word is non-zero.
- * `rspq_write(0x12)` is also valid, and equivalent to `rspq_write(0x12, 0x0)`.
+ * For instance, assuming the overlay ID for an overlay called "gfx" is 1, 
+ * `rspq_write(gfx_id, 0x2, 0x00FF2233)` is a correct call, which
+ * writes `0x12FF2233` into the RSP queue; it will invoke command #2 in
+ * overlay with ID 0x1, and the first word contains other 24 bits of arguments
+ * that will be parsed by the RSP code. Instead, `rspq_write(gfx_id, 0x2, 0x11FF2233)`
+ * is an invalid call because the MSB of the first word is non-zero, and thus
+ * the highest byte "0x11" would clash with the overlay ID and command index.
+ * 
+ * `rspq_write(gfx_id, 0x2)` is a valid call, and equivalent to
+ * `rspq_write(gfx_id, 0x2, 0x0)`. It will write `0x12000000` in the queue.
  * 
  * Notice that after a call to #rspq_write, the command might or might not
  * get executed by the RSP, depending on timing. If you want to make sure that
  * the command will be executed, use #rspq_flush. You can call #rspq_flush
  * after you have finished writing a batch of related commands. See #rspq_flush
  * documentation for more information.
- * 
- * @code{.c}
- * 		// This example adds to the queue a command called CMD_SPRITE with 
- *      // code 0x3A (overlay 3, command A), with its arguments,
- * 		// for a total of three words.
- * 		
- * 		#define CMD_SPRITE  0x3A
- * 		
- * 		rspq_write(CMD_SPRITE, sprite_num, 
- *                 (x0 << 16) | y0,
- *                 (x1 << 16) | y1);
- * @endcode
  *
  * @note Each command can be up to RSPQ_MAX_COMMAND_SIZE 32-bit words.
  * 
+ * @param      ovl_id    The overlay ID of the command to enqueue. Notice that
+ *                       this must be a value preshifted by 28, as returned
+ *                       by #rspq_overlay_register.
+ * @param      cmd_id    Index of the command to call, within the overlay.
+ * @param      ...       Optional arguments for the command
+ *
+ * @see #rspq_overlay_register
  * @see #rspq_flush
  * 
  * @hideinitializer
@@ -339,7 +358,7 @@ void* rspq_overlay_get_state(rsp_ucode_t *overlay_ucode);
     (void)ptr;
 
 #define _rspq_write_epilog() ({ \
-    if (rspq_cur_pointer > rspq_cur_sentinel) \
+    if (__builtin_expect(rspq_cur_pointer > rspq_cur_sentinel, 0)) \
         rspq_next_buffer(); \
 })
 
@@ -394,11 +413,12 @@ void* rspq_overlay_get_state(rsp_ucode_t *overlay_ucode);
  * 		// This example shows some code configuring the lights for a scene.
  * 		// The command in this sample is called CMD_SET_LIGHT and requires
  * 		// a light index and the RGB colors for the list to update.
+ *      uint32_t gfx_overlay_id;   
  *
- * 		#define CMD_SET_LIGHT  0x47
+ * 		#define CMD_SET_LIGHT  0x7
  *
  * 		for (int i=0; i<MAX_LIGHTS; i++) {
- * 			rspq_write(CMD_SET_LIGHT, i,
+ * 			rspq_write(gfx_overlay_id, CMD_SET_LIGHT, i,
  * 			    (lights[i].r << 16) | (lights[i].g << 8) | lights[i].b);
  * 		}
  * 		
