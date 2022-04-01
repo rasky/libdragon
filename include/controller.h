@@ -56,7 +56,11 @@
 #define ERROR_NOT_PRESENT   0x2
 /** @} */
 
-/** @brief SI Controller Data */
+/**
+ * @brief SI Nintendo 64 controller data
+ * 
+ * Data structure for Joybus response to `0x01` (Read N64 controller state) command.
+ */
 typedef struct SI_condat
 {
     /** @brief Unused padding bits */
@@ -113,7 +117,11 @@ typedef struct SI_condat
     };
 } _SI_condat;
 
-/** @brief SI Controller Data, GC */
+/**
+ * @brief SI GameCube controller data.
+ * 
+ * Data structure for Joybus response to `0x40` (Read GC controller state) command.
+ */
 typedef struct SI_condat_gc
 {
     union
@@ -151,6 +159,11 @@ typedef struct SI_condat_gc
     };
 } _SI_condat_gc;
 
+/**
+ * @brief SI GameCube controller origin data.
+ * 
+ * Data structure for Joybus response to `0x41` (Read GC controller origin) command.
+ */
 struct SI_origdat_gc {
     struct SI_condat_gc data;
     uint8_t deadzone0;
@@ -158,36 +171,41 @@ struct SI_origdat_gc {
 };
 
 /**
- * @brief Structure for interpreting SI responses
+ * @brief SI controller data for all controller ports.
+ * 
+ * When reading N64 controller state, only the `c` member array will be populated.
+ * When reading GC controller state, only the `gc` member array will be populated.
  */
 typedef struct controller_data
 {
-    /** @brief Controller Data */
+    /** @brief Array of N64 controller state for each controller port. */
     struct SI_condat c[4];
-    /** @brief Padding or GC data to allow mapping directly to a PIF block */
+    /** @brief Array of GameCube controller state for each controller port. */
     struct SI_condat_gc gc[4];
-} _controller_data;
+} SI_controllers_state_t;
 
-struct controller_origin_data
+/** @brief SI GameCube controller origin data for all controller ports. */
+typedef struct controller_origin_data
 {
+    /** @brief Array of GameCube controller origin data for each controller port. */
     struct SI_origdat_gc gc[4];
-};
+} SI_controllers_origin_t;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void controller_init();
-void controller_read( struct controller_data * data);
-void controller_read_gc( struct controller_data * data, const uint8_t rumble[4]);
+void controller_init( void );
+void controller_read( struct controller_data * data );
+void controller_read_gc( struct controller_data * data, const uint8_t rumble[4] );
 void controller_read_gc_origin( struct controller_origin_data * data);
-int get_controllers_present();
-int get_accessories_present(struct controller_data * data);
-void controller_scan();
-struct controller_data get_keys_down();
-struct controller_data get_keys_up();
-struct controller_data get_keys_held();
-struct controller_data get_keys_pressed();
+int get_controllers_present( void );
+int get_accessories_present( struct controller_data * data );
+void controller_scan( void );
+struct controller_data get_keys_down( void );
+struct controller_data get_keys_up( void );
+struct controller_data get_keys_held( void );
+struct controller_data get_keys_pressed( void );
 int get_dpad_direction( int controller );
 int read_mempak_address( int controller, uint16_t address, uint8_t *data );
 int write_mempak_address( int controller, uint16_t address, uint8_t *data );
@@ -195,9 +213,6 @@ int identify_accessory( int controller );
 void rumble_start( int controller );
 void rumble_stop( int controller );
 void execute_raw_command( int controller, int command, int bytesout, int bytesin, unsigned char *out, unsigned char *in );
-int eeprom_present();
-void eeprom_read(int block, uint8_t * const buf);
-void eeprom_write(int block, const uint8_t * const data);
 
 #ifdef __cplusplus
 }

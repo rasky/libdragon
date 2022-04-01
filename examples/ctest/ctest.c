@@ -2,6 +2,7 @@
 #include <malloc.h>
 #include <string.h>
 #include <stdint.h>
+#include <time.h>
 #include <libdragon.h>
 
 static resolution_t res = RESOLUTION_320x240;
@@ -24,16 +25,16 @@ char *format_type( int accessory )
 
 int main(void)
 {
-    /* enable interrupts (on the CPU) */
-    init_interrupts();
-
     /* Initialize peripherals */
     display_init( res, bit, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE );
     console_init();
     controller_init();
+    timer_init();
+    rtc_init();
 
     console_set_render_mode(RENDER_MANUAL);
 
+    time_t current_time = -1;
     int testv = 0;
     int press = 0;
     uint8_t data[32];
@@ -87,6 +88,12 @@ int main(void)
                                               (accessories & CONTROLLER_4_INSERTED) ? format_type( identify_accessory( 3 ) ) : "" );
 
         printf("\n%d\n\n", testv++ );
+
+        current_time = time( NULL );
+        if( current_time != -1 )
+        {
+            printf("Current date/time: %s\n\n", ctime( &current_time ));
+        }
 
         for( int i = 0; i < 32; i++ )
         {

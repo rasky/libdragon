@@ -3,9 +3,10 @@
  * @brief Controller Subsystem
  * @ingroup controller
  */
+
 #include <string.h>
 #include "libdragon.h"
-#include "regsinternal.h"
+#include "joybusinternal.h"
 
 /**
  * @defgroup controller Controller Subsystem
@@ -13,26 +14,31 @@
  * @brief Controller and accessory interface.
  *
  * The controller subsystem is in charge of communication with all controllers 
- * and accessories plugged into the N64.  The controller subsystem is responsible
- * for interfacing with the serial interface (SI) registers to provide controller
- * data, mempak and rumblepak interfacing, and EEPROM interfacing.
+ * and accessories plugged into the N64 controller ports. The controller subsystem
+ * leverages the @ref joybus "Joybus Subsystem" to provide controller data and
+ * interface with accessories such as the Controller Pak, Rumble Pak, Transfer Pak,
+ * and the Voice-Recognition Unit.
  *
  * Code wishing to communicate with a controller or an accessory should first call
- * #controller_init.  Once the controller subsystem has been initialized, code can
- * either scan the controller interface for changes or perform direct reads from
- * the controller interface.  Controllers can be enumerated with 
- * #get_controllers_present.  Similarly, accessories can be enumerated with
- * #get_accessories_present and #identify_accesory.
+ * #controller_init. The controller subsystem performs an automatic background
+ * scanning of all controllers, in an efficient way, saving the current status
+ * in a local cache. Alternatively, it is possible to execute direct, blocking
+ * controller I/O reads, though they might be quite slow.
+ * 
+ * To read the controller status from this cache, call #controller_scan once per
+ * frame (or whenever you want to perform the reading), and then call #get_keys_down,
+ * #get_keys_up, #get_keys_held and #get_keys_pressed, that will return the
+ * status of all keys relative to the previous inspection. #get_dpad_direction will
+ * return a number signifying the polar direction that the D-Pad is being
+ * pressed in.
  *
- * To read controllers in a managed fashion, call #controller_scan at the beginning
- * of each frame.  From there, #get_keys_down, #get_keys_up, #get_keys_held and
- * #get_keys_pressed will return the status of all keys relative to the last scan.
- * #get_dpad_direction will return a number signifying the polar direction that the
- * D-Pad is being pressed in.
- *
- * To read controllers in a non-managed fashion, call #controller_read.  This will
+ * To perform direct reads to the controllers, call #controller_read.  This will
  * return a structure consisting of all button states on all controllers currently
- * inserted.
+ * inserted. Note that this function takes about 10% of a frame's worth of time.
+ *
+ * Controllers can be enumerated with 
+ * #get_controllers_present.  Similarly, accessories can be enumerated with
+ * #get_accessories_present and #identify_accessory.
  *
  * To enable or disable rumbling on a controller, use #rumble_start and #rumble_stop.
  * These functions will turn rumble on and off at full speed respectively, so if
@@ -51,192 +57,70 @@
  * @{
  */
 
-/**
- * @name SI status register bit definitions
- * @{
- */
-
-/** @brief SI DMA busy */
-#define SI_STATUS_DMA_BUSY  ( 1 << 0 )
-/** @brief SI IO busy */
-#define SI_STATUS_IO_BUSY   ( 1 << 1 )
-/** @} */
-
-/** @brief Structure used to interact with SI registers */
-static volatile struct SI_regs_s * const SI_regs = (struct SI_regs_s *)0xa4800000;
-/** @brief Location of the PIF RAM */
-static void * const PIF_RAM = (void *)0x1fc007c0;
-
-/** @brief The current sampled controller data */
+/** @brief The sampled controller data just read by autoscan */
+static volatile struct controller_data next;
+/** @brief The current sampled controller data accessible via get_keys_* functions */
 static struct controller_data current;
 /** @brief The previously sampled controller data */
-static struct controller_data last;
+static struct controller_data prev;
+/** @brief True if there is a pending controller autoscan */
+static volatile bool controller_autoscan_in_progress = false;
 
-/** 
- * @brief Initialize the controller subsystem 
- */
-void controller_init()
+static void controller_interrupt_update(uint64_t *output)
 {
-    memset(&current, 0, sizeof(current));
-    memset(&last, 0, sizeof(last));
+    memcpy((void*)&next, output, sizeof(struct controller_data));
+    controller_autoscan_in_progress = false;
 }
 
-/**
- * @brief Wait until the SI is finished with a DMA request
- */
-static void __SI_DMA_wait(void)
+static void controller_interrupt(void) 
 {
-    while (SI_regs->status & (SI_STATUS_DMA_BUSY | SI_STATUS_IO_BUSY)) ;
-}
-
-/**
- * @brief Send a block of data to the PIF and fetch the result
- *
- * @param[in]  inblock
- *             The formatted block to send to the PIF
- * @param[out] outblock
- *             The buffer to place the output from the PIF
- */
-static void __controller_exec_PIF( const void *inblock, void *outblock )
-{
-    volatile uint64_t inblock_temp[8];
-    volatile uint64_t outblock_temp[8];
-
-    data_cache_hit_writeback_invalidate(inblock_temp, 64);
-    memcpy(UncachedAddr(inblock_temp), inblock, 64);
-
-    /* Be sure another thread doesn't get into a resource fight */
-    disable_interrupts();
-
-    __SI_DMA_wait();
-
-    SI_regs->DRAM_addr = inblock_temp; // only cares about 23:0
-    MEMORY_BARRIER();
-    SI_regs->PIF_addr_write = PIF_RAM; // is it really ever anything else?
-    MEMORY_BARRIER();
-
-    __SI_DMA_wait();
-
-    data_cache_hit_writeback_invalidate(outblock_temp, 64);
-
-    SI_regs->DRAM_addr = outblock_temp;
-    MEMORY_BARRIER();
-    SI_regs->PIF_addr_read = PIF_RAM;
-    MEMORY_BARRIER();
-
-    __SI_DMA_wait();
-
-    /* Now that we've copied, its safe to let other threads go */
-    enable_interrupts();
-
-    memcpy(outblock, UncachedAddr(outblock_temp), 64);
-}
-
-/**
- * @brief Probe the EEPROM interface
- *
- * Prove the EEPROM to see if it exists on this cartridge.
- *
- * @return Nonzero if EEPROM present, zero if EEPROM not present
- */
-int eeprom_present()
-{
-    static const unsigned long long SI_eeprom_status_block[8] =
+    static const unsigned long long SI_read_con_block[8] =
     {
-        0x00000000ff010300,
-        0xfffffffffe000000,
-        0,
-        0,
-        0,
-        0,
-        0,
-        1
-    };
-    static unsigned long long output[8];
-
-    __controller_exec_PIF(SI_eeprom_status_block,output);
-
-    /* We are looking for 0x80 in the second byte returned, which
-     * signifies that there is an EEPROM present.*/
-    if( ((output[1] >> 48) & 0xFF) == 0x80 )
-    {
-        /* EEPROM found! */
-        return 1;
-    }
-    else
-    {
-        /* EEPROM not found! */
-        return 0;
-    }
-}
-
-/**
- * @brief Read a block from EEPROM
- * 
- * @param[in]  block
- *             Block to read data from.  The N64 accesses eeprom in 8 byte blocks.
- * @param[out] buf
- *             Buffer to place the eight bytes read from EEPROM.
- */
-void eeprom_read(int block, uint8_t * const buf)
-{
-    static unsigned long long SI_eeprom_read_block[8] =
-    {
-        0x0000000002080400,				// LSB is block
-        0xffffffffffffffff,				// return data will be this quad
+        0xff010401ffffffff,
+        0xff010401ffffffff,
+        0xff010401ffffffff,
+        0xff010401ffffffff,
         0xfe00000000000000,
         0,
         0,
-        0,
-        0,
         1
     };
-    static unsigned long long output[8];
-
-	SI_eeprom_read_block[0] = 0x0000000002080400 | (block & 255);
-    __controller_exec_PIF(SI_eeprom_read_block,output);
-    memcpy( buf, &output[1], 8 );
+    
+    if (!controller_autoscan_in_progress) {    
+        controller_autoscan_in_progress = true;
+        joybus_exec_async(SI_read_con_block, controller_interrupt_update);
+    }
 }
 
-/**
- * @brief Write a block to EEPROM
- *
- * @param[in] block
- *            Block to write data to.  The N64 accesses eeprom in 8 byte blocks.
- * @param[in] data
- *            Eight bytes of data to write to block specified
+/** 
+ * @brief Initialize the controller subsystem.
+ * 
+ * After initialization, the controllers will be scanned automatically in
+ * background one time per frame. You can access the last scanned status
+ * using #get_keys_down, #get_keys_up, #get_keys_held #get_keys_pressed,
+ * and #get_dpad_direction.
  */
-void eeprom_write(int block, const uint8_t * const data)
+void controller_init( void )
 {
-    static unsigned long long SI_eeprom_write_block[8] =
-    {
-        0x000000000a010500,				// LSB is block
-        0x0000000000000000,				// send data is this quad
-        0xfffe000000000000,				// MSB will be status of write
-        0,
-        0,
-        0,
-        0,
-        1
-    };
-    static unsigned long long output[8];
-
-	SI_eeprom_write_block[0] = 0x000000000a010500 | (block & 255);
-    memcpy( &SI_eeprom_write_block[1], data, 8 );
-    __controller_exec_PIF(SI_eeprom_write_block,output);
+    memset(&prev, 0, sizeof(struct controller_data));
+    memset(&current, 0, sizeof(struct controller_data));
+    memset((void*)&next, 0, sizeof(struct controller_data));
+    register_VI_handler(controller_interrupt);
 }
 
 /**
  * @brief Read the controller button status for all controllers
  *
- * Read the controller button status immediately and return results to data.  If
- * calling this function, one should not also call #controller_scan as this
- * does not update the internal state of controllers.
+ * Read the controller button status immediately and return results to data.
+ * 
+ * @note This function is slow: it blocks for about 10% of a frame time. To avoid
+ *       this hit, use the managed functions (#get_keys_down, etc.).
  *
  * @param[out] output
  *             Structure to place the returned controller button status
+ *             
  */
-void controller_read(struct controller_data * output)
+void controller_read( struct controller_data * output )
 {
     static const unsigned long long SI_read_con_block[8] =
     {
@@ -250,7 +134,7 @@ void controller_read(struct controller_data * output)
         1
     };
 
-    __controller_exec_PIF(SI_read_con_block,output);
+    joybus_exec( SI_read_con_block, output );
 }
 
 /**
@@ -258,13 +142,13 @@ void controller_read(struct controller_data * output)
  *
  * Read the controller button status immediately and return results to data.
  *
+ * @param[out] outdata
+ *             Structure to place the returned controller button status
  * @param[in]  rumble
  *             Set to 1 to start rumble, 0 to stop it.
  *
- * @param[out] output
- *             Structure to place the returned controller button status
  */
-void controller_read_gc(struct controller_data * outdata, const uint8_t rumble[4])
+void controller_read_gc( struct controller_data * outdata, const uint8_t rumble[4] )
 {
     static const unsigned long long SI_read_con_block[8] =
     {
@@ -280,7 +164,7 @@ void controller_read_gc(struct controller_data * outdata, const uint8_t rumble[4
 
     static unsigned long long output[8], input[8];
 
-    memcpy(input, SI_read_con_block, 64);
+    memcpy( input, SI_read_con_block, 64 );
 
     // Fill in the rumbles
     if (rumble[0])
@@ -292,12 +176,12 @@ void controller_read_gc(struct controller_data * outdata, const uint8_t rumble[4
     if (rumble[3])
         input[5] |= 1LLU << 32;
 
-    __controller_exec_PIF(input, output);
+    joybus_exec( input, output );
 
-    memcpy(&outdata->gc[0], ((uint8_t *) output) + 5, 8);
-    memcpy(&outdata->gc[1], ((uint8_t *) output) + 5 + 13, 8);
-    memcpy(&outdata->gc[2], ((uint8_t *) output) + 5 + 13 * 2, 8);
-    memcpy(&outdata->gc[3], ((uint8_t *) output) + 5 + 13 * 3, 8);
+    memcpy( &outdata->gc[0], ((uint8_t *) output) + 5, 8 );
+    memcpy( &outdata->gc[1], ((uint8_t *) output) + 5 + 13, 8 );
+    memcpy( &outdata->gc[2], ((uint8_t *) output) + 5 + 13 * 2, 8 );
+    memcpy( &outdata->gc[3], ((uint8_t *) output) + 5 + 13 * 3, 8 );
 }
 
 /**
@@ -307,10 +191,10 @@ void controller_read_gc(struct controller_data * outdata, const uint8_t rumble[4
  * by reseting the controller by holding X-Y-start. Apps should use these
  * as the center stick values. The meaning of the two deadzone values is unknown.
  *
- * @param[out] output
+ * @param[out] outdata
  *             Structure to place the returned controller button status
  */
-void controller_read_gc_origin(struct controller_origin_data * outdata)
+void controller_read_gc_origin( struct controller_origin_data * outdata )
 {
     static const unsigned long long SI_read_con_block[8] =
     {
@@ -326,52 +210,52 @@ void controller_read_gc_origin(struct controller_origin_data * outdata)
 
     static unsigned long long output[8];
 
-    __controller_exec_PIF(SI_read_con_block, output);
+    joybus_exec( SI_read_con_block, output );
 
-    memcpy(&outdata->gc[0], ((uint8_t *) output) + 3, 10);
-    memcpy(&outdata->gc[1], ((uint8_t *) output) + 3 + 13, 10);
-    memcpy(&outdata->gc[2], ((uint8_t *) output) + 3 + 13 * 2, 10);
-    memcpy(&outdata->gc[3], ((uint8_t *) output) + 3 + 13 * 3, 10);
+    memcpy( &outdata->gc[0], ((uint8_t *) output) + 3, 10 );
+    memcpy( &outdata->gc[1], ((uint8_t *) output) + 3 + 13, 10 );
+    memcpy( &outdata->gc[2], ((uint8_t *) output) + 3 + 13 * 2, 10 );
+    memcpy( &outdata->gc[3], ((uint8_t *) output) + 3 + 13 * 3, 10 );
 }
 
 /**
- * @brief Scan the controllers to determine the current button state
- *
- * Scan the four controller ports and calculate the buttons state.  This
- * must be called before calling #get_keys_down, #get_keys_up,
- * #get_keys_held, #get_keys_pressed or #get_dpad_direction. Only N64
- * controllers supported.
+ * @brief Fetch the current controller state.
+ * 
+ * This function must be called once per frame, or any time we want to update
+ * the state of the controllers. After calling this function, you can use
+ * #get_keys_down, #get_keys_up, #get_keys_held, #get_keys_pressed and
+ * #get_dpad_direction to inspect the controller state.
+ * 
+ * This function is very fast. In fact, controllers are read in background
+ * asynchronously under interrupt, so this function just synchronizes the
+ * internal state.
  */
-void controller_scan()
+void controller_scan( void )
 {
-    /* Remember last */
-    memcpy(&last, &current, sizeof(current));
+    prev = current;
 
-    /* Grab current */
-    memset(&current, 0, sizeof(current));
-    controller_read(&current);
+    disable_interrupts();
+    memcpy(&current, (void*)&next, sizeof(struct controller_data));
+    enable_interrupts();
 }
 
 /**
  * @brief Get keys that were pressed since the last inspection
  *
- * Return keys pressed since last detection.  This returns a standard
- * #controller_data struct identical to #controller_read.  However, buttons
- * are only set if they were pressed down since the last #controller_scan.
+ * Return keys pressed since last detection. This returns a standard
+ * #SI_controllers_state_t struct identical to #controller_read. However, buttons
+ * are only set if they were pressed down since the last read.
  *
  * @return A structure representing which buttons were just pressed down
  */
-struct controller_data get_keys_down()
+struct controller_data get_keys_down( void )
 {
-    struct controller_data ret;
-
-    /* Start with baseline */
-    memcpy(&ret, &current, sizeof(current));
+    struct controller_data ret = current;
 
     /* Figure out which wasn't pressed last time and is now */
     for(int i = 0; i < 4; i++)
     {
-        ret.c[i].data = (current.c[i].data) & ~(last.c[i].data);
+        ret.c[i].data = (current.c[i].data) & ~(prev.c[i].data);
     }
 
     return ret;
@@ -380,23 +264,21 @@ struct controller_data get_keys_down()
 /**
  * @brief Get keys that were released since the last inspection
  *
- * Return keys released since last detection.  This returns a standard
- * #controller_data struct identical to #controller_read.  However, buttons
- * are only set if they were released since the last #controller_scan.
+ * Return keys released since last detection. This returns a standard
+ * #SI_controllers_state_t struct identical to #controller_read. However, buttons
+ * are only set if they were released since the last read.
  *
  * @return A structure representing which buttons were just released
  */
-struct controller_data get_keys_up()
+struct controller_data get_keys_up( void )
 {
-    struct controller_data ret;
-
     /* Start with baseline */
-    memcpy(&ret, &current, sizeof(current));
+    struct controller_data ret = current;
 
     /* Figure out which was pressed last time and isn't now */
     for(int i = 0; i < 4; i++)
     {
-        ret.c[i].data = ~(current.c[i].data) & (last.c[i].data);
+        ret.c[i].data = ~(current.c[i].data) & (prev.c[i].data);
     }
 
     return ret;
@@ -405,23 +287,21 @@ struct controller_data get_keys_up()
 /**
  * @brief Get keys that were held since the last inspection
  *
- * Return keys held since last detection.  This returns a standard
- * #controller_data struct identical to #controller_read.  However, buttons
- * are only set if they were held since the last #controller_scan.
+ * Return keys held since last detection. This returns a standard
+ * #SI_controllers_state_t struct identical to #controller_read. However, buttons
+ * are only set if they were held since the last read.
  *
  * @return A structure representing which buttons were held
  */
-struct controller_data get_keys_held()
+struct controller_data get_keys_held( void )
 {
-    struct controller_data ret;
-
     /* Start with baseline */
-    memcpy(&ret, &current, sizeof(current));
+    struct controller_data ret = current;
 
     /* Figure out which was pressed last time and now as well */
     for(int i = 0; i < 4; i++)
     {
-        ret.c[i].data = (current.c[i].data) & (last.c[i].data);
+        ret.c[i].data = (current.c[i].data) & (prev.c[i].data);
     }
 
     return ret;
@@ -430,12 +310,12 @@ struct controller_data get_keys_held()
 /**
  * @brief Get keys that are currently pressed, regardless of previous state
  *
- * This function works identically to #controller_read except for it is safe
- * to call when using #controller_scan.
+ * This function works identically to #controller_read except that it returns
+ * the cached data from the last background autoscan.
  *
  * @return A structure representing which buttons were pressed
  */
-struct controller_data get_keys_pressed()
+struct controller_data get_keys_pressed( void )
 {
     return current;
 }
@@ -445,7 +325,7 @@ struct controller_data get_keys_pressed()
  *
  * Return the direction of the DPAD specified in controller.  Follows standard
  * polar coordinates, where 0 = 0, pi/4 = 1, pi/2 = 2, etc...  Returns -1 when
- * not pressed.  Must be used in conjunction with #controller_scan
+ * not pressed.
  *
  * @param[in] controller
  *            The controller (0-3) to inspect
@@ -531,7 +411,7 @@ void execute_raw_command( int controller, int command, int bytesout, int bytesin
     memset( &data[controller + 3 + bytesout], 0xFF, bytesin );
     data[controller + 3 + bytesout + bytesin] = 0xFE;
 
-    __controller_exec_PIF(SI_read_controllers_block,SI_debug);
+    joybus_exec(SI_read_controllers_block,SI_debug);
 
     data = (uint8_t *)SI_debug;
     memcpy( in, &data[controller + 3 + bytesout], bytesin );
@@ -546,7 +426,7 @@ void execute_raw_command( int controller, int command, int bytesout, int bytesin
  *
  * @return A bitmask representing controllers present
  */
-int get_controllers_present()
+int get_controllers_present( void )
 {
     int ret = 0;
     struct controller_data output;
@@ -562,7 +442,7 @@ int get_controllers_present()
         1
     };
 
-    __controller_exec_PIF(SI_read_controllers_block,&output);
+    joybus_exec( SI_read_controllers_block, &output );
 
     if( output.c[0].err == ERROR_NONE ) { ret |= CONTROLLER_1_INSERTED; }
     if( output.c[1].err == ERROR_NONE ) { ret |= CONTROLLER_2_INSERTED; }
@@ -616,7 +496,7 @@ static void __get_accessories_present( struct controller_data *output )
         1
     };
 
-    __controller_exec_PIF(SI_read_status_block,output);
+    joybus_exec( SI_read_status_block, output );
 }
 
 /**
@@ -643,7 +523,7 @@ int get_accessories_present(struct controller_data *out)
     if( (output.c[3].err == ERROR_NONE) && __is_valid_accessory( output.c[3].data ) ) { ret |= CONTROLLER_4_INSERTED; }
 
     if (out)
-        memcpy(out, &output, sizeof(struct controller_data));
+        memcpy( out, &output, sizeof(struct controller_data) );
 
     return ret;
 }
@@ -773,7 +653,7 @@ int read_mempak_address( int controller, uint16_t address, uint8_t *data )
     /* Leave room for 33 bytes (32 bytes + CRC) to come back */
     memset( &SI_read_mempak_block[controller + 5], 0xFF, 33 );
 
-    __controller_exec_PIF(SI_read_mempak_block,&output);
+    joybus_exec( SI_read_mempak_block, &output );
 
     /* Copy data correctly out of command */
     memcpy( data, &output[controller + 5], 32 );
@@ -850,7 +730,7 @@ int write_mempak_address( int controller, uint16_t address, uint8_t *data )
     /* Leave room for CRC to come back */
     SI_write_mempak_block[controller + 5 + 32] = 0xFF;
 
-    __controller_exec_PIF(SI_write_mempak_block,&output);
+    joybus_exec( SI_write_mempak_block, &output );
 
     /* Calculate CRC on output */
     uint8_t crc = __calc_data_crc( &output[controller + 5] );
@@ -889,14 +769,14 @@ static bool __is_transfer_pak( int controller )
 {
     uint8_t data[32];
     memset( data, 0x84, 32 );
-    write_mempak_address(controller, 0x8000, data);
-    read_mempak_address(controller, 0x8000, data);
+    write_mempak_address( controller, 0x8000, data );
+    read_mempak_address( controller, 0x8000, data );
 
     bool result = (data[0] == 0x84);
 
     memset( data, 0xFE, 32 );
-    write_mempak_address(controller, 0x8000, data);
-    read_mempak_address(controller, 0x8000, data);
+    write_mempak_address( controller, 0x8000, data );
+    read_mempak_address( controller, 0x8000, data );
 
     return result & (data[0] == 0x00);
 }

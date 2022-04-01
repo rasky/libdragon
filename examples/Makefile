@@ -1,60 +1,70 @@
-all: cpptest ctest dfsdemo mptest mputest spritemap test timers vrutest vtest ucodetest
-clean: ctest-clean dfsdemo-clean mptest-clean mputest-clean spritemap-clean test-clean timers-clean vrutest-clean vtest-clean ucodetest-clean
+all: audioplayer cpptest ctest dfsdemo mixertest mptest mputest spritemap test timers vrutest vtest ucodetest
+clean: audioplayer-clean cpptest-clean ctest-clean dfsdemo-clean mixertest-clean mptest-clean mputest-clean spritemap-clean test-clean timers-clean vrutest-clean vtest-clean ucodetest-clean
+
+audioplayer:
+	$(MAKE) -C audioplayer
+audioplayer-clean:
+	$(MAKE) -C audioplayer clean
 
 cpptest:
-	+make -C cpptest
+	$(MAKE) -C cpptest
 cpptest-clean:
-	make -C cpptest clean
+	$(MAKE) -C cpptest clean
 
 ctest:
-	+make -C ctest
+	$(MAKE) -C ctest
 ctest-clean:
-	make -C ctest clean
+	$(MAKE) -C ctest clean
 
 dfsdemo:
-	+make -C dfsdemo
+	$(MAKE) -C dfsdemo
 dfsdemo-clean:
-	make -C dfsdemo clean
+	$(MAKE) -C dfsdemo clean
+
+mixertest:
+	$(MAKE) -C mixertest
+mixertest-clean:
+	$(MAKE) -C mixertest clean
 
 mptest:
-	+make -C mptest
+	$(MAKE) -C mptest
 mptest-clean:
-	make -C mptest clean
+	$(MAKE) -C mptest clean
 
 mputest:
-	+make -C mputest
+	$(MAKE) -C mputest
 mputest-clean:
-	make -C mputest clean
+	$(MAKE) -C mputest clean
 
 spritemap:
-	+make -C spritemap
+	$(MAKE) -C spritemap
 spritemap-clean:
-	make -C spritemap clean
+	$(MAKE) -C spritemap clean
 
 test:
-	+make -C test
+	$(MAKE) -C test
 test-clean:
-	make -C test clean
+	$(MAKE) -C test clean
 
 timers:
-	+make -C timers
+	$(MAKE) -C timers
 timers-clean:
-	make -C timers clean
+	$(MAKE) -C timers clean
 
 vrutest:
-	+make -C vrutest
+	$(MAKE) -C vrutest
 vrutest-clean:
-	make -C vrutest clean
+	$(MAKE) -C vrutest clean
 
 vtest:
-	+make -C vtest
+	$(MAKE) -C vtest
 vtest-clean:
-	make -C vtest clean
+	$(MAKE) -C vtest clean
 
 ucodetest:
-	+make -C ucodetest
+	$(MAKE) -C ucodetest
 ucodetest-clean:
-	make -C ucodetest clean
+	$(MAKE) -C ucodetest clean
 
-.PHONY: cpptest cpptest-clean ctest ctest-clean dfsdemo dfsdemo-clean mptest mptest-clean mputest mputest-clean spritemap spritemap-clean
+.PHONY: audioplayer audioplayer-clean cpptest cpptest-clean ctest ctest-clean dfsdemo dfsdemo-clean mixertest mixertest-clean mptest mptest-clean mputest mputest-clean spritemap spritemap-clean
 .PHONY: test test-clean timers timers-clean vrutest vrutest-clean vtest vtest-clean ucodetest ucodetest-clean

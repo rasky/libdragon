@@ -1,6 +1,3 @@
-// Writes the 32bit value to COP0 register 9 (count)
-#define WRITE_TICKS(val) do { asm volatile("mtc0 %0,$9"::"r"(val)); } while(0)
-
 static volatile uint32_t test_ticks_mock = 0;
 static volatile enum test_ticks_state_t { Start = 0, Test = 1, Timeout = 2 } state = -1;
 
@@ -11,7 +8,7 @@ static void frame_callback() {
 
 	switch(state) {
 		case Test:
-			WRITE_TICKS(test_ticks_mock);
+			C0_WRITE_COUNT(test_ticks_mock);
 		break;
 		default:
 		break;
@@ -63,7 +60,7 @@ static void test_ticks_func(TestContext *ctx, void to_test(unsigned long), char 
 	for (int i=0; i < num_cases; i++) {
 		/* move ticks a little before the target to make sure it is actually doing some waiting */
 		test_ticks_mock = tests[i][1] - TICKS_FROM_MS(5);
-		WRITE_TICKS(tests[i][0]);
+		C0_WRITE_COUNT(tests[i][0]);
 		/* act */
 		(*to_test)(tests[i][2]);
 		uint32_t ticks_0 = TICKS_READ();
@@ -88,9 +85,9 @@ void test_ticks(TestContext *ctx) {
 
 	// Put the instructions on the same cacheline
 	for (int i = 0; i < 2; i++) {
-		WRITE_TICKS(0x0);
+		C0_WRITE_COUNT(0x0);
 		ticks_0 = TICKS_READ();
-		WRITE_TICKS(0xFFFFFFFF);
+		C0_WRITE_COUNT(0xFFFFFFFF);
 		ticks_1 = TICKS_READ();
 	}
 
@@ -102,9 +99,9 @@ void test_ticks(TestContext *ctx) {
 
 	// Make sure they are all in I-cache o/w ticks may increment irrespective of actually run instructions
 	for (int i = 0; i < 2; i++) {
-		WRITE_TICKS(0x0);
+		C0_WRITE_COUNT(0x0);
 		ticks_0 = get_ticks();
-		WRITE_TICKS(0xFFFFFFFF);
+		C0_WRITE_COUNT(0xFFFFFFFF);
 		ticks_1 = get_ticks();
 	}
 
@@ -116,9 +113,9 @@ void test_ticks(TestContext *ctx) {
 
 	// Make sure they are all in I-cache o/w ticks may increment irrespective of actually run instructions
 	for (int i = 0; i < 2; i++) {
-		WRITE_TICKS(0x0);
+		C0_WRITE_COUNT(0x0);
 		ticks_0 = get_ticks_ms();
-		WRITE_TICKS(0x7FFFFFFF);
+		C0_WRITE_COUNT(0x7FFFFFFF);
 		ticks_1 = get_ticks_ms();
 	}
 
@@ -126,18 +123,20 @@ void test_ticks(TestContext *ctx) {
 	register_VI_handler(frame_callback);
 	enable_interrupts();
 
-	ASSERT(ticks_0 == 0 && ticks_1 == 45812, "not reading correct register or function not inlined. Received %lu and %lu", ticks_0, ticks_1);
+	ASSERT(ticks_0 == 0 && ticks_1 == (!sys_bbplayer() ? 45812 : 30542), "not reading correct register or function not inlined. Received %lu and %lu", ticks_0, ticks_1);
 
 	// Sync to nearest video frame to use as an interval
 	while (state < Start);
 
 	test_ticks_func(ctx, wait_ticks, "wait_ticks", test_ticks_cases, sizeof(test_ticks_cases) / sizeof(test_ticks_cases[0]));
-	test_ticks_func(ctx, wait_ms, "wait_ms", test_ticks_ms_cases, sizeof(test_ticks_ms_cases) / sizeof(test_ticks_ms_cases[0]));
+
+	// The wait_ms test contains hardcoded tick values that refer to the conversion
+	// between milliseconds and ticks, as computed on a N64. It won't work on
+	// iQue, so just skip this part.
+	if (!sys_bbplayer())
+		test_ticks_func(ctx, wait_ms, "wait_ms", test_ticks_ms_cases, sizeof(test_ticks_ms_cases) / sizeof(test_ticks_ms_cases[0]));
 
 	// Cleanup
 	unregister_VI_handler(frame_callback);
-	WRITE_TICKS(continue_ticks);
+	C0_WRITE_COUNT(continue_ticks);
 }
-
-#undef WRITE_TICKS
-#undef TEST

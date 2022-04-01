@@ -56,16 +56,6 @@
 #define UNCACHED_ADDR(x)    ((void *)(((uint32_t)(x)) | 0xA0000000))
 
 /**
- * @brief Align a memory address to 64 byte offset
- * 
- * @param[in] x
- *            Unaligned memory address
- *
- * @return An aligned address guaranteed to be >= the unaligned address
- */
-#define ALIGN_64BYTE(x)     ((void *)(((uint32_t)(x)+63) & 0xFFFFFFC0))
-
-/**
  * @name Video Mode Register Presets
  * @brief Presets to use when setting a particular video mode
  * @{
@@ -202,7 +192,7 @@ static int now_drawing = -1;
  */
 static void __write_registers( uint32_t const * const registers )
 {
-    uint32_t *reg_base = (uint32_t *)REGISTER_BASE;
+    volatile uint32_t *reg_base = (uint32_t *)REGISTER_BASE;
 
     /* This should never happen */
     if( !registers ) { return; }
@@ -227,7 +217,7 @@ static void __write_registers( uint32_t const * const registers )
  */
 static void __write_dram_register( void const * const dram_val )
 {
-    uint32_t *reg_base = (uint32_t *)REGISTER_BASE;
+    volatile uint32_t *reg_base = (uint32_t *)REGISTER_BASE;
 
     reg_base[1] = (uint32_t)dram_val;
     MEMORY_BARRIER();
@@ -240,15 +230,21 @@ static void __write_dram_register( void const * const dram_val )
  */
 static void __display_callback()
 {
+    volatile uint32_t *reg_base = (uint32_t *)REGISTER_BASE;
+
+    /* Least significant bit of the current line register indicates
+       if the currently displayed field is odd or even. */
+    bool field = reg_base[4] & 1;
+
     /* Only swap frames if we have a new frame to swap, otherwise just
        leave up the current frame */
     if(show_next >= 0 && show_next != now_drawing)
     {
-        __write_dram_register( __safe_buffer[show_next] );
-
         now_showing = show_next;
         show_next = -1;
     }
+
+    __write_dram_register(__safe_buffer[now_showing] + (!field ? __width * __bitdepth : 0));
 }
 
 /**
@@ -272,7 +268,7 @@ void display_init( resolution_t res, bitdepth_t bit, uint32_t num_buffers, gamma
 {
     uint32_t registers[REGISTER_COUNT];
     uint32_t tv_type = get_tv_type();
-    uint32_t control = 0x3000;
+    uint32_t control = !sys_bbplayer() ? 0x3000 : 0x1000;
 
     /* Can't have the video interrupt happening here */
     disable_interrupts();
@@ -320,9 +316,7 @@ void display_init( resolution_t res, bitdepth_t bit, uint32_t num_buffers, gamma
     switch( bit )
     {
         case DEPTH_16_BPP:
-            /* We enable divot filter in 16bpp mode to give our gradients
-               a slightly smoother look */
-            control |= 0x10002;
+            control |= 0x2;
             break;
         case DEPTH_32_BPP:
             control |= 0x3;
@@ -345,20 +339,49 @@ void display_init( resolution_t res, bitdepth_t bit, uint32_t num_buffers, gamma
     switch( aa )
     {
         case ANTIALIAS_OFF:
+            /* Disabling antialias hits a hardware bug on NTSC consoles on
+               low resolutions (see issue #66). We do not know the exact
+               horizontal scale minimum, but among libdragon's supported
+               resolutions the bug appears on 256x240x16 and 320x240x16. It would
+               work on PAL consoles, but we think users are better served by
+               prohibiting it altogether. 
+
+               For people that absolutely need this on PAL consoles, it can
+               be enabled with *(volatile uint32_t*)0xA4400000 |= 0x300 just
+               after the display_init call. */
+            if (bit == DEPTH_16_BPP)
+                assertf(res != RESOLUTION_256x240 && res != RESOLUTION_320x240,
+                    "ANTIALIAS_OFF is not supported by the hardware on 256x240x16 and 320x240x16.\n"
+                    "Please use ANTIALIAS_RESAMPLE instead.");
+
             /* Set AA off flag */
             control |= 0x300;
+
+            /* Dither filter should not be enabled with this AA mode
+               as it will cause ugly vertical streaks */
             break;
         case ANTIALIAS_RESAMPLE:
             /* Set AA on resample as well as divot on */
             control |= 0x210;
+
+            /* Dither filter should not be enabled with this AA mode
+               as it will cause ugly vertical streaks */
             break;
         case ANTIALIAS_RESAMPLE_FETCH_NEEDED:
             /* Set AA on resample and fetch as well as divot on */
             control |= 0x110;
+
+            /* Enable dither filter in 16bpp mode to give gradients
+               a slightly smoother look */
+            if ( bit == DEPTH_16_BPP ) { control |= 0x10000; }
             break;
         case ANTIALIAS_RESAMPLE_FETCH_ALWAYS:
             /* Set AA on resample always and fetch as well as divot on */
             control |= 0x010;
+
+            /* Enable dither filter in 16bpp mode to give gradients
+               a slightly smoother look */
+            if ( bit == DEPTH_16_BPP ) { control |= 0x10000; }
             break;
     }
 
@@ -407,8 +430,8 @@ void display_init( resolution_t res, bitdepth_t bit, uint32_t num_buffers, gamma
     {
         /* Set parameters necessary for drawing */
         /* Grab a location to render to */
-        buffer[i] = malloc( __width * __height * __bitdepth + 63 );
-        __safe_buffer[i] = ALIGN_64BYTE( UNCACHED_ADDR( buffer[i] ) );
+        buffer[i] = memalign( 64, __width * __height * __bitdepth );
+        __safe_buffer[i] = UNCACHED_ADDR( buffer[i] );
 
         /* Baseline is blank */
         memset( __safe_buffer[i], 0, __width * __height * __bitdepth );
@@ -428,7 +451,7 @@ void display_init( resolution_t res, bitdepth_t bit, uint32_t num_buffers, gamma
 
     /* Set which line to call back on in order to flip screens */
     register_VI_handler( __display_callback );
-    set_VI_interrupt( 1, 0x200 );
+    set_VI_interrupt( 1, 0x2 );
 }
 
 /**
@@ -523,13 +546,33 @@ void display_show( display_context_t disp )
     int i = disp - 1;
 
     /* This should match, or something went awry */
-    if( i == now_drawing )
-    {
-        /* Ensure we display this next time */
-        now_drawing = -1;
-        show_next = i;
-    }
+    assertf( i == now_drawing, "display_show_force invoked on non-locked display" );
 
+    /* Ensure we display this next time */
+    now_drawing = -1;
+    show_next = i;
+
+    enable_interrupts();
+}
+
+/**
+ * @brief Force-display a previously locked buffer
+ *
+ * Display a valid display context to the screen right away, without waiting
+ * for vblank interrupt. This function works also with interrupts disabled.
+ *
+ * NOTE: this is currently not part of the public API as we use it only
+ * internally.
+ *
+ * @param[in] disp
+ *            A display context retrieved using #display_lock
+ */
+void display_show_force( display_context_t disp )
+{
+    /* Can't have the video interrupt screwing this up */
+    disable_interrupts();
+    display_show(disp);
+    __display_callback();
     enable_interrupts();
 }
 

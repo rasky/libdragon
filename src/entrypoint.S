@@ -4,10 +4,33 @@
 
 #include "regs.S"
 
+	.set noreorder
+
 	.section .boot
 	.global _start
 _start:
 	lw t0, 0x80000318			/* memory size */
+
+	/* Check whether we are running on iQue or N64. Use the MI version register
+	   which has LSB set to 0xB0 on iQue. We assume 0xBn was meant for BBPlayer.
+	   Notice that we want this test to be hard for emulators to pass by mistake,
+	   so checking for a specific value while reading seems solid enough. */
+	lw t1, 0xA4300004
+	andi t1, 0xF0
+	bne t1, 0xB0, set_sp
+	li fp, 0                    /* fp=0 -> vanilla N64 */
+
+	/* In iQue player, memory allocated to game can be configured and it appears
+	   in 0x80000318. On the other hand, the top 8Mb of RDRAM is reserved to
+	   savegames. So avoid putting the stack there, capping the size to 0x7C0000.
+	   See also get_memory_size. */
+	li fp, 1                    /* fp=1 -> iQue player */
+	li t1, 0x800000
+	blt t0, t1, set_sp
+	nop
+	li t0, 0x7C0000
+
+set_sp:
 	li t1, 0x7FFFFFF0
 	addu sp,t0,t1				/* init stack */
 	la gp, _gp					/* init data pointer */
@@ -22,8 +45,9 @@ _start:
 	/* copy code and data */
 	la a0, __text_start
 	la a1, __data_end
-	subu a2,a0,0x80000400		/* skip over .boot section */
-	addu a2,a2,0xB0001000		/* address in rom */
+	la t0, __libdragon_text_start
+	subu a2, a0, t0				/* skip over .boot section */
+	addu a2, 0xB0001000			/* address in rom */
 data_init:
 	lw t0,(a2)
 	addiu a2,4
@@ -55,6 +79,9 @@ bss_init:
 	jal data_cache_hit_writeback_invalidate
 	nop
 
+	/* Store the bbplayer flag now that BSS has been cleared */
+	sw fp, __bbplayer
+
 	/* load interrupt vector */
 	la t0,intvector
 	la t1,0xa0000000
@@ -76,10 +103,15 @@ loadintvectorloop:
 	bnez t2,loadintvectorloop
 	nop
 
+	la t0, debug_assert_func    /* install assert function in system.c */
+	la t1, __assert_func_ptr
+	sw t0, 0(t1)	
+
 	jal __do_global_ctors		/* call global constructors */
 	nop
+	li a0, 0
 	jal main					/* call main app */
-	nop
+	li a1, 0
 
 deadloop:
 	j deadloop

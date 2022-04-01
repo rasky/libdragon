@@ -1,43 +1,17 @@
-ROOTDIR = $(N64_INST)
-GCCN64PREFIX = $(ROOTDIR)/bin/mips64-elf-
-CHKSUM64PATH = $(ROOTDIR)/bin/chksum64
-MKDFSPATH = $(ROOTDIR)/bin/mkdfs
-HEADERPATH = $(ROOTDIR)/mips64-elf/lib
-N64TOOL = $(ROOTDIR)/bin/n64tool
-HEADERNAME = header
-LINK_FLAGS = -L$(ROOTDIR)/mips64-elf/lib -ldragon -lc -lm -lstdc++ -ldragonsys -Tn64.ld -Wl,--gc-sections
-CFLAGS = -std=c++11 -march=vr4300 -mtune=vr4300 -O2 -Wall -Werror -I$(ROOTDIR)/mips64-elf/include
-ASFLAGS = -mtune=vr4300 -march=vr4300
-CC = $(GCCN64PREFIX)gcc
-AS = $(GCCN64PREFIX)as
-LD = $(GCCN64PREFIX)g++
-OBJCOPY = $(GCCN64PREFIX)objcopy
-OBJDUMP = $(GCCN64PREFIX)objdump
+BUILD_DIR=build
+SOURCE_DIR=.
+include $(N64_INST)/include/n64.mk
 
-ifeq ($(N64_BYTE_SWAP),true)
-ROM_EXTENSION = .v64
-N64_FLAGS = -b -l 2M -h $(HEADERPATH)/$(HEADERNAME) -o $(PROG_NAME)$(ROM_EXTENSION)
-else
-ROM_EXTENSION = .z64
-N64_FLAGS = -l 2M -h $(HEADERPATH)/$(HEADERNAME) -o $(PROG_NAME)$(ROM_EXTENSION)
-endif
+all: cpptest.z64
 
-PROG_NAME = cpptest
+$(BUILD_DIR)/cpptest.elf: \
+	$(BUILD_DIR)/cpptest.o
 
-$(PROG_NAME)$(ROM_EXTENSION): $(PROG_NAME).elf
-	$(OBJCOPY) $(PROG_NAME).elf $(PROG_NAME).bin -O binary
-	rm -f $(PROG_NAME)$(ROM_EXTENSION)
-	$(N64TOOL) $(N64_FLAGS) -t "C++ Test" $(PROG_NAME).bin
-	$(CHKSUM64PATH) $(PROG_NAME)$(ROM_EXTENSION)
-
-# Could not find a single step method?
-$(PROG_NAME).o: $(PROG_NAME).cpp
-	$(CC) -c -o $(PROG_NAME).o $(PROG_NAME).cpp $(CFLAGS)
-
-$(PROG_NAME).elf: $(PROG_NAME).o
-	$(LD) -o $(PROG_NAME).elf $(PROG_NAME).o $(LINK_FLAGS)
-
-all: $(PROG_NAME)$(ROM_EXTENSION)
+cpptest.z64: N64_ROM_TITLE="C++ test"
 
 clean:
-	rm -f *.v64 *.z64 *.elf *.o *.bin
+	rm -rf $(BUILD_DIR) cpptest.z64
+
+-include $(wildcard $(BUILD_DIR)/*.d)
+
+.PHONY: all clean

@@ -21,6 +21,7 @@ extern "C" {
 #endif
 
 #include <dir.h>
+#include <sys/stat.h>
 
 /**
  * @brief Filesystem hook structure
@@ -185,7 +186,10 @@ int attach_filesystem( const char * const prefix, filesystem_t *filesystem );
 int detach_filesystem( const char * const prefix );
 
 int hook_stdio_calls( stdio_t *stdio_calls );
-int unhook_stdio_calls();
+int unhook_stdio_calls( stdio_t *stdio_calls );
+
+int hook_time_call( time_t (*time_fn)( void ) );
+int unhook_time_call( time_t (*time_fn)( void ) );
 
 #ifdef __cplusplus
 }

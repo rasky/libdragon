@@ -22,22 +22,24 @@ OUTPUT_ARCH (mips)
 EXTERN (_start)
 ENTRY (_start)
 
+__kseg0_start = 0x80000000;
+
+/* Start address of code is 1K up in cached, unmapped RAM (KSEG0). We have
+* to be at least this far up in order to not interfere with the cart
+* boot code which is copying it down from the cart
+*/
+__libdragon_text_start  = __kseg0_start + 0x400;
+
 MEMORY
 {
-    mem : ORIGIN = 0x80000400, LENGTH = 4M-0x0400
+    mem : ORIGIN = __kseg0_start, LENGTH = 4M
 }
 
 SECTIONS {
-   /* Start address of code is 1K up in uncached, unmapped RAM.  We have
-    * to be at least this far up in order to not interfere with the cart
-    * boot code which is copying it down from the cart
-    */
-    . = 0x80000400;
-
     /* The text section carries the app code and its relocation addr is
     * the first byte of the cart domain in cached, unmapped memory
     */
-    .text : {
+    .text __libdragon_text_start  : {
         *(.boot)
         . = ALIGN(16);
         __text_start = .;
@@ -63,11 +65,29 @@ SECTIONS {
         . = ALIGN(8);
     } > mem
 
-    . = ALIGN(8);
+    /* This is important to keep __CTOR_END__ consistent */
+    . = ALIGN(4);
 
     .ctors : {
         __CTOR_LIST__ = .;
-        *(.ctors)
+        /* Actually we should place the count here like;
+
+        LONG((__CTOR_END__ - __CTOR_LIST__) / 4 - 2)
+
+        but g++ seem to already do this (though incorrectly placing an 0xFFFFFFFF)
+        and that breaks things if we also add it. Ideally this should be parsed
+        by the code but we already know the end as well.
+
+        The new build system links everything via g++ by default and should use
+        __wrap___do_global_ctors and enables it via the --wrap linker option.
+        When linking with ld, we should use __do_global_ctors, which is the default
+        if you don't provide the --wrap option. */
+        KEEP(*(.ctors))
+         /* Similarly we should have a;
+
+        LONG(0)
+
+        here, and g++ seem to insert it at __CTOR_END__ */
         __CTOR_END__ = .;
     } > mem
 
