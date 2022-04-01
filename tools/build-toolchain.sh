@@ -1,72 +1,33 @@
 #! /bin/bash
-# N64 MIPS GCC toolchain build/install script (runs under UNIX systems).
-# (c) 2012 Shaun Taylor and libDragon Contributors.
+# N64 MIPS GCC toolchain build/install script for Unix distributions
+# (c) 2012-2021 DragonMinded and libDragon Contributors.
 # See the root folder for license information.
 
-
-# Before calling this script, make sure you have all required
-# dependency packages installed in your system.
-# On a Debian-based systems this is achieved by typing the following commands:
+# Before calling this script, make sure you have GMP, MPFR and TexInfo
+# packages installed in your system.  On a Debian-based system this is
+# achieved by typing the following commands:
 #
-# sudo apt-get update && sudo apt-get upgrade
-# sudo apt-get install -yq wget bzip2 gcc g++ make file libmpfr-dev libmpc-dev zlib1g-dev texinfo git gcc-multilib
+# sudo apt-get install libmpfr-dev
+# sudo apt-get install texinfo
+# sudo apt-get install libmpc-dev
 
 # Bash strict mode http://redsymbol.net/articles/unofficial-bash-strict-mode/
 set -euo pipefail
 IFS=$'\n\t'
 
-# Exit script on error
-set -e
-
-# Ensure you set 'N64_INST' before calling the script to change the default installation directory path
-  # by default it will presume 'usr/local/n64_toolchain'
-  INSTALL_PATH="${N64_INST:-/usr/local}"
-  # rm -rf "$INSTALL_PATH" # We should probably do a clean install?!
-  mkdir -p "$INSTALL_PATH" # But make sure the install path exists!
-
-  # Defines the build system variables to allow cross compilation.
-  BUILD=${BUILD:-x86_64-linux-gnu}
-  HOST=${HOST:-x86_64-linux-gnu}
-  TARGET=${TARGET:-mips64-elf}
-
-  # Dependency source libs (Versions)
-  # This will allow the optional use of FP lib source 
-  # (if not available for the host or build system)
-  # By default it uses the installed system versions.
-  GMP_V=${GMP_V:-""}
-  MPC_V=${MPC_V:-""}
-  MPFR_V=${MPFR_V:-""}
-  # This will allow the optional build of Make against a specific version
-  # (useful for cross compiling). 
-  MAKE_V=${MAKE_V:-""}
-
-# Check for cross compile script flag
-if [ "$BUILD" != "$HOST" ]; then # cross compile (host) flag is specified.
-  # This (may) also require the following (extra) package dependencies:
-  # sudo apt-get install -yq mingw-w64 libgmp-dev bison libz-mingw-w64-dev autoconf
-  echo "Cross compiling for different host"
-  
-  # Use the current-directory/$HOST/n64_toolchain for the install path for non native parts, as these is not for the current system!
-  # THIS_SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-  # always ensure the folder is clean (if rebuilding)
-  # rm -rf "$THIS_SCRIPT_PATH/$HOST"
-  # mkdir -p "$THIS_SCRIPT_PATH/$HOST"
-  # FOREIGN_INSTALL_PATH="$THIS_SCRIPT_PATH/$HOST"
-
-else # We are compiling for the native system.
-  echo "building for native system"
-
-fi
-
-BINUTILS_V=2.36.1 # linux works fine with 2.37 (but is it worth the effort?)
-GCC_V=11.2.0
-NEWLIB_V=4.1.0
-
+# Set N64_INST before calling the script to change the default installation directory path
+INSTALL_PATH="${N64_INST:-/usr/local}"
+# Set PATH for newlib to compile using GCC for MIPS N64 (pass 1)
+export PATH="$PATH:$INSTALL_PATH/bin"
 
 # Determine how many parallel Make jobs to run based on CPU count
 JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN)}"
 JOBS="${JOBS:-1}" # If getconf returned nothing, default to 1
 
+# Dependency source libs (Versions)
+BINUTILS_V=2.37
+GCC_V=11.2.0
+NEWLIB_V=4.1.0
 
 # Check if a command-line tool is available: status 0 means "yes"; status 1 means "no"
 command_exists () {
@@ -76,110 +37,45 @@ command_exists () {
 
 # Download the file URL using wget or curl (depending on which is installed)
 download () {
-  if   command_exists wget ; then wget --no-check-certificate -c  "$1" # checking the certificate chain is not done by curl and requires extra dependencies.
+  if   command_exists wget ; then wget -c  "$1"
   elif command_exists curl ; then curl -LO "$1"
   else
-    echo "Install 'wget' or 'curl' to download toolchain sources" 1>&2
+    echo "Install wget or curl to download toolchain sources" 1>&2
     return 1
   fi
 }
 
-echo "Stage: Download and extract dependencies"
+# Dependency source: Download stage
 test -f "binutils-$BINUTILS_V.tar.gz" || download "https://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS_V.tar.gz"
-test -d "binutils-$BINUTILS_V"        || tar -xzf "binutils-$BINUTILS_V.tar.gz"
-
 test -f "gcc-$GCC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/gcc/gcc-$GCC_V/gcc-$GCC_V.tar.gz"
-test -d "gcc-$GCC_V"                  || tar -xzf "gcc-$GCC_V.tar.gz" --checkpoint=.100 # TODO: there must be a better way of showing progress (given such a large file)!
-
 test -f "newlib-$NEWLIB_V.tar.gz"     || download "https://sourceware.org/pub/newlib/newlib-$NEWLIB_V.tar.gz"
-test -d "newlib-$NEWLIB_V"            || tar -xzf "newlib-$NEWLIB_V.tar.gz"
 
-# Optional dependency handling
-# Copies the FP libs into GCC sources so they are compiled as part of it
-if [ "$GMP_V" != "" ]; then
-  test -f "gmp-$GMP_V.tar.xz"         || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.xz"
-  test -d "gmp-$GMP_V"                || tar -xf "gmp-$GMP_V.tar.xz" # note no .gz download file currently available
-  cd "gcc-$GCC_V"
-  ln -sf ../"gmp-$GMP_V" "gmp"
-  cd ..
-fi
-if [ "$MPC_V" != "" ]; then
-  test -f "mpc-$MPC_V.tar.gz"         || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
-  test -d "mpc-$MPC_V"                || tar -xzf "mpc-$MPC_V.tar.gz"
-  cd "gcc-$GCC_V"
-  ln -sf ../"mpc-$MPC_V" "mpc"
-  cd ..
-fi
-if [ "$MPFR_V" != "" ]; then
-  test -f "mpfr-$MPFR_V.tar.gz"       || download "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_V.tar.gz"
-  test -d "mpfr-$MPFR_V"              || tar -xzf "mpfr-$MPFR_V.tar.gz"
-  cd "gcc-$GCC_V"
-  ln -sf ../"mpfr-$MPFR_V" "mpfr"
-  cd ..
-fi
-# Certain platforms might require Makefile cross compiling
-if [ "$MAKE_V" != "" ]; then
-  test -f "make-$MAKE_V.tar.gz"       || download "https://ftp.gnu.org/gnu/make/make-$MAKE_V.tar.gz"
-  test -d "make-$MAKE_V"              || tar -xzf "make-$MAKE_V.tar.gz"
-fi
+# Dependency source: Extract stage
+test -d "binutils-$BINUTILS_V" || tar -xzf "binutils-$BINUTILS_V.tar.gz"
+test -d "gcc-$GCC_V"           || tar -xzf "gcc-$GCC_V.tar.gz"
+test -d "newlib-$NEWLIB_V"     || tar -xzf "newlib-$NEWLIB_V.tar.gz"
 
-if [ "$BUILD" != "$HOST" ]; then
-  echo "Stage: Patch step"
-  
-  if [[ "$GCC_V" = "11.2.0" || "$GCC_V" = "11.1.0" ]]; then
-    # GCC 11.x fails on canadian cross
-    # see: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100017
-    # see: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80196
-    echo "Apply patch for GCC using SED:"
-    sed -z 's/RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET"/RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET -nostdinc++"/' ./"gcc-$GCC_V"/configure
-  fi
-
-  if ["$BINUTILS_V" = "2.37"]; then
-    # BINUTILS 2.37 fails on canadian cross
-    # See: https://lists.gnu.org/archive/html/bug-binutils/2021-07/msg00133.html
-    # Also seems to involve more indepth patches... https://gcc.gnu.org/bugzilla/attachment.cgi?id=50777
-    # BUT can try my changes...
-    echo "Apply patch for BINUTILS 2.37 using SED:"
-    # Add something like: #define uint unsigned int
-    #nl=$'\n'
-    #sed -z 's/uint recursion;/#define uint unsigned int'"\\${nl}"'uint recursion;/' ./"binutils-$BINUTILS_V"/libiberty/rust-demangle.c
-    #sed -z 's/uint recursion;/unsigned int recursion;/' ./"binutils-$BINUTILS_V"/libiberty/rust-demangle.c
-    #sed -z 's/#define RUST_NO_RECURSION_LIMIT   ((uint) -1)/#define RUST_NO_RECURSION_LIMIT   ((unsigned int) -1)/' ./"binutils-$BINUTILS_V"/libiberty/rust-demangle.c
-  fi
-
-fi
-
-echo "Stage: Compile toolchain"
-
-echo "Compiling binutils-$BINUTILS_V"
-# TODO why do we bother if we already have a good (compatible) binutils installed?! 
-# e.g. we could use apt-install binutils-mips-linux-gnu if the host is debian?!
-# This would seriously decrease build time.
+# Compile binutils
 cd "binutils-$BINUTILS_V"
 ./configure \
   --prefix="$INSTALL_PATH" \
-  --target="$TARGET" \
+  --target=mips64-elf \
   --with-cpu=mips64vr4300 \
   --disable-werror
 make -j "$JOBS"
 make install-strip || sudo make install-strip || su -c "make install-strip"
-make distclean # Cleanup to ensure we can build it again
-echo "Finished Compiling binutils-$BINUTILS_V"
 
-echo "Compiling native build of GCC-$GCC_V for MIPS N64 - (pass 1) outside of the source tree"
-# TODO why do we bother if we already have a good (compatible) compiler installed?! 
-# e.g. we could use ` whereis` ?! it does not need to be up-to-date as we have a second pass?!
-# This would seriously decrease build time.
+# Compile GCC for MIPS N64 (pass 1) outside of the source tree
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
 cd gcc_compile
 ../"gcc-$GCC_V"/configure \
   --prefix="$INSTALL_PATH" \
-  --target="$TARGET" \
+  --target=mips64-elf \
   --with-arch=vr4300 \
   --with-tune=vr4300 \
-  --enable-languages=c,c++ \
+  --enable-languages=c \
   --without-headers \
   --with-newlib \
   --disable-libssp \
@@ -195,19 +91,11 @@ make all-gcc -j "$JOBS"
 make all-target-libgcc -j "$JOBS"
 make install-strip-gcc || sudo make install-strip-gcc || su -c "make install-strip-gcc"
 make install-target-libgcc || sudo make install-target-libgcc || su -c "make install-target-libgcc"
-echo "Finished Compiling GCC-$GCC_V for MIPS N64 - (pass 1) outside of the source tree"
-# if [ "$BUILD" != "$HOST" ]; then
-#   echo "Installing GCC-$GCC_V  libgcc for foreign host"
-#   make install-target-libgcc DESTDIR="$FOREIGN_INSTALL_PATH" || sudo make install-target-libgcc DESTDIR="$FOREIGN_INSTALL_PATH" || su -c "make install-target-libgcc DESTDIR=\"$FOREIGN_INSTALL_PATH\""
-# fi
 
-echo "Compiling newlib-$NEWLIB_V"
+# Compile newlib
 cd ../"newlib-$NEWLIB_V"
-
-# Set PATH for newlib to compile using GCC for MIPS N64 (pass 1)
-export PATH="$PATH:$INSTALL_PATH/bin" #TODO: why is this export?!
 CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
-  --target="$TARGET" \
+  --target=mips64-elf \
   --prefix="$INSTALL_PATH" \
   --with-cpu=mips64vr4300 \
   --disable-threads \
@@ -215,45 +103,18 @@ CFLAGS_FOR_TARGET="-DHAVE_ASSERT_FUNC -O2" ./configure \
   --disable-werror
 make -j "$JOBS"
 make install || sudo env PATH="$PATH" make install || su -c "env PATH=\"$PATH\" make install"
-echo "Finished Compiling newlib-$NEWLIB_V"
 
-
-if [ "$BUILD" != "$HOST" ]; then
-  #INSTALL_PATH="$FOREIGN_INSTALL_PATH"
-
-  echo "Installing newlib-$NEWLIB_V for foreign host"
-  # make install || sudo env PATH="$FOREIGN_INSTALL_PATH/bin" make install || su -c "env PATH=\"$FOREIGN_INSTALL_PATH/bin\" make install"
-  # make install DESTDIR="$FOREIGN_INSTALL_PATH/mips64-elf/" || sudo make install DESTDIR="$FOREIGN_INSTALL_PATH/mips64-elf/" || su -c "make install DESTDIR=\"$FOREIGN_INSTALL_PATH/mips64-elf/\""
-  make clean
-
-
-  echo "Compiling binutils-$BINUTILS_V for foreign host"
-  cd ../"binutils-$BINUTILS_V"
-  ./configure \
-    --prefix="$INSTALL_PATH" \
-    --target="$TARGET" \
-    --with-cpu=mips64vr4300 \
-    --disable-werror \
-    --build="$BUILD" \
-    --host="$HOST"
-  make -j "$JOBS"
-  make install-strip || sudo make install-strip || su -c "make install-strip"
-  make distclean # Ensure we can build it again (distclean is used as we may use it again for a native target).
-  echo "Finished Compiling foreign binutils-$BINUTILS_V"
-fi
-
-echo "Compiling gcc-$GCC_V for MIPS N64 for host - (pass 2) outside of the source tree"
+# Compile GCC for MIPS N64 (pass 2) outside of the source tree
 cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
 cd gcc_compile
-CFLAGS_FOR_TARGET="-O2" CXXFLAGS_FOR_TARGET=" -O2" ../"gcc-$GCC_V"/configure \
+CFLAGS_FOR_TARGET="-O2" CXXFLAGS_FOR_TARGET="-O2" ../"gcc-$GCC_V"/configure \
   --prefix="$INSTALL_PATH" \
-  --target="$TARGET" \
+  --target=mips64-elf \
   --with-arch=vr4300 \
   --with-tune=vr4300 \
   --enable-languages=c,c++ \
-  --without-headers \
   --with-newlib \
   --disable-libssp \
   --enable-multilib \
@@ -262,32 +123,6 @@ CFLAGS_FOR_TARGET="-O2" CXXFLAGS_FOR_TARGET=" -O2" ../"gcc-$GCC_V"/configure \
   --disable-threads \
   --disable-win32-registry \
   --disable-nls \
-  --disable-werror \
-  --with-system-zlib \
-  --build="$BUILD" \
-  --host="$HOST"
+  --with-system-zlib
 make -j "$JOBS"
 make install-strip || sudo make install-strip || su -c "make install-strip"
-echo "Finished Compiling gcc-$GCC_V for MIPS N64 - (pass 2) outside of the source tree"
-
-if [ "$MAKE_V" != "" ]; then
-echo "Compiling make-$MAKE_V" # As make is otherwise not available on Windows
-cd ../"make-$MAKE_V"
-  ./configure \
-    --prefix="$INSTALL_PATH" \
-    --disable-largefile \
-    --disable-nls \
-    --disable-rpath \
-    --build="$BUILD" \
-    --host="$HOST"
-make -j "$JOBS"
-make install-strip || sudo make install-strip || su -c "make install-strip"
-make clean
-echo "Finished Compiling make-$MAKE_V"
-fi
-
-if [ "$BUILD" != "$HOST" ]; then
-  echo "Cross compile successful"
-else
-  echo "Native compile successful"
-fi
