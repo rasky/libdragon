@@ -76,5 +76,8 @@ ucodetest:
 ucodetest-clean:
 	$(MAKE) -C ucodetest clean
 
+clean:
+	rm -rf *.o *.a *.z64
+	
 .PHONY: audioplayer audioplayer-clean cpptest cpptest-clean ctest ctest-clean dfsdemo dfsdemo-clean mixertest mixertest-clean mptest mptest-clean mputest mputest-clean spritemap spritemap-clean
 .PHONY: test test-clean timers timers-clean vrutest vrutest-clean vtest vtest-clean ucodetest ucodetest-clean eepromfstest eepromfstest-clean
