@@ -7,6 +7,7 @@
 #define __LIBDRAGON_N64SYS_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <assert.h>
 #include "cop0.h"
 #include "cop1.h"
@@ -17,9 +18,14 @@
  */
 
 /**
+ * @brief Indicates whether we are running on a vanilla N64 or a iQue player
+ */
+extern int __bbplayer;
+
+/**
  * @brief Frequency of the MIPS R4300 CPU
  */
-#define CPU_FREQUENCY    93750000 
+#define CPU_FREQUENCY    (__bbplayer ? 140625000 : 93750000)
 
 
 /**
@@ -143,6 +149,8 @@
 extern "C" {
 #endif
 
+bool sys_bbplayer(void);
+
 int sys_get_boot_cic();
 void sys_set_boot_cic(int bc);
 /**
@@ -217,6 +225,8 @@ void inst_cache_invalidate_all(void);
 
 int get_memory_size();
 bool is_memory_expanded();
+void *malloc_uncached(size_t size);
+void free_uncached(void *buf);
 
 /** @brief Type of TV video output */
 typedef enum {

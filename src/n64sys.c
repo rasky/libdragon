@@ -6,7 +6,9 @@
 
 #include <stdint.h>
 #include <assert.h>
+#include <malloc.h>
 #include "n64sys.h"
+#include "utils.h"
 
 /**
  * @defgroup n64sys N64 System Interface
@@ -25,6 +27,16 @@
  * both instruction cache and data cache.
  * @{
  */
+
+/**
+ * @brief Indicates whether we are running on a vanilla N64 or a iQue player
+ */
+int __bbplayer = 0;
+
+/** @brief Return true if we are running on a iQue player */
+bool sys_bbplayer(void) {
+    return __bbplayer != 0;
+}
 
 /** 
  * @brief Boot CIC 
@@ -190,6 +202,57 @@ void inst_cache_invalidate_all(void)
     inst_cache_hit_invalidate(KSEG0_START_ADDR, get_memory_size());
 }
 
+/**
+ * @brief Allocate a buffer that will be accessed as uncached memory.
+ * 
+ * This function allocates a memory buffer that can be safely read and written
+ * through uncached memory accesses only. It makes sure that that the buffer
+ * does not share any cacheline with other buffers in the heap, and returns
+ * a pointer in the uncached segment (0xA0000000).
+ * 
+ * The buffer contents are uninitialized.
+ * 
+ * To free the buffer, use #free_uncached.
+ * 
+ * @param[in]  size  The size of the buffer to allocate
+ *
+ * @return a pointer to the start of the buffer (in the uncached segment)
+ * 
+ * @see #free_uncached
+ */
+void *malloc_uncached(size_t size)
+{
+    // Since we will be accessing the buffer as uncached memory, we absolutely
+    // need to prevent part of it to ever enter the data cache, even as false
+    // sharing with contiguous buffers. So we want the buffer to exclusively
+    // cover full cachelines (aligned to 16 bytes, multiple of 16 bytes).
+    size = ROUND_UP(size, 16);
+    void *mem = memalign(16, size);
+    if (!mem) return NULL;
+
+    // The memory returned by the system allocator could already be partly in
+    // cache (eg: it might have been previously used as a normal heap buffer
+    // and recently returned to the allocator). Invalidate it so that
+    // we don't risk a writeback in the short future.
+    data_cache_hit_invalidate(mem, size);
+
+    // Return the pointer as uncached memory.
+    return UncachedAddr(mem);
+}
+
+/**
+ * @brief Free an uncached memory buffer
+ * 
+ * This function frees a memory buffer previously allocated via #malloc_uncached.
+ * 
+ * @param[in]  buf  The buffer to free
+ * 
+ * @see #malloc_uncached
+ */
+void free_uncached(void *buf)
+{
+    free(CachedAddr(buf));
+}
 
 /**
  * @brief Get amount of available memory.
@@ -198,6 +261,17 @@ void inst_cache_invalidate_all(void)
  */
 int get_memory_size()
 {
+    if (sys_bbplayer()) {
+        /* On iQue, memory allocated to the game can be decided by the OS.
+           Even if the memory is allocated as 8Mb, the top part handles
+           save states (emulation of EEPROM/Flash/SRAM), so we should avoid
+           writing there anyway. See also entrypoint.S which sets up the
+           stack with the same logic. */
+        int size = (*(int*)0xA0000318);
+        if (size == 0x800000)
+            size = 0x7C0000;
+        return size;
+    } 
     return (__bootcic != 6105) ? (*(int*)0xA0000318) : (*(int*)0xA00003F0);
 }
 
@@ -207,10 +281,13 @@ int get_memory_size()
  * Checks whether the maximum available memory has been expanded to 8MB
  *
  * @return true if expansion pak detected, false otherwise.
+ * 
+ * @note On iQue, this function returns true only if the game has been assigned
+ *       exactly 8MB of RAM.
  */
 bool is_memory_expanded()
 {
-    return get_memory_size() == 0x800000;
+    return get_memory_size() >= 0x7C0000;
 }
 
 /** @brief Memory location to read which determines the TV type. */
