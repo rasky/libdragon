@@ -58,9 +58,9 @@ else # We are compiling for the native system.
 
 fi
 
-BINUTILS_V=2.36.1 # linux works fine with 2.37 (but is it worth the effort?)
+BINUTILS_V=2.38 # 2.36.1 # linux works fine with 2.37 (but is it worth the effort?)
 GCC_V=11.2.0
-NEWLIB_V=4.1.0
+NEWLIB_V=4.1.0 # Possibily should be updated to 4.2 (new release)!
 
 
 # Determine how many parallel Make jobs to run based on CPU count
@@ -76,8 +76,8 @@ command_exists () {
 
 # Download the file URL using wget or curl (depending on which is installed)
 download () {
-  if   command_exists wget ; then wget --no-check-certificate -c  "$1" # checking the certificate chain is not done by curl and requires extra dependencies.
-  elif command_exists curl ; then curl -LO "$1"
+  if   command_exists curl ; then curl -LO "$1" # prefer curl over wget.
+  elif command_exists wget ; then wget --no-check-certificate -c  "$1" # checking the certificate chain is not done by curl and requires extra dependencies for wget.
   else
     echo "Install 'wget' or 'curl' to download toolchain sources" 1>&2
     return 1
