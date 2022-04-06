@@ -78,7 +78,7 @@ jobs:
           # cd ${{ github.workspace }}
           # make && make install
       - name: Upload Toolchain Artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: "windows-x86_64-toolchain"
           path: ${{ github.workspace }}/**/n64_toolchain/**/*
