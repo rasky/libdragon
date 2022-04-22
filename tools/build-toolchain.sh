@@ -58,8 +58,8 @@ else # We are compiling for the native system.
 
 fi
 
-BINUTILS_V=2.38 # 2.36.1 # linux works fine with 2.37 (but is it worth the effort?)
-GCC_V=11.2.0
+BINUTILS_V=2.38
+GCC_V=11.3.0
 NEWLIB_V=4.1.0 # Possibily should be updated to 4.2 (new release)!
 
 
