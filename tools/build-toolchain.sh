@@ -222,7 +222,7 @@ cd ..
 rm -rf gcc_compile
 mkdir gcc_compile
 cd gcc_compile
-CFLAGS_FOR_TARGET="-O2" CXXFLAGS_FOR_TARGET=" -O2" ../"gcc-$GCC_V"/configure \
+CFLAGS_FOR_TARGET="-O2" CXXFLAGS_FOR_TARGET="-O2" ../"gcc-$GCC_V"/configure \
   --prefix="$INSTALL_PATH" \
   --target="$TARGET" \
   --with-arch=vr4300 \
