@@ -48,6 +48,10 @@ static volatile uint32_t *last_rdp_cmd;
 static void __rdpq_interrupt(void) {
     rdpq_state_t *rdpq_state = UncachedAddr(rspq_overlay_get_state(&rsp_rdpq));
 
+    assert(*SP_STATUS & SP_STATUS_SIG_RDPSYNCFULL);
+
+    debugf("__rdpq_interrupt\n");
+
     // The state has been updated to contain a copy of the last SYNC_FULL command
     // that was sent to RDP. The command might contain a callback to invoke.
     // Extract and call it.

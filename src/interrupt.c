@@ -110,12 +110,12 @@
  * interrupt enable calls that need to be made to re-enable interrupts.  A negative
  * number means that the interrupt system hasn't been initialized yet.
  */
-static int __interrupt_depth = -1;
+int __interrupt_depth = -1;
 
 /** @brief Value of the status register at the moment interrupts
  *         got disabled.
  */
-static int __interrupt_sr = 0;
+int __interrupt_sr = 0;
 
 /** @brief tick at which interrupts were disabled. */
 uint32_t interrupt_disabled_tick = 0;
@@ -256,9 +256,10 @@ static void __unregister_callback( struct callback_link ** head, void (*callback
  * @note This function handles most of the interrupts on the system as
  *       they come through the MI.
  */
-void __MI_handler(void)
+void __MI_handler(volatile reg_block_t *regs)
 {
     unsigned long status = MI_regs->intr & MI_regs->mask;
+    debugf("__MI_handler begin: %lx %lx (Stack SR:%lx)\n", MI_regs->intr, MI_regs->mask, regs->sr);
 
     if( status & MI_INTR_SP )
     {
@@ -307,6 +308,8 @@ void __MI_handler(void)
 
         __call_callback(DP_callback);
     }
+
+    debugf("__MI_handler end: %lx %lx (Stack SR:%lx SR:%lx)\n", MI_regs->intr, MI_regs->mask, regs->sr, C0_STATUS());
 }
 
 /**
@@ -622,6 +625,7 @@ void disable_interrupts()
         __interrupt_sr = C0_STATUS();
         C0_WRITE_STATUS(__interrupt_sr & ~C0_STATUS_IE);
         interrupt_disabled_tick = TICKS_READ();
+        // debugf("IRQ disable (%x)\n", __interrupt_sr&1);
     }
 
     /* Ensure that we remember nesting levels */

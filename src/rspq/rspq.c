@@ -409,8 +409,10 @@ static void rspq_crash_handler(rsp_snapshot_t *state)
     printf("RSPQ: Highpri DRAM address: %08lx\n", rspq->rspq_dram_highpri_addr);
     printf("RSPQ: Current DRAM address: %08lx + GP=%lx = %08lx\n", 
         rspq->rspq_dram_addr, state->gpr[28], cur);
-    printf("RSPQ: RDP     DRAM address: %08lx\n", rspq->rspq_rdp_buffers[rspq->rdp_buf_idx / sizeof(uint32_t)]);
     printf("RSPQ: Current Overlay: %s (%02x)\n", ovl_name, ovl_idx);
+    printf("RSPQ: RDP     DRAM address: %08lx\n", rspq->rspq_rdp_buffers[rspq->rdp_buf_idx / sizeof(uint32_t)]);
+    printf("RSPQ: RDP     sentinel: %08lx\n", rspq->rspq_rdp_sentinel);
+    printf("RSPQ: RDP     otherbuf: %08lx\n", rspq->rspq_rdp_buffers[(rspq->rdp_buf_idx^4) / sizeof(uint32_t)]);
 
     // Dump the command queue in DMEM.
     debugf("RSPQ: Command queue:\n");
