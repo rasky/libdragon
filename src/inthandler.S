@@ -339,4 +339,3 @@ save_fpu_regs:
 	.section .bss
  	.align 8
 	.lcomm interrupt_exception_frame, 4
-

@@ -73,8 +73,6 @@ typedef struct MI_regs_s {
 
 void render()
 {
-    static int lock_count = 0;
-
     if (!rdp_can_attach_display())
     {
         return;
@@ -83,17 +81,8 @@ void render()
     display_context_t disp = display_lock();
     if (!disp)
     {
-        lock_count++;
-        if (lock_count == 10000) {
-            extern int __interrupt_depth, __interrupt_sr;
-            static volatile struct MI_regs_s * const MI_regs = (struct MI_regs_s *)0xa4300000;
-            debugf("precrash: %lx %lx\n", MI_regs->intr, MI_regs->mask);
-            debugf("IE: %lx depth:%d presr:%x\n", C0_STATUS() & 1, __interrupt_depth, __interrupt_sr);
-            rsp_crash();
-        }
         return;
     }
-    lock_count = 0;
 
     rdp_attach_display(disp);
     rdp_set_default_clipping();

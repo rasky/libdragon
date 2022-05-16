@@ -259,7 +259,6 @@ static void __unregister_callback( struct callback_link ** head, void (*callback
 void __MI_handler(volatile reg_block_t *regs)
 {
     unsigned long status = MI_regs->intr & MI_regs->mask;
-    debugf("__MI_handler begin: %lx %lx (Stack SR:%lx)\n", MI_regs->intr, MI_regs->mask, regs->sr);
 
     if( status & MI_INTR_SP )
     {
@@ -309,7 +308,6 @@ void __MI_handler(volatile reg_block_t *regs)
         __call_callback(DP_callback);
     }
 
-    debugf("__MI_handler end: %lx %lx (Stack SR:%lx SR:%lx)\n", MI_regs->intr, MI_regs->mask, regs->sr, C0_STATUS());
 }
 
 /**
@@ -622,10 +620,19 @@ void disable_interrupts()
     if( __interrupt_depth == 0 )
     {
         /* We must disable the interrupts now. */
-        __interrupt_sr = C0_STATUS();
-        C0_WRITE_STATUS(__interrupt_sr & ~C0_STATUS_IE);
+        uint32_t sr = C0_STATUS();
+        C0_WRITE_STATUS(sr & ~C0_STATUS_IE);
+
+        /* Save the original SR value away, so that we now if
+           interrupts where enabled and whether to restore them.
+           NOTE: this memory write must happen now that interrupts
+           are disabled, otherwise it could cause a race condition
+           because an interrupt could trigger and overwrite it. 
+           So put an explicit barrier. */
+        MEMORY_BARRIER();
+        __interrupt_sr = sr;
+
         interrupt_disabled_tick = TICKS_READ();
-        // debugf("IRQ disable (%x)\n", __interrupt_sr&1);
     }
 
     /* Ensure that we remember nesting levels */

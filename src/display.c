@@ -251,7 +251,6 @@ static void __display_callback()
     if (ready_mask & (1 << next)) {
         now_showing = next;
         ready_mask &= ~(1 << next);
-        debugf("vblank: %d\n", now_showing);
     }
 
     __write_dram_register(__safe_buffer[now_showing] + (!field ? __width * __bitdepth : 0));
@@ -526,10 +525,8 @@ display_context_t display_lock(void)
        being ready to be displayed. */
     for (next = buffer_next(now_showing); next != now_showing; next = buffer_next(next)) {
         if (((drawing_mask | ready_mask) & (1 << next)) == 0)  {
-            debugf("display_lock: %d\n", next);
             retval = next+1;
             drawing_mask |= 1 << next;
-            debugf("display_lock finished: ready_mask:%lx drawing_mask:%lx\n", ready_mask, drawing_mask);
             break;
         }
     }
@@ -560,8 +557,6 @@ void display_show( display_context_t disp )
     /* Correct to ensure we are handling the right screen */
     int i = disp - 1;
 
-    debugf("display_show: %d\n", i);
-
     /* Check we have not unlocked this display already and is pending drawn. */
     assertf(!(ready_mask & (1 << i)), "display_show called again on the same display %d (mask: %lx)", i, ready_mask);
 
@@ -570,8 +565,6 @@ void display_show( display_context_t disp )
 
     drawing_mask &= ~(1 << i);
     ready_mask |= 1 << i;
-
-    debugf("display_show finished: ready_mask:%lx drawing_mask:%lx\n", ready_mask, drawing_mask);
 
     enable_interrupts();
 }
