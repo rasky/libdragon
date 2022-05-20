@@ -4,7 +4,12 @@
 
 #include "ugfx_internal.h"
 
-DEFINE_RSP_UCODE(rsp_ugfx);
+static void ugfx_assert_handler(rsp_snapshot_t *state, uint16_t assert_code);
+static void ugfx_crash_handler(rsp_snapshot_t *state);
+
+DEFINE_RSP_UCODE(rsp_ugfx, 
+    .crash_handler = ugfx_crash_handler,
+    .assert_handler = ugfx_assert_handler);
 
 uint8_t __ugfx_dram_buffer[UGFX_RDP_DRAM_BUFFER_SIZE];
 
@@ -34,3 +39,25 @@ void ugfx_close()
 {
     __ugfx_initialized = 0;
 }
+
+static void ugfx_assert_handler(rsp_snapshot_t *state, uint16_t assert_code)
+{
+    switch (assert_code) {
+    case ASSERT_RDP_FROZEN:
+        printf("RDP display list stalled\n");
+    }
+}
+
+static void ugfx_crash_handler(rsp_snapshot_t *state)
+{
+    // Dump RDP display list contents around the current pointer
+    if (state->cop0[10] != 0) {    
+        debugf("UGFX: RDP Display List\n");
+        uint64_t *cur = (void*)(state->cop0[10] | 0xA0000000);
+        for (int i=0; i<64; i++) {
+            debugf("%016llx%c", cur[i-32], i==32 ? '*' : ' ');
+            if (i%8 == 7) debugf("\n");
+        }
+    }
+}
+

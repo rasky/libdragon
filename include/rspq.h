@@ -307,7 +307,7 @@ void* rspq_overlay_get_state(rsp_ucode_t *overlay_ucode);
     (void)ptr;
 
 #define _rspq_write_epilog() ({ \
-    if (rspq_cur_pointer > rspq_cur_sentinel) \
+    if (__builtin_expect(rspq_cur_pointer > rspq_cur_sentinel, 0)) \
         rspq_next_buffer(); \
 })
 

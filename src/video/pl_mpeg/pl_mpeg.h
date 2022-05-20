@@ -1518,6 +1518,12 @@ void plm_buffer_discard_read_bytes(plm_buffer_t *self) {
 		self->length = 0;
 	}
 	else if (byte_pos > 0) {
+		#ifdef N64
+		// Maintain 8-byte alignment in the read buffer. This speeds up
+		// ROM accesses by avoiding memcpys.
+		if (byte_pos & 7)
+			byte_pos -= byte_pos & 7;
+		#endif
 		memmove(self->bytes, self->bytes + byte_pos, self->length - byte_pos);
 		self->bit_index -= byte_pos << 3;
 		self->length -= byte_pos;
@@ -2618,9 +2624,11 @@ typedef struct plm_video_t {
 	plm_buffer_t *buffer;
 	int destroy_buffer_when_done;
 
+	int decode_state;
 	plm_frame_t frame_current;
 	plm_frame_t frame_forward;
 	plm_frame_t frame_backward;
+	plm_frame_t frame_picture_temp;
 
 	uint8_t *frames_data;
 
@@ -2644,7 +2652,9 @@ static inline uint8_t plm_clamp(int n) {
 
 int plm_video_decode_sequence_header(plm_video_t *self);
 void plm_video_init_frame(plm_video_t *self, plm_frame_t *frame, uint8_t *base);
-void plm_video_decode_picture(plm_video_t *self);
+void plm_video_decode_picture_begin(plm_video_t *self);
+bool plm_video_decode_picture_poll(plm_video_t *self);
+void plm_video_decode_picture_end(plm_video_t *self);
 void plm_video_decode_slice(plm_video_t *self, int slice);
 void plm_video_decode_macroblock(plm_video_t *self);
 void plm_video_decode_motion_vectors(plm_video_t *self);
@@ -2680,7 +2690,7 @@ void plm_video_destroy(plm_video_t *self) {
 	}
 
 	if (self->has_sequence_header) {
-		if (RSP_MODE >= 2)
+		if (RSP_MODE >= 3)
 			free_uncached(self->frames_data);
 		else
 			free(self->frames_data);
@@ -2732,13 +2742,24 @@ int plm_video_has_ended(plm_video_t *self) {
 	return plm_buffer_has_ended(self->buffer);
 }
 
+plm_frame_t *plm_video_decode_poll(plm_video_t *self);
+
 plm_frame_t *plm_video_decode(plm_video_t *self) {
+	plm_frame_t *frame;
+	do {
+		frame = plm_video_decode_poll(self);
+	} while (!frame && self->start_code != -1);
+	return frame;
+}
+
+plm_frame_t *plm_video_decode_poll(plm_video_t *self) {
 	if (!plm_video_has_header(self)) {
 		return NULL;
 	}
-	
+
 	plm_frame_t *frame = NULL;
-	do {
+	switch (self->decode_state) {
+	case 0:
 		if (self->start_code != PLM_START_PICTURE) {
 			PROFILE_START(PS_MPEG_FINDSTART, 0);
 			self->start_code = plm_buffer_find_start_code(self->buffer, PLM_START_PICTURE);
@@ -2778,7 +2799,16 @@ plm_frame_t *plm_video_decode(plm_video_t *self) {
 		}
 		PROFILE_STOP(PS_MPEG_HASSTART, 0);
 		
-		plm_video_decode_picture(self);
+		plm_video_decode_picture_begin(self);
+		self->decode_state = 1;
+		/* fallthrough */
+
+	case 1:
+		if (plm_video_decode_picture_poll(self))
+			return NULL;
+
+		plm_video_decode_picture_end(self);
+		self->decode_state = 0;
 
 		if (self->assume_no_b_frames) {
 			frame = &self->frame_backward;
@@ -2791,13 +2821,15 @@ plm_frame_t *plm_video_decode(plm_video_t *self) {
 		}
 		else {
 			self->has_reference_frame = TRUE;
+			return NULL;
 		}
-	} while (!frame);
+	}
 	
-	frame->time = self->time;
-	self->frames_decoded++;
-	self->time = (double)self->frames_decoded / self->framerate;
-	
+	if (frame) {	
+		frame->time = self->time;
+		self->frames_decoded++;
+		self->time = (double)self->frames_decoded / self->framerate;
+	}
 	return frame;
 }
 
@@ -2881,7 +2913,7 @@ int plm_video_decode_sequence_header(plm_video_t *self) {
 	size_t chroma_plane_size = self->chroma_width * self->chroma_height;
 	size_t frame_data_size = (luma_plane_size + 2 * chroma_plane_size);
 
-	if (RSP_MODE >= 2)
+	if (RSP_MODE >= 3)
 		self->frames_data = (uint8_t*)malloc_uncached(frame_data_size * 3);
 	else
 		self->frames_data = (uint8_t*)memalign(16, frame_data_size * 3);
@@ -2912,7 +2944,7 @@ void plm_video_init_frame(plm_video_t *self, plm_frame_t *frame, uint8_t *base) 
 	frame->cb.data = base + luma_plane_size + chroma_plane_size;
 }
 
-void plm_video_decode_picture(plm_video_t *self) {
+void plm_video_decode_picture_begin(plm_video_t *self) {
 	plm_buffer_skip(self->buffer, 10); // skip temporalReference
 	self->picture_type = plm_buffer_read(self->buffer, 3);
 	plm_buffer_skip(self->buffer, 16); // skip vbv_delay
@@ -2947,14 +2979,13 @@ void plm_video_decode_picture(plm_video_t *self) {
 		self->motion_backward.r_size = f_code - 1;
 	}
 
-	plm_frame_t frame_temp = self->frame_forward;
+	self->frame_picture_temp = self->frame_forward;
 	if (
 		self->picture_type == PLM_VIDEO_PICTURE_TYPE_INTRA ||
 		self->picture_type == PLM_VIDEO_PICTURE_TYPE_PREDICTIVE
 	) {
 		self->frame_forward = self->frame_backward;
 	}
-
 
 	// Find first slice start code; skip extension and user data
 	do {
@@ -2963,25 +2994,33 @@ void plm_video_decode_picture(plm_video_t *self) {
 		self->start_code == PLM_START_EXTENSION || 
 		self->start_code == PLM_START_USER_DATA
 	);
+}
 
-	// Decode all slices
+bool plm_video_decode_picture_poll(plm_video_t *self) {
 	PROFILE_START(PS_MPEG_DECODESLICE, 0);
-	while (PLM_START_IS_SLICE(self->start_code)) {
-		plm_video_decode_slice(self, self->start_code & 0x000000FF);
-		if (self->macroblock_address >= self->mb_size - 2) {
-			break;
-		}
-		self->start_code = plm_buffer_next_start_code(self->buffer);
-	}
-	PROFILE_STOP(PS_MPEG_DECODESLICE, 0);
 
+	if (!PLM_START_IS_SLICE(self->start_code))
+		return false;
+
+	// Decode current slice
+	plm_video_decode_slice(self, self->start_code & 0x000000FF);
+	if (self->macroblock_address >= self->mb_size - 2) {
+		return false;
+	}
+	self->start_code = plm_buffer_next_start_code(self->buffer);
+
+	PROFILE_STOP(PS_MPEG_DECODESLICE, 0);
+	return true;
+}
+
+void plm_video_decode_picture_end(plm_video_t *self) {
 	// If this is a reference picture rotate the prediction pointers
 	if (
 		self->picture_type == PLM_VIDEO_PICTURE_TYPE_INTRA ||
 		self->picture_type == PLM_VIDEO_PICTURE_TYPE_PREDICTIVE
 	) {
 		self->frame_backward = self->frame_current;
-		self->frame_current = frame_temp;
+		self->frame_current = self->frame_picture_temp;
 	}
 }
 
@@ -3449,7 +3488,6 @@ void plm_video_decode_block(plm_video_t *self, int block) {
 		dw = self->chroma_width;
 		di = ((self->mb_row * self->luma_width) << 2) + (self->mb_col << 3);
 	}
-	PROFILE_STOP(PS_MPEG_MB_DECODE_BLOCK, 0);
 
 	if (RSP_MODE > 0) {		
 		if (RSP_MODE >= 3 && !self->macroblock_intra) {
@@ -3469,6 +3507,7 @@ void plm_video_decode_block(plm_video_t *self, int block) {
 			rsp_mpeg1_block_coeff(0, self->block_data[0]);
 		}
 	}
+	PROFILE_STOP(PS_MPEG_MB_DECODE_BLOCK, 0);
 
 	// Decode AC coefficients (+DC for non-intra)
 	PROFILE_START(PS_MPEG_MB_DECODE_AC, 0);
@@ -3482,7 +3521,7 @@ void plm_video_decode_block(plm_video_t *self, int block) {
 		PROFILE_STOP(PS_MPEG_MB_DECODE_AC_VLC, 0);
 
 		PROFILE_START(PS_MPEG_MB_DECODE_AC_CODE, 0);
-		uint64_t bits = plm_buffer_showbits(self->buffer);
+		uint64_t bits = plm_buffer_showbits2(self->buffer);
 		#define readbits(n) ({ uint64_t val = bits>>(64-n); bits <<= n; self->buffer->bit_index += n; val; })
 
 		if ((coeff == 0x0001) && (n > 0) && (readbits(1) == 0)) {
@@ -3519,6 +3558,8 @@ void plm_video_decode_block(plm_video_t *self, int block) {
 		PROFILE_STOP(PS_MPEG_MB_DECODE_AC_CODE, 0);
 		PROFILE_START(PS_MPEG_MB_DECODE_AC_DEQUANT, 0);
 
+		// We got the coefficient level. Check whether we need to
+		// dequantize on the CPU or RSP.
 		if (RSP_MODE < 2) {
 			int de_zig_zagged = PLM_VIDEO_ZIG_ZAG[n];
 
@@ -3541,10 +3582,12 @@ void plm_video_decode_block(plm_video_t *self, int block) {
 			// Save premultiplied coefficient
 			level = (level * PLM_VIDEO_PREMULTIPLIER_MATRIX[de_zig_zagged]) >> RSP_IDCT_SCALER;
 			self->block_data[de_zig_zagged] = level;
-			rsp_mpeg1_block_coeff(n, level);
-		} else {
-			rsp_mpeg1_block_coeff(n, level);
 		}
+
+		// If we're using the RSP at all, store the coefficient into it.
+		// It might have been dequantized or not.
+		if (RSP_MODE > 0)
+			rsp_mpeg1_block_coeff(n, level);
 		n++;
 		PROFILE_STOP(PS_MPEG_MB_DECODE_AC_DEQUANT, 0);
 	}
@@ -3556,30 +3599,21 @@ void plm_video_decode_block(plm_video_t *self, int block) {
 		int16_t *s = self->block_data;
 		int si = 0;
 		plm_video_decode_block_residual(s, si, d, di, dw, n, self->macroblock_intra);
-	} else if (RSP_MODE == 1) {
-		if (self->macroblock_intra)
-			rsp_mpeg1_zero_pixels();
-		else
+	} else {
+		// If this is a predicted block and prediction was done on the
+		// CPU, load the pixels into the RSP. Otherwise, they're already there.
+		if (RSP_MODE < 3 && !self->macroblock_intra && (block == 0 || block == 4 || block == 5))
 			rsp_mpeg1_load_pixels();
+
+		// Check if the matrix was dequantized on the CPU (RSP_MODE == 1) or it
+		// must be done on the RSP. If the latter, this is the time to do it.
+		if (RSP_MODE >= 2)
+			rsp_mpeg1_block_dequant(self->macroblock_intra, self->quantizer_scale);
+
+		// Decode the block: do IDCT and add to residual.
 		rsp_mpeg1_block_decode(n, self->macroblock_intra!=0);
-		//rsp_mpeg1_store_pixels();
+
 		rspq_flush();
-	} else if (RSP_MODE == 2) {
-		if (self->macroblock_intra)
-			rsp_mpeg1_zero_pixels();
-		else
-			rsp_mpeg1_load_pixels();
-		rsp_mpeg1_block_dequant(self->macroblock_intra, self->quantizer_scale);
-		rsp_mpeg1_block_decode(n, self->macroblock_intra!=0);
-		//rsp_mpeg1_store_pixels();
-		rspq_flush();
-	} else if (RSP_MODE >= 3) {
-		// if (self->macroblock_intra && (block == 0 || block == 4 || block == 5))
-		// 	rsp_mpeg1_zero_pixels();
-		rsp_mpeg1_block_dequant(self->macroblock_intra, self->quantizer_scale);
-		rsp_mpeg1_block_decode(n, self->macroblock_intra!=0);
-		//rsp_mpeg1_store_pixels();
-		rspq_flush();		
 	}
 
 	PROFILE_STOP(PS_MPEG_MB_DECODE_BLOCK, 1);

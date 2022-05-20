@@ -478,7 +478,7 @@ static void rspq_crash_handler(rsp_snapshot_t *state)
 
     int ovl_idx = rspq->current_ovl / sizeof(rspq_overlay_t);
     const char *ovl_name = "?";
-    if (ovl_idx < RSPQ_BLOCK_MAX_SIZE && rspq_overlay_ucodes[ovl_idx])
+    if (ovl_idx < RSPQ_MAX_OVERLAY_COUNT && rspq_overlay_ucodes[ovl_idx])
         ovl_name = rspq_overlay_ucodes[ovl_idx]->name;
     printf("RSPQ: Current Overlay: %s (%02x)\n", ovl_name, ovl_idx);
 
@@ -498,13 +498,20 @@ static void rspq_crash_handler(rsp_snapshot_t *state)
             debugf("%08lx%c", q[i+j*16-32], i+j*16-32==0 ? '*' : ' ');
         debugf("\n");
     }
+
+    // Check if there is a crash handler for the current overlay.
+    // If it exists, forward request to it.
+    // Be defensive against DMEM corruptions.
+    if (ovl_idx < RSPQ_MAX_OVERLAY_COUNT &&
+        rspq_overlay_ucodes[ovl_idx] &&
+        rspq_overlay_ucodes[ovl_idx]->crash_handler)
+        rspq_overlay_ucodes[ovl_idx]->crash_handler(state);
 }
 
 /** @brief Special RSPQ assert handler*/
 static void rspq_assert_handler(rsp_snapshot_t *state, uint16_t code)
 {
     rsp_queue_t *rspq = (rsp_queue_t*)state->dmem;
-    debugf("rspq_assert_handler\n");
 
     switch (code) {
         case ASSERT_INVALID_COMMAND: {
@@ -530,7 +537,6 @@ static void rspq_assert_handler(rsp_snapshot_t *state, uint16_t code)
             // If it exists, forward request to it.
             // Be defensive against DMEM corruptions.
             int ovl_idx = rspq->current_ovl / sizeof(rspq_overlay_t);
-            debugf("ovl_idx: %x %p\n", ovl_idx, rspq_overlay_ucodes[ovl_idx]);
             if (ovl_idx < RSPQ_MAX_OVERLAY_COUNT &&
                 rspq_overlay_ucodes[ovl_idx] &&
                 rspq_overlay_ucodes[ovl_idx]->assert_handler)
@@ -801,12 +807,14 @@ void rspq_next_buffer(void) {
     // if the overhead of an interrupt is obviously higher.
     MEMORY_BARRIER();
     if (!(*SP_STATUS & rspq_ctx->sp_status_bufdone)) {
+        // uint32_t t0 = TICKS_READ();
         rspq_flush_internal();
         RSP_WAIT_LOOP(200) {
             if (*SP_STATUS & rspq_ctx->sp_status_bufdone)
                 break;
             rspq_flush_internal();
         }
+        // debugf("RSPQ: throttling: %ld ticks\n", TICKS_DISTANCE(TICKS_READ(), t0));
     }
     MEMORY_BARRIER();
     *SP_STATUS = rspq_ctx->sp_wstatus_clear_bufdone;

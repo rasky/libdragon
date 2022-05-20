@@ -109,7 +109,7 @@ void rdp_set_convert(uint16_t k0, uint16_t k1, uint16_t k2, uint16_t k3, uint16_
 /**
  * @brief Low level function to set the scissoring region
  */
-void rdp_set_scissor(int16_t xh, int16_t yh, int16_t xl, int16_t yl);
+void rdp_set_scissor(int16_t xh, int16_t yh, int16_t xl, int16_t yl, bool fields, int odd);
 
 /**
  * @brief Low level function to set the primitive depth

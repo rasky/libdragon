@@ -980,8 +980,7 @@ int dfs_read(void * const buf, int size, int count, uint32_t handle)
         else
             data_cache_hit_writeback_invalidate(buf, to_read);
 
-        dma_read((void *)(((uint32_t)buf) & 0x1FFFFFFF),
-            file->cart_start_loc + file->loc, to_read);
+        dma_read(buf, file->cart_start_loc + file->loc, to_read);
 
         file->loc += to_read;
         return to_read;

@@ -1,7 +1,7 @@
 #ifndef PROFILE_H
 #define PROFILE_H
 
-#define LIBDRAGON_PROFILE 1
+#define LIBDRAGON_PROFILE 0
 
 // Global enable/disable of libdragon profiler.
 //

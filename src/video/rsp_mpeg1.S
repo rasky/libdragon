@@ -19,8 +19,7 @@ COMMAND_TABLE:
 	RSPQ_DefineCommand cmd_mpeg1_block_predict  12  # 0x5A
     RSPQ_DefineCommand cmd_mpeg1_block_switch    4  # 0x5B
     RSPQ_DefineCommand cmd_mpeg1_load_pixels     4  # 0x5C
-    RSPQ_DefineCommand cmd_mpeg1_zero_pixels     4  # 0x5D
-	.dcb.w 16-14
+	.dcb.w 15-12
 
 	vsll_data
 	vsll8_data
@@ -460,7 +459,7 @@ cmd_mpeg1_load_pixels:
     assert_ne s4, zero, ASSERT_UNDEFINED_BLOCK
     lw t1, %lo(RDRAM_BLOCK_PITCH)
     jal DMAIn
-    li t0, DMA_SIZE(8,8)
+    lw t0, %lo(RDRAM_BLOCK_SIZE)
 
     lw t4, %lo(PIXELCHECK)
     assert_eq t4, 0xBADC0DE, ASSERT_PIXELCHECK(8)

@@ -126,6 +126,7 @@ install: install-mk libdragon
 	install -Cv -m 0644 include/ay8910.h $(INSTALLDIR)/mips64-elf/include/ay8910.h
 	install -Cv -m 0644 include/rspq.h $(INSTALLDIR)/mips64-elf/include/rspq.h
 	install -Cv -m 0644 include/ugfx.h $(INSTALLDIR)/mips64-elf/include/ugfx.h
+	install -Cv -m 0644 include/yuv.h $(INSTALLDIR)/mips64-elf/include/yuv.h
 	install -Cv -m 0644 include/rdp_commands.h $(INSTALLDIR)/mips64-elf/include/rdp_commands.h
 	install -Cv -m 0644 include/rsp_queue.inc $(INSTALLDIR)/mips64-elf/include/rsp_queue.inc
 

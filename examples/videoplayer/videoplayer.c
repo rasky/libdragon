@@ -31,10 +31,10 @@ int main(void) {
 	mixer_init(8);
 
 	mpeg2_t mp2;
-	mpeg2_open(&mp2, "rom:/live.m1v");
+	mpeg2_open(&mp2, "rom:/cgi.m1v");
 
 	wav64_t music;
-	wav64_open(&music, "live.wav64");
+	wav64_open(&music, "cgi.wav64");
 
 	float fps = mpeg2_get_framerate(&mp2);
 	throttle_init(fps, 0, 8);
@@ -44,12 +44,16 @@ int main(void) {
 	debugf("start\n");
 	int nframes = 0;
 	display_context_t disp = 0;
+	rspq_syncpoint_t syncf = 0;
 
 	while (1) {
 		mixer_throttle(44100.0f / fps);
 
 		if (!mpeg2_next_frame(&mp2))
 			break;
+
+		if (syncf)
+			rspq_wait_syncpoint(syncf);
 
 		RSP_WAIT_LOOP(500) {
 			disp = display_lock();
@@ -67,6 +71,8 @@ int main(void) {
 		#else
 		rdp_detach_display_async(display_show);
 		#endif
+
+		syncf = rspq_syncpoint();
 
 		audio_poll();
 
@@ -86,8 +92,9 @@ int main(void) {
 
 		audio_poll();
 
-		PROFILE_START(PS_SYNC, 0);
-		rspq_sync();
-		PROFILE_STOP(PS_SYNC, 0);
+		// PROFILE_START(PS_SYNC, 0);
+		// rspq_sync();
+		// PROFILE_STOP(PS_SYNC, 0);
+
 	}
 }

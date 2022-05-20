@@ -250,6 +250,7 @@ rdp_write_end:
     .func rdp_flush
 rdp_flush:
     #define dram_size t4
+    #define timeout   t5
     #define init      t6
     #define dmem_ptr  t7
     #define dram_addr s5
@@ -275,7 +276,10 @@ rdp_flush_init_rdp:
     mfc0 t2, COP0_DP_STATUS
 
     # Wait for RDP to be done
+    li timeout, 0x100000
 rdp_flush_wait_rdp_idle:
+    addi timeout, -1
+    assert_ne timeout, zero, ASSERT_RDP_FROZEN
     andi t1, t2, DP_STATUS_START_VALID | DP_STATUS_END_VALID
     bnez t1, rdp_flush_wait_rdp_idle
     mfc0 t2, COP0_DP_STATUS

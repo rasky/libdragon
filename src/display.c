@@ -38,7 +38,7 @@
  */
 
 /** @brief Maximum number of video backbuffers */
-#define NUM_BUFFERS         3
+#define MAX_BUFFERS         4
 
 /** @brief Register location in memory of VI */
 #define REGISTER_BASE       0xA4400000
@@ -163,7 +163,7 @@ static const uint32_t * const reg_values[] = {
 };
 
 /** @brief Video buffer pointers */
-static void *buffer[NUM_BUFFERS];
+static void *buffer[MAX_BUFFERS];
 /** @brief Currently active bit depth */
 uint32_t __bitdepth;
 /** @brief Currently active video width (calculated) */
@@ -171,12 +171,12 @@ uint32_t __width;
 /** @brief Currently active video height (calculated) */
 uint32_t __height;
 /** @brief Number of active buffers */
-uint32_t __buffers = NUM_BUFFERS;
+uint32_t __buffers = MAX_BUFFERS;
 /** @brief Pointer to uncached 16-bit aligned version of buffers */
-void *__safe_buffer[NUM_BUFFERS];
+void *__safe_buffer[MAX_BUFFERS];
 
 /** @brief Currently displayed buffer */
-static int now_showing = -1;
+static volatile int now_showing = -1;
 
 /** @brief Complete drawn buffer to display next */
 static int show_next = -1;
@@ -238,13 +238,13 @@ static void __display_callback()
 
     /* Only swap frames if we have a new frame to swap, otherwise just
        leave up the current frame */
-    if(show_next >= 0 && show_next != now_drawing)
+    if(show_next > now_showing)
     {
-        now_showing = show_next;
-        show_next = -1;
+        now_showing++;
     }
 
-    __write_dram_register(__safe_buffer[now_showing] + (!field ? __width * __bitdepth : 0));
+    int disp = now_showing % __buffers;
+    __write_dram_register(__safe_buffer[disp] + (!field ? __width * __bitdepth : 0));
 }
 
 /**
@@ -274,9 +274,9 @@ void display_init( resolution_t res, bitdepth_t bit, uint32_t num_buffers, gamma
     disable_interrupts();
 
     /* Ensure that buffering is either double or twiple */
-    if( num_buffers != 2 && num_buffers != 3 )
+    if( num_buffers > MAX_BUFFERS )
     {
-        __buffers = NUM_BUFFERS;
+        __buffers = MAX_BUFFERS;
     }
     else
     {
@@ -439,8 +439,8 @@ void display_init( resolution_t res, bitdepth_t bit, uint32_t num_buffers, gamma
 
     /* Set the first buffer as the displaying buffer */
     now_showing = 0;
-    now_drawing = -1;
-    show_next = -1;
+    now_drawing = 0;
+    show_next = 0;
 
     /* Show our screen normally */
     registers[1] = (uintptr_t) __safe_buffer[0];
@@ -507,18 +507,11 @@ display_context_t display_lock()
     /* Can't have the video interrupt happening here */
     disable_interrupts();
 
-    for( int i = 0; i < __buffers; i++ )
-    {
-        if( i != now_showing && i != now_drawing && i != show_next )
-        {
-            /* This screen should be returned */
-            now_drawing = i;
-            retval = i + 1;
-
-            break;
-        }
+    if (now_drawing + 1 < now_showing + __buffers) {
+        now_drawing++;
+        retval = (now_drawing % __buffers) + 1;
     }
-
+    
     enable_interrupts();
 
     /* Possibility of returning nothing, or a valid display context */
@@ -543,14 +536,14 @@ void display_show( display_context_t disp )
     disable_interrupts();
 
     /* Correct to ensure we are handling the right screen */
-    int i = disp - 1;
+    // int i = disp - 1;
 
     /* This should match, or something went awry */
-    assertf( i == now_drawing, "display_show_force invoked on non-locked display" );
+    // assertf( (show_next+1) % __buffers != i, 
+    //     "display_show invoked on wrong display context (out of order?)" );
 
     /* Ensure we display this next time */
-    now_drawing = -1;
-    show_next = i;
+    show_next++;
 
     enable_interrupts();
 }

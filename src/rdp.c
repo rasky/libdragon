@@ -7,6 +7,7 @@
 #include <malloc.h>
 #include <string.h>
 #include "libdragon.h"
+#include "rdp_commands.h"
 
 /**
  * @defgroup rdp Hardware Display Interface
@@ -170,6 +171,11 @@ static inline uint32_t __rdp_log2( uint32_t number )
 
 void rdp_init( void )
 {
+    /* Initialize the RDP */
+    volatile uint32_t *DP_STATUS = (volatile uint32_t*)0xA410000C;
+    *DP_STATUS = (1<<0) | (1<<2) | (1<<4); // clear xbus / flush / freeze
+
+
     /* Default to flushing automatically */
     flush_strategy = FLUSH_STRATEGY_AUTOMATIC;
 
@@ -178,12 +184,16 @@ void rdp_init( void )
     set_DP_interrupt( 1 );
 
     ugfx_init();
+
+    debugf("rdp_init: attached display: %d\n", attached_display);
 }
 
 void rdp_close( void )
 {
     set_DP_interrupt( 0 );
     unregister_DP_handler( __rdp_interrupt );
+
+    ugfx_close();
 }
 
 #define _carg(value, mask, shift) (((uint32_t)((value) & mask)) << shift)
@@ -248,11 +258,11 @@ void rdp_set_convert(uint16_t k0, uint16_t k1, uint16_t k2, uint16_t k3, uint16_
         _carg(k2, 0x1F, 27) | _carg(k3, 0x1FF, 18) | _carg(k4, 0x1FF, 9) | _carg(k5, 0x1FF, 0));
 }
 
-void rdp_set_scissor(int16_t x0, int16_t y0, int16_t x1, int16_t y1)
+void rdp_set_scissor(int16_t x0, int16_t y0, int16_t x1, int16_t y1, bool fields, int odd)
 {
     rspq_write(0x2D,
         _carg(x0, 0xFFF, 12) | _carg(y0, 0xFFF, 0),
-        _carg(x1, 0xFFF, 12) | _carg(y1, 0xFFF, 0));
+        _carg(fields, 0x1, 25) | _carg(odd, 0x1, 24) | _carg(x1, 0xFFF, 12) | _carg(y1, 0xFFF, 0));
 }
 
 void rdp_set_prim_depth(uint16_t primitive_z, uint16_t primitive_delta_z)
@@ -381,7 +391,7 @@ void rdp_attach_display( display_context_t disp )
 {
     if( disp == 0 ) { return; }
 
-    assertf(!rdp_is_display_attached(), "A display is already attached!");
+    // assertf(!rdp_is_display_attached(), "A display is already attached!");
     attached_display = disp;
 
     /* Set the rasterization buffer */
@@ -405,7 +415,10 @@ void rdp_detach_display( void )
     if( INTERRUPTS_ENABLED == get_interrupts_state() )
     {
         /* Only wait if interrupts are enabled */
-        while( !wait_intr ) { ; }
+        RSP_WAIT_LOOP(500) {
+            if (wait_intr)
+                break;
+        }
     }
 
     /* Set back to zero for next detach */
@@ -419,8 +432,8 @@ bool rdp_is_display_attached()
 
 void rdp_detach_display_async(void (*cb)(display_context_t disp))
 {
-    assertf(rdp_is_display_attached(), "No display is currently attached!");
-    assertf(cb != NULL, "Callback should not be NULL!");
+    // assertf(rdp_is_display_attached(), "No display is currently attached!");
+    // assertf(cb != NULL, "Callback should not be NULL!");
     detach_callback = cb;
     rdp_sync_full();
 }
@@ -447,7 +460,7 @@ void rdp_sync( sync_t sync )
 void rdp_set_clipping( uint32_t tx, uint32_t ty, uint32_t bx, uint32_t by )
 {
     /* Convert pixel space to screen space in command */
-    rdp_set_scissor(tx << 2, ty << 2, bx << 2, by << 2);
+    rdp_set_scissor(tx << 2, ty << 2, bx << 2, by << 2, 0, 0);
 }
 
 void rdp_set_default_clipping( void )

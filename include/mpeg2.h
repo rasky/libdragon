@@ -3,6 +3,7 @@
 
 #include "display.h"
 #include "rspq.h"
+#include "yuv.h"
 #include <stdbool.h>
 
 typedef struct plm_t plm_t;
@@ -13,6 +14,7 @@ typedef struct {
 	plm_buffer_t *buf;
 	plm_video_t *v;
 	void *f;
+	yuv_config_t yuv_cfg;
 	rspq_block_t* yuv_convert;
 } mpeg2_t;
 

@@ -54,6 +54,7 @@
 #include "ym64.h"
 #include "rspq.h"
 #include "ugfx.h"
+#include "yuv.h"
 //#include "rdp_commands.h"
 
 #endif
