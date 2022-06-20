@@ -2,7 +2,7 @@
 # V0 - Use this comment to force a re-build without changing the contents
 
 # Stage 1 - Build the toolchain
-FROM debian:11.1-slim AS toolchain-builder
+FROM debian:stable-slim AS toolchain-builder
 # Avoid warnings by switching to noninteractive
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -34,7 +34,7 @@ RUN ./build-toolchain.sh
 RUN rm -rf ${N64_INST}/share/locale/*
 
 # Stage 2 - Prepare minimal image
-FROM debian:11.1-slim
+FROM debian:stable-slim
 # Avoid warnings by switching to noninteractive
 ENV DEBIAN_FRONTEND=noninteractive
 # Setup paths for the libgragon toolchain
