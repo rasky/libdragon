@@ -100,14 +100,9 @@ enum {
     RSPQ_CMD_TEST_WRITE_STATUS = 0x08,
 
     /**
-     * @brief RSPQ command: Push commands to RDP
-     * 
-     * This command will send a buffer of RDP commands in RDRAM to the RDP.
-     * Additionally, it will perform a write to SP_STATUS when the buffer is 
-     * not contiguous with the previous one. This is used for synchronization
-     * with the CPU.
+     *  FIXME
      */
-    RSPQ_CMD_RDP               = 0x09,
+    RSPQ_CMD_RDP_SET_BUFFER    = 0x09,
 
     /**
      * @brief RSPQ command: Wait for RDP to be idle.
@@ -119,7 +114,12 @@ enum {
      * really does make sure that all previous commands have finished
      * running.
      */
-    RSPQ_CMD_RDP_WAIT_IDLE     = 0x0A
+    RSPQ_CMD_RDP_WAIT_IDLE     = 0x0A,
+
+    /**
+     *  FIXME
+     */
+    RSPQ_CMD_RDP_APPEND_BUFFER = 0x0B,
 };
 
 /** @brief Write an internal command to the RSP queue */

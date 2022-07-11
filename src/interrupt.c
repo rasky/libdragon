@@ -264,6 +264,7 @@ static void __unregister_callback( struct callback_link ** head, void (*callback
 void __MI_handler(void)
 {
     unsigned long status = MI_regs->intr & MI_regs->mask;
+    debugf("__MI_handler: %lx\n", status);
 
     if( status & MI_INTR_SP )
     {

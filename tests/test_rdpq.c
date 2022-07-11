@@ -165,6 +165,7 @@ void test_rdpq_block(TestContext *ctx)
     rspq_block_begin();
     rdpq_set_mode_fill(RGBA32(0,0,0,0));
 
+    int count = 0;
     for (uint32_t y = 0; y < TEST_RDPQ_FBWIDTH; y++)
     {
         for (uint32_t x = 0; x < TEST_RDPQ_FBWIDTH; x += 4)
@@ -177,13 +178,34 @@ void test_rdpq_block(TestContext *ctx)
             rdpq_set_fill_color(c);
             rdpq_set_scissor(x, y, x + 4, y + 1);
             rdpq_fill_rectangle(0, 0, TEST_RDPQ_FBWIDTH, TEST_RDPQ_FBWIDTH);
+            if (++count == 2) goto exitfor;
         }
     }
+exitfor:
     rspq_block_t *block = rspq_block_end();
     DEFER(rspq_block_free(block));
 
+    uint64_t *rdp_cmds = (uint64_t*)block->rdp_block->cmds;
+    for (int i=0;i<16;i++) {
+        debugf("%p: %016llx\n", &rdp_cmds[i], rdp_cmds[i]);
+    }
+    uint32_t *rsp_cmds = (uint32_t*)block->cmds;
+    for (int i=0;i<32;i++) {
+        debugf("%p: %08lx\n", &rsp_cmds[i], rsp_cmds[i]);
+    }
+    extern volatile uint32_t *rspq_cur_pointer;
+    rspq_wait();
+    debugf("set color (rspq_cur_pointer: %p, DP: %08lx/%08lx/%08lx - %lx)\n", rspq_cur_pointer, *DP_START, *DP_CURRENT, *DP_END, *DP_STATUS);
     rdpq_set_color_image(framebuffer, FMT_RGBA16, TEST_RDPQ_FBWIDTH, TEST_RDPQ_FBWIDTH, TEST_RDPQ_FBWIDTH*2);
+    rspq_wait();
+    debugf("run (rspq_cur_pointer: %p, DP: %08lx/%08lx/%08lx - %lx)\n", rspq_cur_pointer, *DP_START, *DP_CURRENT, *DP_END, *DP_STATUS);
     rspq_block_run(block);
+    rspq_flush();
+    wait_ms(1000);
+    debugf("wait\n");
+    rspq_wait();
+
+    debugf("wait\n");
     rspq_wait();
     
     //dump_mem(framebuffer, TEST_RDPQ_FBSIZE);
@@ -227,11 +249,11 @@ void test_rdpq_block_coalescing(TestContext *ctx)
 
     uint32_t expected_cmds[] = {
         // auto sync + First 3 commands + auto sync
-        (RSPQ_CMD_RDP << 24) | PhysicalAddr(rdp_cmds + 5), PhysicalAddr(rdp_cmds),
+        (RSPQ_CMD_RDP_SET_BUFFER << 24) | PhysicalAddr(rdp_cmds + 5), PhysicalAddr(rdp_cmds), PhysicalAddr(rdp_cmds + 64 - 44),
         // Fixup command (leaves a hole in rdp block)
         (RDPQ_CMD_SET_FILL_COLOR_32_FIX + 0xC0) << 24, 0,
         // Last 3 commands
-        (RSPQ_CMD_RDP << 24) | PhysicalAddr(rdp_cmds + 9), PhysicalAddr(rdp_cmds + 6),
+        (RSPQ_CMD_RDP_APPEND_BUFFER << 24) | PhysicalAddr(rdp_cmds + 9),
     };
 
     ASSERT_EQUAL_MEM((uint8_t*)block->cmds, (uint8_t*)expected_cmds, sizeof(expected_cmds), "Block commands don't match!");
@@ -828,7 +850,9 @@ void test_rdpq_automode(TestContext *ctx) {
             expected_fb[(y + 4) * TEST_RDPQ_FBWIDTH + (x + 4)] = color_to_packed16(c);
             ((uint16_t*)texture)[y * TEST_RDPQ_TEXWIDTH + x] = color_to_packed16(c);
         }
+        debugf("\n");
     }
+    debugf("\n");
 
     uint64_t som;
     rdpq_set_color_image(framebuffer, FMT_RGBA16, TEST_RDPQ_FBWIDTH, TEST_RDPQ_FBWIDTH, TEST_RDPQ_FBWIDTH*2);
@@ -840,8 +864,8 @@ void test_rdpq_automode(TestContext *ctx) {
     rdpq_set_mode_standard();
     rdpq_set_blend_color(RGBA32(0xFF, 0xFF, 0xFF, 0xFF));
     rdpq_set_fog_color(RGBA32(0xEE, 0xEE, 0xEE, 0xFF));
-    rdpq_set_env_color(RGBA32(0x0,0x0,0x0,0x80));
-    rdpq_set_prim_color(RGBA32(0x0,0x0,0x0,0x80));
+    rdpq_set_env_color(RGBA32(0x0,0x0,0x0,0x7F));
+    rdpq_set_prim_color(RGBA32(0x0,0x0,0x0,0x7F));
 
     memset(framebuffer, 0xFF, TEST_RDPQ_FBSIZE);
     rdpq_mode_combiner(RDPQ_COMBINER1((ZERO, ZERO, ZERO, TEX0), (ZERO, ZERO, ZERO, ZERO)));

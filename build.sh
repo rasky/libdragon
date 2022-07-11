@@ -4,8 +4,14 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+if [[ -z ${N64_INST:-} ]]; then
+  echo \$N64_INST not defined
+  echo Please set \$N64_INST to point to your libdragon toolchain prefix
+  exit 1
+fi
+
 makeWithParams(){
-  make -j${CPU_COUNT} $@
+  make -j"${CPU_COUNT}" "$@"
 }
 
 # Limit the number of make jobs to the number of CPUs
@@ -18,7 +24,7 @@ LIBMIKMOD_DIR=/tmp/libmikmod
 
 # Clean, build, and install libdragon + tools
 makeWithParams clobber
-makeWithParams install tools-install
+makeWithParams install tools-install || sudo env N64_INST="$N64_INST" makeWithParams install tools-install
 
 # Remove the cloned libmikmod repo if it already exists
 [ -d "$LIBMIKMOD_DIR" ] && rm -Rf $LIBMIKMOD_DIR
@@ -27,7 +33,7 @@ git clone $LIBMIKMOD_REPO $LIBMIKMOD_DIR
 pushd $LIBMIKMOD_DIR/n64
 git checkout $LIBMIKMOD_COMMIT
 makeWithParams
-makeWithParams install
+makeWithParams install || sudo env N64_INST="$N64_INST" makeWithParams install tools-install
 popd
 rm -Rf $LIBMIKMOD_DIR
 

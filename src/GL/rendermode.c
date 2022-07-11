@@ -85,19 +85,19 @@ void gl_update_render_mode()
             modes |= SOM_COVERAGE_DEST_WRAP | SOM_BLENDING;
         } else {
             modes |= SOM_ALPHA_USE_CVG | SOM_COVERAGE_DEST_CLAMP;
-            blend = RDPQ_BLENDER1((PIXEL_RGB, MUX_ALPHA, MEMORY_RGB, MEMORY_ALPHA)) & ~SOM_BLENDING;
+            blend = RDPQ_BLENDER1((PIXEL_RGB, PIXEL_ALPHA, MEMORY_RGB, MEMORY_ALPHA)) & ~SOM_BLENDING;
         }
     }
 
     if (state.fog) {
         if (state.blend) {
-            blend = RDPQ_BLENDER2((PIXEL_RGB, SHADE_ALPHA, FOG_RGB, INV_MUX_ALPHA), (PIXEL_RGB, MUX_ALPHA, MEMORY_RGB, INV_MUX_ALPHA));
+            blend = RDPQ_BLENDER2((PIXEL_RGB, SHADE_ALPHA, FOG_RGB, INV_MUX_ALPHA), (CYCLE1_RGB, CYCLE1_ALPHA, MEMORY_RGB, INV_MUX_ALPHA));
         } else {
             blend = RDPQ_BLENDER1((PIXEL_RGB, SHADE_ALPHA, FOG_RGB, INV_MUX_ALPHA));
         }
     } else if (state.blend) {
         // TODO: derive the blender config from blend_src and blend_dst
-        blend = RDPQ_BLENDER1((PIXEL_RGB, MUX_ALPHA, MEMORY_RGB, INV_MUX_ALPHA));
+        blend = RDPQ_BLENDER1((PIXEL_RGB, PIXEL_ALPHA, MEMORY_RGB, INV_MUX_ALPHA));
     }
 
     if (state.alpha_test && state.alpha_func == GL_GREATER) {

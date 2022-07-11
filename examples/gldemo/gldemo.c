@@ -13,7 +13,7 @@ void setup()
 {
     glEnable(GL_DITHER);
     glEnable(GL_LIGHT0);
-    //glEnable(GL_COLOR_MATERIAL);
+    // glEnable(GL_COLOR_MATERIAL);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glEnable(GL_LIGHTING);

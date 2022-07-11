@@ -854,7 +854,9 @@ inline void rdpq_set_mode_copy(bool transparency) {
 inline void rdpq_set_mode_standard(void) {
     // FIXME: accept structure?
     // FIXME: reset combiner?
-    rdpq_set_other_modes_raw(SOM_CYCLE_1 | SOM_TC_FILTER | SOM_RGBDITHER_NONE | SOM_ALPHADITHER_NONE);
+    rdpq_set_other_modes_raw(SOM_CYCLE_1 | 
+        SOM_TC_FILTER | SOM_TEXTURE_PERSP |
+        SOM_RGBDITHER_NONE | SOM_ALPHADITHER_NONE);
 }
 
 inline void rdpq_mode_combiner(rdpq_combiner_t comb) {
@@ -870,6 +872,33 @@ inline void rdpq_mode_combiner(rdpq_combiner_t comb) {
             (comb >> 32) & 0x00FFFFFF,
             comb & 0xFFFFFFFF);
 }
+
+#if 0
+// Enable anti-aliasing on polygons. NOTE: this will also configure the blender
+// with an appropriate formula to allow antialias to work correctly.
+void rdpq_mode_antialias(bool enable);
+
+// Enable blending (translucency) of polygons.
+void rdpq_mode_blending(bool enable);
+
+typedef enum {
+    RDPQ_ZBUF_OFF,
+    RDPQ_ZBUF_STANDARD,
+    RDPQ_ZBUF_INTERPENETRATE,
+    RDPQ_ZBUF_DECAL,
+} rdpq_zbuf_t;
+
+// Set the zbuffer rendering mode
+void rdpq_mode_zbuf(rdpq_zbuf_t zbuf);
+
+// Set the blender function to use. Notice that also all the following functions
+// also set a blender function, so make sure to change it at the right time to
+// obtain a custom blending effect:
+//    * rdpq_mode_antialias
+//    * rdpq_mode_blending
+//    * rdpq_mode_zbuf
+void rdpq_mode_blender_func(rdpq_blender_t blend);
+#endif
 
 inline void rdpq_mode_blender(rdpq_blender_t blend) {
     extern void __rdpq_fixup_write8(uint32_t cmd_id_dyn, uint32_t cmd_id_fix, int skip_size, uint32_t arg0, uint32_t arg1);

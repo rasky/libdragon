@@ -146,6 +146,7 @@
 #include "rdp_commands.h"
 #include "interrupt.h"
 #include "utils.h"
+#include "rdp.h"
 #include <string.h>
 #include <math.h>
 #include <float.h>
@@ -193,6 +194,7 @@ static volatile uint32_t *last_rdp_cmd;
 static void __rdpq_interrupt(void) {
     rdpq_state_t *rdpq_state = UncachedAddr(rspq_overlay_get_state(&rsp_rdpq));
 
+    if (!(*SP_STATUS & SP_STATUS_SIG_RDPSYNCFULL)) rsp_crash();
     assert(*SP_STATUS & SP_STATUS_SIG_RDPSYNCFULL);
 
     // The state has been updated to contain a copy of the last SYNC_FULL command
@@ -317,24 +319,28 @@ static void autosync_change(uint32_t res) {
     }
 }
 
-void __rdpq_block_flush(uint32_t *start, uint32_t *end)
+void __rdpq_block_update(uint32_t* old, uint32_t *new)
 {
-    assertf(((uint32_t)start & 0x7) == 0, "start not aligned to 8 bytes: %lx", (uint32_t)start);
-    assertf(((uint32_t)end & 0x7) == 0, "end not aligned to 8 bytes: %lx", (uint32_t)end);
+    uint32_t phys_old = PhysicalAddr(old);
+    uint32_t phys_new = PhysicalAddr(new);
 
-    uint32_t phys_start = PhysicalAddr(start);
-    uint32_t phys_end = PhysicalAddr(end);
+    assertf((phys_old & 0x7) == 0, "old not aligned to 8 bytes: %lx", phys_old);
+    assertf((phys_new & 0x7) == 0, "new not aligned to 8 bytes: %lx", phys_new);
 
-    // FIXME: Updating the previous command won't work across buffer switches
-    extern volatile uint32_t *rspq_cur_pointer;
-    uint32_t diff = rspq_cur_pointer - last_rdp_cmd;
-    if (diff == 2 && (*last_rdp_cmd&0xFFFFFF) == phys_start) {
-        // Update the previous command
-        *last_rdp_cmd = (RSPQ_CMD_RDP<<24) | phys_end;
+    assert(last_rdp_cmd);
+    if ((*last_rdp_cmd & 0xFFFFFF) == phys_old) {
+        // Update the previous command.
+        // It can be either a RSPQ_CMD_RDP_SET_BUFFER or RSPQ_CMD_RDP_APPEND_BUFFER,
+        // but we still need to update it to the new END pointer.
+        debugf("RDP_APPEND_BUFFER: %lx (coalesce)\n", phys_new);
+        *last_rdp_cmd = (*last_rdp_cmd & 0xFF000000) | phys_new;
     } else {
-        // Put a command in the regular RSP queue that will submit the last buffer of RDP commands.
+        // A fixup has emitted some commands, so we need to emit a new
+        // RSPQ_CMD_RDP_APPEND_BUFFER in the RSP queue of the block
+        debugf("RDP_APPEND_BUFFER: %lx\n", phys_new);
+        extern volatile uint32_t *rspq_cur_pointer;
         last_rdp_cmd = rspq_cur_pointer;
-        rspq_int_write(RSPQ_CMD_RDP, phys_end, phys_start);
+        rspq_int_write(RSPQ_CMD_RDP_APPEND_BUFFER, phys_new);
     }
 }
 
@@ -345,9 +351,16 @@ void __rdpq_block_switch_buffer(uint32_t *new, uint32_t size)
     rdpq_block_ptr = new;
     rdpq_block_end = new + size - RDPQ_MAX_COMMAND_SIZE;
 
-    // Enqueue a command that will point RDP to the start of the block so that static fixup commands still work.
-    // Those commands rely on the fact that DP_END always points to the end of the current static block.
-    __rdpq_block_flush((uint32_t*)rdpq_block_ptr, (uint32_t*)rdpq_block_ptr);
+    assertf((PhysicalAddr(rdpq_block_ptr) & 0x7) == 0,
+        "start not aligned to 8 bytes: %lx", PhysicalAddr(rdpq_block_ptr));
+    assertf((PhysicalAddr(rdpq_block_end) & 0x7) == 0,
+        "end not aligned to 8 bytes: %lx", PhysicalAddr(rdpq_block_end));
+
+    debugf("RDP_SET_BUFFER: %lx %lx %lx\n", PhysicalAddr(rdpq_block_ptr), PhysicalAddr(rdpq_block_ptr), PhysicalAddr(rdpq_block_end));
+    extern volatile uint32_t *rspq_cur_pointer;
+    last_rdp_cmd = rspq_cur_pointer;
+    rspq_int_write(RSPQ_CMD_RDP_SET_BUFFER,
+        PhysicalAddr(rdpq_block_ptr), PhysicalAddr(rdpq_block_ptr), PhysicalAddr(rdpq_block_end));
 }
 
 void __rdpq_block_next_buffer()
@@ -414,6 +427,7 @@ void __rdpq_block_free(rdpq_block_t *block)
     while (block) {
         void *b = block;
         block = block->next;
+        debugf("BLOCK FREE: %08lx %08lx\n", *DP_START, PhysicalAddr(block->cmds));
         free_uncached(b);
     }
 }
@@ -439,7 +453,7 @@ static void __rdpq_block_check(void)
     volatile uint32_t *ptr = rdpq_block_ptr; \
     *ptr++ = (RDPQ_OVL_ID + ((cmd_id)<<24)) | (arg0); \
     __CALL_FOREACH(_rdpq_write_arg, ##__VA_ARGS__); \
-    __rdpq_block_flush((uint32_t*)rdpq_block_ptr, (uint32_t*)ptr); \
+    __rdpq_block_update((uint32_t*)rdpq_block_ptr, (uint32_t*)ptr); \
     rdpq_block_ptr = ptr; \
     if (__builtin_expect(rdpq_block_ptr > rdpq_block_end, 0)) \
         __rdpq_block_next_buffer(); \
@@ -883,13 +897,16 @@ void __rdpq_set_other_modes(uint32_t w0, uint32_t w1)
 {
     autosync_change(AUTOSYNC_PIPE);
     if (in_block()) {
-        __rdpq_block_check(); \
+        __rdpq_block_check();
         // Write set other modes normally first, because it doesn't need to be modified
+        debugf("RDPQ_CMD_SET_OTHER_MODES @ %p\n", rdpq_block_ptr);
         rdpq_static_write(RDPQ_CMD_SET_OTHER_MODES, w0, w1);
         // This command will just record the other modes to DMEM and output a set scissor command
         rdpq_dynamic_write(RDPQ_CMD_SET_OTHER_MODES_FIX, w0, w1);
         // Placeholder for the set scissor
+        debugf("RDPQ static skip @ %p\n", rdpq_block_ptr);
         rdpq_static_skip(2);
+        debugf("RDPQ static skip done @ %p\n", rdpq_block_ptr);
     } else {
         // The regular dynamic command will output both the set other modes and the set scissor commands
         rdpq_dynamic_write(RDPQ_CMD_SET_OTHER_MODES, w0, w1);
