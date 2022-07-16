@@ -162,6 +162,10 @@ interrupt:
 	and t0, ~SR_CU1
 	mtc0 t0, C0_SR
 
+	andi t0, cause, 0x400
+	bnez t0, notrcp
+	nop
+
 	# If a FPU instruction is executed during the interrupt handler, a nested
 	# exception will trigger. The nested handler will enable the FPU and save
 	# the FPU registers into the interrupt exception frame. To do so, it needs
@@ -170,6 +174,73 @@ interrupt:
 	# Notice that interrupts cannot be reentrant (only exceptions are), so
 	# a single variable will suffice.
 	sw sp, interrupt_exception_frame
+
+	sd s0,(STACK_GPR+16*8)(sp)
+	lui t0, MI_BASE
+	lw t1, MI_INTR(t0)
+	lw t2, MI_MASK(t0)
+	and s0, t1, t2
+	beqz s0, notrcp
+	andi t0, s0, 0x01
+	bnez t0, interrupt_sp
+interrupt_check_si:
+	andi t0, s0, 0x02
+	bnez t0, interrupt_si
+interrupt_check_ai:
+	andi t0, s0, 0x04
+	bnez t0, interrupt_ai
+interrupt_check_vi:
+	andi t0, s0, 0x08
+	bnez t0, interrupt_vi
+interrupt_check_pi:
+	andi t0, s0, 0x10
+	bnez t0, interrupt_pi
+interrupt_check_dp:
+	andi t0, s0, 0x20
+	bnez t0, interrupt_dp
+	nop
+	j end_interrupt
+	nop
+
+interrupt_sp:
+	sw SP_CLEAR_INTERRUPT, SP_STATUS
+interrupt_sp_handlers:
+	nop; nop; nop; nop; nop; nop; nop; nop;
+	j interrupt_check_si; nop
+
+interrupt_si:
+	sw SI_CLEAR_INTERRUPT, SI_STATUS
+interrupt_si_hanlders:
+	nop; nop; nop; nop; nop; nop; nop; nop;
+	j interrupt_check_ai; nop
+
+interrupt_ai:
+	sw AI_CLEAR_INTERRUPT, AI_STATUS
+interrupt_ai_handlers:
+	nop; nop; nop; nop; nop; nop; nop; nop;
+	j interrupt_check_vi; nop
+
+interrupt_vi:
+	lw t0, VI_CUR_LINE
+	sw t0, VI_CUR_LINE
+interrupt_vi_handlers:
+	nop; nop; nop; nop; nop; nop; nop; nop;
+	j interrupt_check_pi; nop
+
+interrupt_pi:
+	sw PI_CLEAR_INTERRUPT, PI_STATUS
+interrupt_pi_handlers:
+	nop; nop; nop; nop; nop; nop; nop; nop;
+	j interrupt_check_dp; nop
+
+interrupt_dp:
+	sw DP_CLEAR_INTERRUPT, MI_STATUS
+interrupt_pi_handlers:
+	nop; nop; nop; nop; nop; nop; nop; nop;
+	j end_interrupt
+	nop
+
+notrcp:
 
 	/* check for "pre-NMI" (reset) */
 	andi t0, cause, 0x1000
@@ -185,7 +256,6 @@ interrupt:
 	nop
 
 notprenmi:
-
 	/* check for count=compare */
 	and t0, cause, 0x8000
 	beqz t0,notcount
@@ -204,22 +274,15 @@ notprenmi:
 	nop
 notcount:
 	and t0, cause, 0x800
-	beqz t0, notcart
+	beqz t0, end_interrupt
 	nop
 
 	/* handle CART interrupt */
 	jal __CART_handler
 	nop
 
-	j end_interrupt
-	nop
-
-notcart:
-	/* pass anything else along to MI (RCP) handler */
-	jal __MI_handler
-	addiu a0, sp, 32
-	j end_interrupt
-	nop
+	#j end_interrupt
+	#nop
 
 end_interrupt:
 	mfc0 t0, C0_SR

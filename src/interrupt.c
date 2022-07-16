@@ -340,6 +340,14 @@ void __CART_handler(void)
         assertf(++last_cart_interrupt_count < 128, "CART interrupt deadlock: a CART interrupt is continuously triggering, with no ack");
 }
 
+static void __register_inline_callback(uint32_t *ops, void (*callback)()) {
+    for (int i=0;i<8;i+=2) {
+        if (ops[i] == 0) {
+            ops[i] = (3<<26) | (((uint32_t)callback - (uint32_t)&ops[i]) >> 2);
+            return;
+        }
+    }
+}
 
 /**
  * @brief Register an AI callback
@@ -349,6 +357,15 @@ void __CART_handler(void)
  */
 void register_AI_handler( void (*callback)() )
 {
+    extern uint32_t interrupt_ai_handlers[8];
+    for (int i=0;i<8;i+=2) {
+
+        if (interrupt_ai_handlers[i] == 0) {
+            interrput_ai_hanlders[i] = (3<<26) | ((uint32_t)callback - (uin) >> 2)
+        }
+    }
+
+
     __register_callback(&AI_callback,callback);
 }
 
