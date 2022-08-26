@@ -127,7 +127,7 @@ void xm_context_save(xm_context_t* ctx, FILE* out) {
 	#define WALIGN()  ({ while (ftell(out) % 8) _W8(0); })
 
 
-	const uint8_t version = 5;
+	const uint8_t version = 6;
 	WA("XM64", 4);
 	W8(version);
 	W32(ctx->ctx_size);
@@ -441,7 +441,7 @@ int xm_context_load(xm_context_t** ctxp, FILE* in, uint32_t rate) {
 		return 1;
 	}
 	R8(version);
-	if (version != 5) {
+	if (version != 6) {
 		DEBUG("invalid XM64 version %d\n", version);
 		return 1;		
 	}

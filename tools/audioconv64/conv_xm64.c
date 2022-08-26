@@ -175,9 +175,8 @@ int xm_convert(const char *infn, const char *outfn) {
 				if (ch->sample->bits == 16)
 					n *= 2;
 
-				// Looping samples require the overread buffer
-				if (ch->sample->loop_type != XM_NO_LOOP)
-					n += MIXER_LOOP_OVERREAD;
+				// Take overread buffer into account
+				n += MIXER_LOOP_OVERREAD;
 
 				// Keep the maximum
 				if (ch_buf[i] < n)
