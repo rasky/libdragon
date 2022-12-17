@@ -17,7 +17,7 @@
  * ========================================================================
  */
 
-OUTPUT_FORMAT ("elf32-bigmips", "elf32-bigmips", "elf32-littlemips")
+OUTPUT_FORMAT ("elf32-bigmips", "elf32-nbigmips", "elf32-littlemips")
 OUTPUT_ARCH (mips)
 EXTERN (_start)
 ENTRY (_start)

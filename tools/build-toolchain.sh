@@ -99,8 +99,11 @@ test -d "newlib-$NEWLIB_V"     || tar -xzf "newlib-$NEWLIB_V.tar.gz"
 cd "binutils-$BINUTILS_V"
 ./configure \
   --prefix="$INSTALL_PATH" \
-  --target=mips64-elf \
-  --with-cpu=mips64vr4300 \
+  --target=mips64-ps2-elf \
+  --program-prefix=mips64-elf- \
+  --enable-64-bit-bfd \
+  --enable-multilib \
+  --with-abi=n32 \
   --disable-werror
 make -j "$JOBS"
 make install-strip || sudo make install-strip || su -c "make install-strip"
@@ -113,6 +116,7 @@ cd gcc_compile
 ../"gcc-$GCC_V"/configure "${GCC_CONFIGURE_ARGS[@]}" \
   --prefix="$INSTALL_PATH" \
   --target=mips64-elf \
+  --with-abi=n32 \
   --with-arch=vr4300 \
   --with-tune=vr4300 \
   --enable-languages=c \
@@ -153,6 +157,7 @@ CFLAGS_FOR_TARGET="-O2" CXXFLAGS_FOR_TARGET="-O2" \
   ../"gcc-$GCC_V"/configure "${GCC_CONFIGURE_ARGS[@]}" \
   --prefix="$INSTALL_PATH" \
   --target=mips64-elf \
+  --with-abi=n32 \
   --with-arch=vr4300 \
   --with-tune=vr4300 \
   --enable-languages=c,c++ \
