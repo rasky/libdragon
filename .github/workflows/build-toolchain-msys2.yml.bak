@@ -1,0 +1,37 @@
+# This workflow takes a very long time, and is not really needed, so commented out.
+
+name: MSYS2
+on: [push, pull_request]
+
+jobs:
+  build-toolchain-msys2-mingw64:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: mingw64
+          update: true
+          install: >-
+            git
+            base-devel
+            mingw-w64-x86_64-toolchain
+      # - name: Correct MSYS2 pthread.h to allow static libraries (otherwise you would need to use a lib DLL, rather than it being built into the EXE.)
+      #   run: |
+      #     sed -z 's/#else\n#define WINPTHREAD_API __declspec(dllimport)/#else\n#define WINPTHREAD_API/' /mingw64/include/pthread.h
+      - name: CI-Build
+        run: |
+          echo 'Running in MSYS2!'
+          mkdir -p ${{ runner.temp }}/n64/
+          export N64_INST=${{ runner.temp }}/n64/
+          cd ./tools/
+          ./build-toolchain.sh
+
+      - name: Publish w64-x86_64 Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: gcc-toolchain-mips64-w64-x86_64
+          path: ${{ runner.temp }}/n64/
