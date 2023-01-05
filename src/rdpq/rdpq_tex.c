@@ -4,9 +4,12 @@
  * @ingroup rdp
  */
 
+#define _GNU_SOURCE
 #include "rdpq.h"
+#include "rdpq_tri.h"
 #include "rdpq_tex.h"
 #include "utils.h"
+#include <math.h>
 
 /** @brief Address in TMEM where the palettes must be loaded */
 #define TMEM_PALETTE_ADDR   0x800
@@ -85,9 +88,9 @@ static void tex_loader_set_tlut(tex_loader_t *tload, int tlut)
     tload->load_mode = TEX_LOAD_UNKNOWN;
 }
 
-static int texload_calc_max_height(tex_loader_t *tload, int width)
+static int texload_calc_max_height(tex_loader_t *tload, int s0, int s1)
 {
-    texload_set_rect(tload, 0, 0, width, 1);
+    texload_set_rect(tload, s0, 0, s1, 1);
 
     tex_format_t fmt = surface_get_format(tload->tex);
     int tmem_size = (fmt == FMT_RGBA32 || fmt == FMT_CI4 || fmt == FMT_CI8) ? 2048 : 4096;
@@ -209,7 +212,7 @@ int rdpq_tex_load(rdpq_tile_t tile, surface_t *tex, int tmem_addr)
  *                      with the tile to use for drawing, and the rectangle of the original
  *                      surface that has been loaded into TMEM.
  */
-static void tex_draw_split(rdpq_tile_t tile, surface_t *tex, 
+static void tex_draw_split(rdpq_tile_t tile, surface_t *tex, int s0, int t0, int s1, int t1, 
     void (*draw_cb)(rdpq_tile_t tile, int s0, int t0, int s1, int t1))
 {
     // The most efficient way to split a large surface is to load it in horizontal strips,
@@ -219,24 +222,23 @@ static void tex_draw_split(rdpq_tile_t tile, surface_t *tex,
     tex_loader_t tload = tex_loader_init(tile, tex);
 
     // Calculate the optimal height for a strip, based on strips of maximum length.
-    int tile_h = texload_calc_max_height(&tload, tex->width);
-    int s0 = 0, t0 = 0;
+    int tile_h = texload_calc_max_height(&tload, s0, s1);
     
     // Go through the surface
-    while (t0 < tex->height) 
+    while (t0 < t1) 
     {
         // Calculate the height of the current strip
-        int s1 = tex->width;
-        int t1 = MIN(t0 + tile_h, tex->height);
+        int sn = s1;
+        int tn = MIN(t0 + tile_h, t1);
 
         // Load the current strip
-        tex_loader_load(&tload, s0, t0, s1, t1);
+        tex_loader_load(&tload, s0, t0, sn, tn);
 
         // Call the draw callback for this strip
-        draw_cb(tile, s0, t0, s1, t1);
+        draw_cb(tile, s0, t0, sn, tn);
 
         // Move to the next strip
-        t0 = t1;
+        t0 = tn;
     }
 }
 
@@ -255,7 +257,86 @@ void rdpq_tex_blit(rdpq_tile_t tile, surface_t *tex, int x0, int y0, int screen_
             s0, t0, dsdx, dtdy);
     }
 
-    tex_draw_split(tile, tex, draw_cb);
+    tex_draw_split(tile, tex, 0, 0, tex->width, tex->height, draw_cb);
+}
+
+void rdpq_tex_xblit(rdpq_tile_t tile, surface_t *surf, int x0, int y0, const rdpq_blitparms_t *parms)
+{
+    static const rdpq_blitparms_t default_parms = {0};
+    if (!parms) parms = &default_parms;
+
+    int src_width = parms->width ? parms->width : surf->width;
+    int src_height = parms->height ? parms->height : surf->height;
+    int s0 = parms->s0;
+    int t0 = parms->t0;
+    int cx = parms->cx;
+    int cy = parms->cy;
+    float scalex = parms->scale_x == 0 ? 1.0f : parms->scale_x;
+    float scaley = parms->scale_y == 0 ? 1.0f : parms->scale_y;
+    float dsdx, dtdy; 
+
+    bool rotate = true; //parms->theta != 0.0f;
+    float sin_theta, cos_theta; 
+    if (rotate) {
+        sincosf(parms->theta, &sin_theta, &cos_theta);
+    } else {
+        sin_theta = 0.0f; cos_theta = 1.0f;
+        dsdx = 1.0f / scalex;
+        dtdy = 1.0f / scaley;
+        if (parms->flip_x) dsdx = -dsdx;
+        if (parms->flip_y) dtdy = -dtdy;
+    }
+
+    // Translation before all transformations
+    float ox = parms->ox;
+    float oy = parms->oy;
+
+    float mtx[3][2] = {
+        { cos_theta * scalex, -sin_theta * scaley },
+        { sin_theta * scalex, cos_theta * scaley },
+        { x0 - cx * cos_theta * scalex - cy * sin_theta * scaley,
+          y0 + cx * sin_theta * scalex - cy * cos_theta * scaley }
+    };
+
+    void draw_cb(rdpq_tile_t tile, int s0, int t0, int s1, int t1)
+    {
+        if (!rotate) {
+            int ks0 = s0, kt0 = t0, ks1 = s1, kt1 = t1;
+
+            if ((scalex < 0) ^ parms->flip_x) { ks0 = src_width - s1; ks1 = src_width - s0; s0 = s1-1; }
+            if ((scaley < 0) ^ parms->flip_y) { kt0 = src_height - t1; kt1 = src_height - t0; t0 = t1-1; }
+
+            float k0x = mtx[0][0] * ks0 + mtx[1][0] * kt0 + mtx[2][0];
+            float k0y = mtx[0][1] * ks0 + mtx[1][1] * kt0 + mtx[2][1];
+            float k2x = mtx[0][0] * ks1 + mtx[1][0] * kt1 + mtx[2][0];
+            float k2y = mtx[0][1] * ks1 + mtx[1][1] * kt1 + mtx[2][1];
+
+            rdpq_texture_rectangle(tile, k0x, k0y, k2x, k2y, s0, t0, dsdx, dtdy);
+        } else {
+            int ks0 = s0 + ox, kt0 = t0 + oy, ks1 = s1 + ox, kt1 = t1 + oy;
+
+            if (parms->flip_x) { ks0 = src_width - ks0; ks1 = src_width - ks1; }
+            if (parms->flip_y) { kt0 = src_height - kt0; kt1 = src_height - kt1; }
+
+            float k0x = mtx[0][0] * ks0 + mtx[1][0] * kt0 + mtx[2][0];
+            float k0y = mtx[0][1] * ks0 + mtx[1][1] * kt0 + mtx[2][1];
+            float k2x = mtx[0][0] * ks1 + mtx[1][0] * kt1 + mtx[2][0];
+            float k2y = mtx[0][1] * ks1 + mtx[1][1] * kt1 + mtx[2][1];
+            float k1x = mtx[0][0] * ks1 + mtx[1][0] * kt0 + mtx[2][0];
+            float k1y = mtx[0][1] * ks1 + mtx[1][1] * kt0 + mtx[2][1];
+            float k3x = mtx[0][0] * ks0 + mtx[1][0] * kt1 + mtx[2][0];
+            float k3y = mtx[0][1] * ks0 + mtx[1][1] * kt1 + mtx[2][1];
+
+            float v0[5] = { k0x, k0y, s0, t0, 1.0f };
+            float v1[5] = { k1x, k1y, s1, t0, 1.0f };
+            float v2[5] = { k2x, k2y, s1, t1, 1.0f };
+            float v3[5] = { k3x, k3y, s0, t1, 1.0f };
+            rdpq_triangle(&TRIFMT_TEX, v0, v1, v2);
+            rdpq_triangle(&TRIFMT_TEX, v0, v2, v3);
+        }
+    }
+
+    tex_draw_split(tile, surf, s0, t0, s0 + src_width, t0 + src_height, draw_cb);
 }
 
 void rdpq_tex_load_tlut(uint16_t *tlut, int color_idx, int num_colors)

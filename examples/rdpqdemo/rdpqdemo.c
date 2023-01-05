@@ -13,6 +13,7 @@ typedef struct {
     int32_t dx;
     int32_t dy;
     float scale_factor;
+    float theta;
 } object_t;
 
 #define NUM_OBJECTS 64
@@ -41,6 +42,9 @@ static int32_t obj_max_y;
 static int32_t cur_tick = 0;
 static uint32_t num_objs = 1;
 
+#define DEG2RAD(x) ((x) * M_PI / 180.0f)
+
+
 void update(int ovfl)
 {
     for (uint32_t i = 0; i < NUM_OBJECTS; i++)
@@ -55,9 +59,10 @@ void update(int ovfl)
         if (y >= obj_max_y) y -= obj_max_y;
         if (y < 0) y += obj_max_y;
         
-        obj->x = x;
-        obj->y = y;
+        obj->x = 200;
+        obj->y = 100;
         obj->scale_factor = sinf(cur_tick * 0.1f + i) * 0.5f + 1.5f;
+        obj->theta += DEG2RAD(1);
     }
     cur_tick++;
 }
@@ -91,20 +96,31 @@ void render(int cur_frame)
     // Draw the brew sprites. Use standard mode because copy mode cannot handle
     // scaled sprites.
     rdpq_debug_log_msg("sprites");
-    rdpq_set_mode_standard();
-    rdpq_mode_filter(FILTER_BILINEAR);
-    rdpq_mode_alphacompare(1);                // colorkey (draw pixel with alpha >= 1)
+    rdpq_mode_begin();
+        rdpq_set_mode_standard();
+        rdpq_mode_alphacompare(1);                // colorkey (draw pixel with alpha >= 1)
+    rdpq_mode_end();
 
     surface_t brew_surf = sprite_get_pixels(brew_sprite);
-    for (uint32_t i = 0; i < num_objs; i++)
+    for (uint32_t i = 0; i < 2; i++)
     {
-        rdpq_tex_blit(TILE0, &brew_surf,
-            objects[i].x, objects[i].y,
-            brew_sprite->width * objects[i].scale_factor,
-            brew_sprite->height * objects[i].scale_factor);
+        rdpq_mode_filter(i == 0 ? FILTER_POINT : FILTER_BILINEAR);
+
+        rdpq_tex_xblit(TILE0, &brew_surf,
+            50 + 130*i, 100,
+            &(rdpq_blitparms_t){
+                // .width = 32, .height = 32,
+                // .theta = objects[i].theta,
+                .cx = brew_surf.width / 2,
+                .cy = brew_surf.height / 2,
+                .scale_x = objects[i].scale_factor,
+                // .scale_y = objects[i].scale_factor,
+            });
     }
 
-    rdpq_detach_show();
+    rdpq_detach();
+    rspq_wait();
+    display_show(disp);
 }
 
 int main()

@@ -210,6 +210,24 @@ void rdpq_tex_load_tlut(uint16_t *tlut, int color_idx, int num_colors);
  */
 void rdpq_tex_blit(rdpq_tile_t tile, surface_t *surf, int x0, int y0, int draw_width, int draw_height);
 
+typedef struct {
+    int s0, t0;         ///< Source sub-rect begin coordinates (0,0: top-left)
+    int width;          ///< Source sub-rect width. If 0, the width of the surface is used
+    int height;         ///< Source sub-rect height. If 0, the height of the surface is used
+
+    int ox, oy;         ///< Origin of the object (relative to (s0,t0)). Used for all transformations
+    int cx, cy;         ///< Transformation center, relative to (s0,t0). Used for all transformations
+
+    float scale_x;      ///< Width of the sprite on the screen. If 0, no scaling is performed (the same as 1.0f)
+    float scale_y;      ///< Height of the sprite on the screen. If 0, no scaling is performed (the same as 1.0f)
+
+    float theta;        ///< Rotation angle in radians
+    bool flip_x;        ///< Flip horizontally (before rotation)
+    bool flip_y;        ///< Flip vertically (before rotation)
+} rdpq_blitparms_t;
+
+void rdpq_tex_xblit(rdpq_tile_t tile, surface_t *surf, int x0, int y0, const rdpq_blitparms_t *parms);
+
 #ifdef __cplusplus
 }
 #endif
