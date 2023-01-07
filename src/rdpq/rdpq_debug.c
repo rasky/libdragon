@@ -1195,6 +1195,7 @@ void rdpq_validate(uint64_t *buf, uint32_t flags, int *r_errs, int *r_warns)
         VALIDATE_ERR_TEX(hpixels <= 2048, "cannot load more than 2048 texels at once");
         VALIDATE_CRASH_TEX(!check_loading_crash(hpixels), "loading pixels from a misaligned texture image");
         rdp.busy.tile[tidx] = true;  // mask as in use
+        validate_busy_tmem(rdp.tile[tidx].tmem_addr, hpixels * (4 << rdp.tex.size) / 8);
     }   break;
     case 0x30: { // LOAD_TLUT
         int tidx = BITS(buf[0], 24, 26);
@@ -1210,6 +1211,7 @@ void rdpq_validate(uint64_t *buf, uint32_t flags, int *r_errs, int *r_warns)
         VALIDATE_ERR(low>>2 < 256, "palette start index must be < 256");
         VALIDATE_ERR(high>>2 < 256, "palette stop index must be < 256");
         VALIDATE_CRASH(low>>2 <= high>>2, "palette stop index is lower than palette start index");
+        validate_busy_tmem(t->tmem_addr, ((high >> 2) - (low >> 2) + 1)*8);
     }   break;
     case 0x2F: // SET_OTHER_MODES
         validate_busy_pipe();
