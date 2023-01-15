@@ -1,3 +1,6 @@
+# Copyright (c) libdragon and contributers 2023
+# See LICENSE file in the project root for full license information.
+
 name: "Git diff"
 description: "Compares provided paths (optional) for given git refs/commits."
 inputs:
@@ -19,7 +22,7 @@ runs:
   using: "composite"
   steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
@@ -31,4 +34,4 @@ runs:
         ${{ inputs.base }} \
         ${{ inputs.head }} \
         -- ${{ inputs.paths }}
-        echo "::set-output name=exitCode::$?"
+        echo "exitCode=$?" >> $GITHUB_OUTPUT

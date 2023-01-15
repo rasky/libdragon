@@ -1,3 +1,6 @@
+# Copyright (c) libdragon and contributers 2023
+# See LICENSE file in the project root for full license information.
+
 name: Build
 
 on: [push, pull_request]

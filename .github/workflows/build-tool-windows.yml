@@ -1,3 +1,6 @@
+# Copyright (c) libdragon and contributers 2023
+# See LICENSE file in the project root for full license information.
+
 on: workflow_call
 
 jobs:
@@ -20,7 +23,7 @@ jobs:
            mingw-w64-${{ matrix.arch }}-toolchain
          update: true
 
-     - uses: actions/checkout@v2
+     - uses: actions/checkout@v3
        with:
          fetch-depth: 0
 
