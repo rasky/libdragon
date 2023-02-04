@@ -1,6 +1,7 @@
 # Libdragon
 
-[![Build](https://github.com/DragonMinded/libdragon/actions/workflows/build-toolchain-library-and-roms.yml/badge.svg?branch=trunk)](https://github.com/DragonMinded/libdragon/actions/workflows/build-toolchain-library-and-roms.yml)
+[![Build-stable](https://github.com/DragonMinded/libdragon/actions/workflows/build-toolchain-library-and-roms.yml/badge.svg?branch=trunk)](https://github.com/DragonMinded/libdragon/actions/workflows/build-toolchain-library-and-roms.yml)
+[![Build-unstable](https://github.com/DragonMinded/libdragon/actions/workflows/build-toolchain-library-and-roms.yml/badge.svg?branch=unstable)](https://github.com/DragonMinded/libdragon/actions/workflows/build-toolchain-library-and-roms.yml)
 
 ## Welcome to libdragon
 
