@@ -17,12 +17,12 @@ int main(void)
     console_clear();
 
     printf( "Press A on a controller\n"
-                    "to read that controller's\n"
-                    "mempak.\n\n"
-                    "Press B to format mempak.\n\n"
-                    "Press Z to corrupt mempak.\n\n"
-                    "Press L to copy mempak.\n\n"
-                    "Press R to paste mempak." );
+                    "to read the inserted\n"
+                    "ControllerPak (mempak).\n\n"
+                    "Press B to format CPak.\n\n"
+                    "Press Z to corrupt CPak.\n\n"
+                    "Press L to copy CPak.\n\n"
+                    "Press R to paste CPak." );
     
     console_render();
 
@@ -54,18 +54,18 @@ int main(void)
                         case ACCESSORY_NONE:
                             printf( "No accessory inserted!" );
                             break;
-                        case ACCESSORY_MEMPAK:
+                        case ACCESSORY_CONTROLLERPAK:
                         {
                             int err;
                             if( (err = validate_mempak( i )) )
                             {
                                 if( err == -3 )
                                 {
-                                    printf( "Mempak is not formatted!" );
+                                    printf( "CPak is not formatted!" );
                                 }
                                 else
                                 {
-                                    printf( "Mempak bad or removed during read!" );
+                                    printf( "CPak bad or removed during read!" );
                                 }
                             }
                             else
@@ -92,7 +92,7 @@ int main(void)
                             break;
                         }
                         case ACCESSORY_RUMBLEPAK:
-                            printf( "Cannot read data off of rumblepak!" );
+                            printf( "Cannot read data from a RumblePak!" );
                             break;
                     }
 
@@ -108,19 +108,19 @@ int main(void)
                         case ACCESSORY_NONE:
                             printf( "No accessory inserted!" );
                             break;
-                        case ACCESSORY_MEMPAK:
+                        case ACCESSORY_CONTROLLERPAK:
                             if( format_mempak( i ) )
                             {
-                                printf( "Error formatting mempak!" );
+                                printf( "Error formatting CPak!" );
                             }
                             else
                             {
-                                printf( "Memory card formatted!" );
+                                printf( "CPak formatted!" );
                             }
 
                             break;
                         case ACCESSORY_RUMBLEPAK:
-                            printf( "Cannot format rumblepak!" );
+                            printf( "Cannot format a RumblePak!" );
                             break;
                     }
 
@@ -136,7 +136,7 @@ int main(void)
                         case ACCESSORY_NONE:
                             printf( "No accessory inserted!" );
                             break;
-                        case ACCESSORY_MEMPAK:
+                        case ACCESSORY_CONTROLLERPAK:
                         {
                             uint8_t sector[256];
                             int err = 0;
@@ -155,13 +155,13 @@ int main(void)
                             }
                             else
                             {
-                                printf( "Data corrupted on memory card!" );
+                                printf( "Data corrupted on CPak!" );
                             }
 
                             break;
                         }
                         case ACCESSORY_RUMBLEPAK:
-                            printf( "Cannot erase data off of rumblepak!" );
+                            printf( "Cannot erase data from a RumblePak!" );
                             break;
                     }
 
@@ -177,7 +177,7 @@ int main(void)
                         case ACCESSORY_NONE:
                             printf( "No accessory inserted!" );
                             break;
-                        case ACCESSORY_MEMPAK:
+                        case ACCESSORY_CONTROLLERPAK:
                         {
                             int err = 0;
 
@@ -198,7 +198,7 @@ int main(void)
                             break;
                         }
                         case ACCESSORY_RUMBLEPAK:
-                            printf( "Cannot erase data off of rumblepak!" );
+                            printf( "Cannot erase data from a RumblePak!" );
                             break;
                     }
 
@@ -214,7 +214,7 @@ int main(void)
                         case ACCESSORY_NONE:
                             printf( "No accessory inserted!" );
                             break;
-                        case ACCESSORY_MEMPAK:
+                        case ACCESSORY_CONTROLLERPAK:
                         {
                             int err = 0;
 
@@ -229,13 +229,13 @@ int main(void)
                             }
                             else
                             {
-                                printf( "Data saved into mempak!" );
+                                printf( "Data saved into CPak!" );
                             }
 
                             break;
                         }
                         case ACCESSORY_RUMBLEPAK:
-                            printf( "Cannot erase data off of rumblepak!" );
+                            printf( "Cannot erase data from a RumblePak!" );
                             break;
                     }
 

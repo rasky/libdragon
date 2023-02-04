@@ -14,7 +14,7 @@ char *format_type( int accessory )
     {
         case ACCESSORY_RUMBLEPAK:
             return "(rumble)";
-        case ACCESSORY_MEMPAK:
+        case ACCESSORY_CONTROLLERPAK:
             return "(memory)";
         case ACCESSORY_VRU:
             return "(vru)";

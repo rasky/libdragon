@@ -852,13 +852,13 @@ int get_mempak_free_space( int controller )
  */
 int format_mempak( int controller )
 {
-    /* Many cpak dumps exist online for users of emulated games to get
+#ifdef FIXED_MPAK_FORMAT_DATA
+    /* Many CPak dumps exist online for users of emulated games to get
        saves that have all unlocks. Every beginning sector on all these
        was the same, but this it wrong as the serial number for each
-       should be unique. A fully populated empty cpak should look like
-       this:
+       should be unique. A fully populated empty CPak should look like
+       this (still requiring checksums adding):
     */
-#ifdef FIXED_MPAK_FORMAT_DATA
     uint8_t cpak_header_data[1280] = { 
                             0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
                             0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 
@@ -1009,11 +1009,9 @@ int format_mempak( int controller )
         0x00, 0x01, 0x01, 0x00, 0x01, 0x01, 0xFE, 0xF1  //0x20 - 0x2f (24 - 32)
     };
 
-    // //TODO: Do we really need to dissable interupts?!
-    // disable_interrupts();
     /* Assign 'random' value to ID */
     uint64_t id = C0_COUNT(); /* id uses a random seed (using C0 register (ticks since boot?)). */
-    // enable_interrupts();
+
     for (i = 0; i < 24; i++)
     {
         id ^= id >> 27; id *= 0x9E3779B97F4A7C55; id ^= id >> 33; /* simple 64-bit random generator (PRNG), for each byte of serial number */

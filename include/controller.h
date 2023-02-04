@@ -34,8 +34,10 @@
  */
 /** @brief No accessory present */
 #define ACCESSORY_NONE          0
-/** @brief Mempak present */
+/** @brief Mempak present (Deprecated - use: ACCESSORY_CONTROLLERPAK) */
 #define ACCESSORY_MEMPAK        1
+/** @brief ControllerPak present */
+#define ACCESSORY_CONTROLLERPAK 1
 /** @brief Rumblepak present */
 #define ACCESSORY_RUMBLEPAK     2
 /** @brief VRU present */

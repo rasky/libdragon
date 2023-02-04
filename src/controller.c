@@ -789,9 +789,9 @@ static bool __is_transfer_pak( int controller )
  * @param[in] controller
  *            The controller (0-3) to identify accessories on
  *
- * @retval #ACCESSORY_RUMBLEPAK The accessory connected is a rumblepak
- * @retval #ACCESSORY_MEMPAK The accessory connected is a mempak
- * @retval #ACCESSORY_TRANSFERPAK The accessory connected is a transferpak
+ * @retval #ACCESSORY_RUMBLEPAK The accessory connected is a RumblePak
+ * @retval #ACCESSORY_CONTROLLERPAK The accessory connected is a ControllerPak
+ * @retval #ACCESSORY_TRANSFERPAK The accessory connected is a TransferPak
  * @retval #ACCESSORY_VRU The accessory connected is a VRU
  * @retval #ACCESSORY_NONE The accessory was not recognized
  */
@@ -807,7 +807,7 @@ int identify_accessory( int controller )
     {
         switch( ( output.c[controller].data >> 8 ) & 0xFFFF )
         {
-            case 0x0001: /* Mempak/rumblepak/transferpak */
+            case 0x0001: /* ControllerPak/RumblePak/TransferPak */
             {
                 /* Init string one */
                 memset( data, 0xfe, 32 );
@@ -827,7 +827,7 @@ int identify_accessory( int controller )
                     }
                     else
                     {
-                        return __is_transfer_pak( controller ) ? ACCESSORY_TRANSFERPAK : ACCESSORY_MEMPAK;
+                        return __is_transfer_pak( controller ) ? ACCESSORY_TRANSFERPAK : ACCESSORY_CONTROLLERPAK;
                     }
                 }
 
