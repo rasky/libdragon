@@ -472,7 +472,7 @@ static int __is_valid_accessory( uint32_t data )
 {
     if( ((data >> 8) & 0xFFFF) == 0x0001 )
     {
-        /* This is a rumble pak, mem pak or transfer pak */
+        /* This is a rumble pak, controller pak or transfer pak */
         return 1;
     }
     else if( ((data >> 8) & 0xFFFF) == 0x0100 )
@@ -828,10 +828,16 @@ int identify_accessory( int controller )
                 /* Get register contents */
                 if( read_mempak_address( controller, 0x8000, data ) == 0 )
                 {
-                    /* Should really check all bytes, but this should suffice */
+                    /* TODO: Should really check all bytes, but this should suffice */
                     if( data[0] == 0x80 )
                     {
-                        return ACCESSORY_RUMBLEPAK;
+                        /*
+                          FIXME: The id is meant to be `ACCESSORY_RUMBLEPAK` 
+                          it does not always work with all 3rd party Controller Paks!
+                          as some will still be returned as `ACCESSORY_RUMBLEPAK`.
+                          it seems better to return `ACCESSORY_CONTROLLERPAK` just in case!
+                        */
+                        return ACCESSORY_CONTROLLERPAK;
                     }
                     else
                     {
