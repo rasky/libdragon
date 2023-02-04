@@ -20,7 +20,7 @@
  * The controller subsystem is in charge of communication with all controllers 
  * and accessories plugged into the N64 controller ports. The controller subsystem
  * leverages the @ref joybus "Joybus Subsystem" to provide controller data and
- * interface with accessories such as the Controller Pak, Rumble Pak, Transfer Pak,
+ * interface with accessories such as the ControllerPak, RumblePak, TransferPak,
  * and the Voice-Recognition Unit.
  *
  * Code wishing to communicate with a controller or an accessory should first call
@@ -472,7 +472,7 @@ static int __is_valid_accessory( uint32_t data )
 {
     if( ((data >> 8) & 0xFFFF) == 0x0001 )
     {
-        /* This is a rumble pak, controller pak or transfer pak */
+        /* This is a RumblePak, ControllerPak or TransferPak */
         return 1;
     }
     else if( ((data >> 8) & 0xFFFF) == 0x0100 )
@@ -863,7 +863,7 @@ int identify_accessory( int controller )
  * @brief Turn rumble on for a particular controller
  *
  * @param[in] controller
- *            The controller (0-3) who's rumblepak should activate
+ *            The controller (0-3) who's RumblePak should activate
  */
 void rumble_start( int controller )
 {
@@ -880,7 +880,7 @@ void rumble_start( int controller )
  * @brief Turn rumble off for a particular controller
  *
  * @param[in] controller
- *            The controller (0-3) who's rumblepak should deactivate
+ *            The controller (0-3) who's RumblePak should deactivate
  */
 void rumble_stop( int controller )
 {

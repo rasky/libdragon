@@ -8,7 +8,7 @@
 #include "regsinternal.h"
 
 /**
- * @defgroup mempak Mempak Filesystem Routines
+ * @defgroup mempak Mempak CPak ControllerPak Filesystem Routines
  * @ingroup controller
  * @brief Managed ControllerPak (mempak) interface.
  *

@@ -48,7 +48,7 @@ int main(void)
                     struct controller_data output;
                     get_accessories_present( &output );
 
-                    /* Make sure they don't have a rumble pak inserted instead */
+                    /* Make sure they don't have a RumblePak inserted instead */
                     switch( identify_accessory( i ) )
                     {
                         case ACCESSORY_NONE:
@@ -102,7 +102,7 @@ int main(void)
                 {
                     console_clear();
 
-                    /* Make sure they don't have a rumble pak inserted instead */
+                    /* Make sure they don't have a RumblePak inserted instead */
                     switch( identify_accessory( i ) )
                     {
                         case ACCESSORY_NONE:
@@ -130,7 +130,7 @@ int main(void)
                 {
                     console_clear();
 
-                    /* Make sure they don't have a rumble pak inserted instead */
+                    /* Make sure they don't have a RumblePak inserted instead */
                     switch( identify_accessory( i ) )
                     {
                         case ACCESSORY_NONE:
@@ -208,7 +208,7 @@ int main(void)
                 {
                     console_clear();
 
-                    /* Make sure they don't have a rumble pak inserted instead */
+                    /* Make sure they don't have a RumblePak inserted instead */
                     switch( identify_accessory( i ) )
                     {
                         case ACCESSORY_NONE:

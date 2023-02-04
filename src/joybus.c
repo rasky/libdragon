@@ -17,7 +17,7 @@
  * accessories, and peripherals plugged into the N64 controller ports as well
  * as some peripherals on the cartridge. The Joybus subsystem is responsible
  * for communicating with the serial interface (SI) registers to send commands
- * to controllers (including Controller Paks, Rumble Paks, and Transfer Paks),
+ * to controllers (including ControllerPak's, RumblePak's, and TransferPak's),
  * the VRU, EEPROM save memory, and the cartridge-based real-time clock.
  * 
  * This module implements just the low-level protocol. You should use it
