@@ -1,11 +1,9 @@
-#include <stdio.h>
-#include <malloc.h>
-#include <string.h>
-#include <stdint.h>
+#include <cstdio>
+#include <cstdint>
 #include <libdragon.h>
+#include <memory>
 
-static resolution_t res = RESOLUTION_320x240;
-static bitdepth_t bit = DEPTH_32_BPP;
+int state = 1;
 
 class TestClass
 {
@@ -21,6 +19,23 @@ class TestClass
             d = d + 1;
             return d;
         }
+        void exc1()
+        {
+            if (state)
+                throw (int)d;
+        }
+        int exc()
+        {
+            try {
+                exc1();
+            } catch(int x) {
+                return x;
+            } catch(...) {
+                assertf(0, "Exceptions not working");
+                return -1;
+            }
+            return -1;
+        }
 };
 
 // Test global constructor
@@ -28,21 +43,20 @@ TestClass globalClass;
 
 int main(void)
 {
-    TestClass* localClass = new TestClass();
+    debug_init_isviewer();
+    debug_init_usblog();
+
+    auto localClass = std::make_unique<TestClass>();
 
     console_init();
-
     console_set_render_mode(RENDER_MANUAL);
-
-    display_init( res, bit, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE );
 
     while(1)
     {
         console_clear();
         printf("Global class method: %d\n", globalClass.f1());
         printf("Local class method: %d\n", localClass->f1());
+        printf("Exception data: %d\n", localClass->exc());
         console_render();
     }
-
-    delete localClass;
 }

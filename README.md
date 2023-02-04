@@ -1,6 +1,6 @@
 # Libdragon
 
-[![Build](https://github.com/DragonMinded/libdragon/actions/workflows/ci.yml/badge.svg?branch=trunk)](https://github.com/DragonMinded/libdragon/actions/workflows/ci.yml)
+[![Build](https://github.com/DragonMinded/libdragon/actions/workflows/build-toolchain-library-and-roms.yml/badge.svg?branch=trunk)](https://github.com/DragonMinded/libdragon/actions/workflows/build-toolchain-library-and-roms.yml)
 
 ## Welcome to libdragon
 
@@ -8,13 +8,13 @@ Libdragon is an open-source SDK for Nintendo 64. It aims for a complete N64
 programming experience while providing programmers with modern approach to
 programming and debugging. These are the main features:
 
-* Based on modern GCC (11.2) and Newlib, for a full C11 programming experience.
+* Based on modern GCC (12.2) and Newlib, for a full C11 programming experience.
   A Docker container is available to quickly set up the programming environment.
 * The GCC toolchain is 64 bit capable to be able to use the full R4300 capabilities
   (commercial games and libultra are based on a 32-bit ABI and is not possible
   to use 64-bit registers and opcodes with it)
-* Can be developed with newer-generation emulators (cen64, Ares, Dillonb's n64,
-  m64p) or development cartridges (64drive, EverDrive64).
+* Can be developed with newer-generation emulators (ares, cen64, Dillonb's n64,
+  simple64) or development cartridges (64drive, EverDrive64).
 * Support both vanilla N64 and iQue Player (chinese variant). The support is
   experimental and done fully at runtime, so it is possible to run ROMs built
   with libdragon on iQue without modifying the source code.
@@ -40,35 +40,24 @@ programming and debugging. These are the main features:
 * Simple and powerful Makefile-based build system for your ROMs and assets
   (n64.mk)
 
+The [unstable branch](https://github.com/DragonMinded/libdragon/wiki/Unstable-branch) features
+many more features:
+
+ * a new comprehensive RDP engine
+ * a full OpenGL 1.1 port for 3D graphics programming, with a custom, efficient RSP ucode
+   with full T&L support.
+ * a MPEG1 RSP-accelerated movie player
+ * support for showing source-level stack traces in case of crashes or assertions, including
+   source file name and line number.
+
+and much more. These features will eventually land to trunk, but you can start playing
+with them even today. Go the [unstable branch doc](https://github.com/DragonMinded/libdragon/wiki/Unstable-branch) for more information.
+
 ## Getting started: how to build a ROM
 
-### Option 1: Use the libdragon CLI with Docker (Windows, macOS, Linux)
+To get started with libdragon, you need to [download and install the toolchain](https://github.com/DragonMinded/libdragon/releases/tag/toolchain-continuous-prerelease).
 
-See [the libdragon CLI](https://github.com/anacierdem/libdragon-docker) to
-quickly get libdragon up and running. Basically:
-
-1. Download the CLI (as a pre-built binary, or build from source)
-2. Run `libdragon init` to create a skeleton project
-3. Run `libdragon make` to compile a build a ROM
-
-If you want, you can also compile and run one of the examples that will
-be found in `libdragon/examples` in the skeleton project.
-
-### Option 2: Compile the toolchain (Linux only)
-
-1. Create a directory and copy the `build-toolchain.sh` script there from the `tools/` directory.
-2. Read the comments in the build script to see what additional packages are needed.
-3. Run `./build-toolchain.sh` from the created directory, let it build and install the toolchain.
-4. Install libpng-dev if not already installed.
-
-*Below steps can also be executed by running `build.sh` at the top level.*
-
-5. Install libdragon by typing `make install` at the top level.
-6. Install the tools by typing `make tools-install` at the top level.
-7. Install libmikmod for the examples using it. See `build.sh` at the top level for details.
-8. Compile the examples by typing `make examples` at the top level.
-
-You are now ready to run the examples on your N64.
+Make sure to read the [full installation instructions](https://github.com/DragonMinded/libdragon/wiki/Installing-libdragon) which also explain the system requirements.
 
 ## Getting started: how to run a ROM
 
@@ -76,9 +65,9 @@ You are now ready to run the examples on your N64.
 
 libdragon requires a modern N64 emulator (the first generation of emulators
 are basically HLE-only and can only play the old commercial games). Suggested
-emulators for homebrew developemnt are: [Ares](https://ares-emulator.github.io),
+emulators for homebrew developemnt are: [ares](https://ares-emu.net),
 [cen64](https://github.com/n64dev/cen64), [dgb-n64](https://github.com/Dillonb/n64),
-[m64p](https://m64p.github.io).
+[simple64](https://simple64.github.io).
 
 On all the above emulators, you are also able to see in console anything printed
 via `fprintf(stderr)`, see the debug library for more information.
@@ -87,7 +76,7 @@ via `fprintf(stderr)`, see the debug library for more information.
 
 All cartridges that are able to load custom ROMs should be able to successfully
 load libdragon ROMs via either USB/serial, or from a MMC/SD card. For instance,
-the followig are known to work: 64drive, EverDrive64 (all models), SummerCart 64.
+the following are known to work: 64drive, EverDrive64 (all models), SC64.
 
 If your cartridge has USB support, use one of the loaders that implement the
 libdragon debugging protocol, so to be able to show logs in console. For instance,
@@ -95,7 +84,27 @@ libdragon debugging protocol, so to be able to show logs in console. For instanc
 [ed64](https://github.com/anacierdem/ed64). The official loaders provided by
 the vendors are usually less feature-rich.
 
+## Libdragon stable vs unstable
+
+Currently, there are two main libragon versions: 
+
+ * The **stable** version is the one in the `trunk`. Stable means that we strive never
+   to break backward compatibility, that is we will never do changes in a way
+   that will impede existing applications to successfully compile and work
+   against a newer libdragon version. We feel this is important because otherwise
+   we would fragment the homebrew ecosystem too much, and we would leave a trail
+   of libdragon-based applications that can't be compiled anymore. See also the 
+   wiki for [common hurdles in upgrading libdragon](https://github.com/DragonMinded/libdragon/wiki/Upgrade-troubleshooting).
+ * The **unstable** version is the one in the `unstable` branch. This is where most
+   development happens first. In fact, features are developed, evolved and
+   battle-tested here, before the APIs are stabilized and they are finally
+   merged on the trunk. Applications that use the unstable branch need to be aware
+   that the APIs can break at any time (though we try to avoid *gratuitous* breakage).
+
 ## Documentation
 
  * [API reference](https://dragonminded.github.io/libdragon/ref/modules.html)
  * [Examples](https://github.com/DragonMinded/libdragon/tree/trunk/examples)
+ * [Wiki](https://github.com/DragonMinded/libdragon/wiki) (contains tutorials
+   and troubleshooting guides)
+

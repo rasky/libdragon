@@ -190,6 +190,8 @@ void console_init()
     /* Register ourselves with newlib */
     stdio_t console_calls = { 0, __console_write, 0 };
     hook_stdio_calls( &console_calls );
+
+    graphics_set_default_font();
 }
 
 /**
@@ -280,7 +282,7 @@ end:;
     uint32_t c0_status = C0_STATUS();
     if ((c0_status & C0_STATUS_IE) == 0 || ((c0_status & (C0_STATUS_EXL|C0_STATUS_ERL)) != 0))
     {
-        extern void display_show_force(int dc);
+        extern void display_show_force(display_context_t dc);
         display_show_force(dc);
     }
     else

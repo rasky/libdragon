@@ -4,9 +4,6 @@
 #include <stdint.h>
 #include <libdragon.h>
 
-static resolution_t res = RESOLUTION_320x240;
-static bitdepth_t bit = DEPTH_32_BPP;
-
 typedef struct
 {
     char initials[3];
@@ -317,7 +314,7 @@ static int validate_eeprom_4k(void)
         { "/player.sav",      sizeof(game_save_state_t) }
     };
 
-    printf( "EEPROM Detected: 4Kb (64 blocks)\n" );
+    printf( "EEPROM Detected: 4 Kibit (64 blocks)\n" );
     printf( "Initializing EEPROM Filesystem...\n" );
     result = eepfs_init(eeprom_4k_files, 3);
     switch ( result )
@@ -378,7 +375,7 @@ static int validate_eeprom_16k(void)
         { "saves/slot4.sav", sizeof(game_save_state_t) }
     };
 
-    printf( "EEPROM Detected: 16Kb (256 blocks)\n" );
+    printf( "EEPROM Detected: 16 Kibit (256 blocks)\n" );
     printf( "Initializing EEPROM Filesystem...\n" );
     result = eepfs_init(eeprom_16k_files, 6);
     switch ( result )
@@ -456,7 +453,6 @@ static int validate_eeprom(eeprom_type_t eeprom_type)
 int main(void)
 {
     /* Initialize peripherals */
-    display_init( res, bit, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE );
     console_init();
     controller_init();
 

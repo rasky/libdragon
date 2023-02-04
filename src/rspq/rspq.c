@@ -339,6 +339,9 @@ typedef struct rspq_block_s {
     uint32_t cmds[];            ///< Block contents (commands)
 } rspq_block_t;
 
+/** @brief RSPQ overlays */
+rsp_ucode_t *rspq_overlay_ucodes[RSPQ_MAX_OVERLAY_COUNT];
+
 /** @brief A RSPQ overlay ucode. This is similar to rsp_ucode_t, but is used
  * internally to managed it as a RSPQ overlay */
 typedef struct rspq_overlay_t {
@@ -471,6 +474,18 @@ static void rspq_sp_interrupt(void)
         *SP_STATUS = wstatus;
 }
 
+/** @brief Extract the current overlay index and name from the RSP queue state */
+static void rspq_get_current_ovl(rsp_queue_t *rspq, int *ovl_idx, const char **ovl_name)
+{
+    *ovl_idx = rspq->current_ovl / sizeof(rspq_overlay_t);
+    if (*ovl_idx == 0)
+        *ovl_name = "builtin";
+    else if (*ovl_idx < RSPQ_MAX_OVERLAY_COUNT && rspq_overlay_ucodes[*ovl_idx])
+        *ovl_name = rspq_overlay_ucodes[*ovl_idx]->name;
+    else
+        *ovl_name = "?";
+}
+
 /** @brief RSPQ crash handler. This shows RSPQ-specific info the in RSP crash screen. */
 static void rspq_crash_handler(rsp_snapshot_t *state)
 {
@@ -478,11 +493,14 @@ static void rspq_crash_handler(rsp_snapshot_t *state)
     uint32_t cur = rspq->rspq_dram_addr + state->gpr[28];
     uint32_t dmem_buffer = RSPQ_DEBUG ? 0x140 : 0x100;
 
+    int ovl_idx; const char *ovl_name;
+    rspq_get_current_ovl(rspq, &ovl_idx, &ovl_name);
+
     printf("RSPQ: Normal  DRAM address: %08lx\n", rspq->rspq_dram_lowpri_addr);
     printf("RSPQ: Highpri DRAM address: %08lx\n", rspq->rspq_dram_highpri_addr);
     printf("RSPQ: Current DRAM address: %08lx + GP=%lx = %08lx\n", 
         rspq->rspq_dram_addr, state->gpr[28], cur);
-    printf("RSPQ: Current Overlay: %02x\n", rspq->current_ovl / sizeof(rspq_overlay_t));
+    printf("RSPQ: Current Overlay: %s (%02x)\n", ovl_name, ovl_idx);
 
     // Dump the command queue in DMEM.
     debugf("RSPQ: Command queue:\n");
@@ -506,15 +524,18 @@ static void rspq_crash_handler(rsp_snapshot_t *state)
 static void rspq_assert_invalid_command(rsp_snapshot_t *state)
 {
     rsp_queue_t *rspq = (rsp_queue_t*)state->dmem;
+    int ovl_idx; const char *ovl_name;
+    rspq_get_current_ovl(rspq, &ovl_idx, &ovl_name);
+
     uint32_t dmem_buffer = RSPQ_DEBUG ? 0x140 : 0x100;
     uint32_t cur = dmem_buffer + state->gpr[28];
-    printf("Invalid command\nCommand %02x not found in overlay %02x\n", state->dmem[cur], rspq->current_ovl / sizeof(rspq_overlay_t));
+    printf("Invalid command\nCommand %02x not found in overlay %s (0x%01x)\n", state->dmem[cur], ovl_name, ovl_idx);
 }
 
 /** @brief Special RSP assert handler for ASSERT_INVALID_OVERLAY */
 static void rspq_assert_invalid_overlay(rsp_snapshot_t *state)
 {
-    printf("Invalid overlay\nOverlay %02lx not registered\n", state->gpr[8]);
+    printf("Invalid overlay\nOverlay 0x%01lx not registered\n", state->gpr[8]);
 }
 
 /** @brief RSP assert handler for rspq */
@@ -527,9 +548,19 @@ static void rspq_assert_handler(rsp_snapshot_t *state, uint16_t assert_code)
         case ASSERT_INVALID_COMMAND:
             rspq_assert_invalid_command(state);
             break;
-        default:
-            printf("Unknown assert");
+        default: {
+            rsp_queue_t *rspq = (rsp_queue_t*)state->dmem;
+
+            // Check if there is an assert handler for the current overlay.
+            // If it exists, forward request to it.
+            // Be defensive against DMEM corruptions.
+            int ovl_idx = rspq->current_ovl / sizeof(rspq_overlay_t);
+            if (ovl_idx < RSPQ_MAX_OVERLAY_COUNT &&
+                rspq_overlay_ucodes[ovl_idx] &&
+                rspq_overlay_ucodes[ovl_idx]->assert_handler)
+                rspq_overlay_ucodes[ovl_idx]->assert_handler(state, assert_code);
             break;
+        }
     }
 }
 
@@ -564,7 +595,7 @@ static volatile uint32_t* rspq_switch_buffer(uint32_t *new, int size, bool clear
 
     // Switch to the new buffer, and calculate the new sentinel.
     rspq_cur_pointer = new;
-    rspq_cur_sentinel = new + size - RSPQ_MAX_COMMAND_SIZE;
+    rspq_cur_sentinel = new + size - RSPQ_MAX_SHORT_COMMAND_SIZE;
 
     // Return a pointer to the previous buffer
     return prev;
@@ -608,12 +639,9 @@ static void rspq_start(void)
     MEMORY_BARRIER();
 
     // Off we go!
-    rsp_run_async();
-
-    // Disable INTR_ON_BREAK as that it is not useful in the RSPQ engine, and
-    // might even cause excessive interrupts.
-    // It was turned on by rsp_run_async.
-    *SP_STATUS = SP_WSTATUS_CLEAR_INTR_BREAK;
+    // Do not turn on INTR_BREAK as we don't need it.
+    extern void __rsp_run_async(uint32_t status_flags);
+    __rsp_run_async(0);
 }
 
 /** @brief Initialize a rspq_ctx_t structure */
@@ -822,9 +850,9 @@ static uint32_t rspq_overlay_register_internal(rsp_ucode_t *overlay_ucode, uint3
     uint32_t rspq_data_size = rsp_queue_data_end - rsp_queue_data_start;
 
     assertf(memcmp(rsp_queue_text_start, overlay_ucode->code, rspq_text_size) == 0,
-        "Common code of overlay does not match!");
+        "Common code of overlay %s does not match!", overlay_ucode->name);
     assertf(memcmp(rsp_queue_data_start, overlay_ucode->data, rspq_data_size) == 0,
-        "Common data of overlay does not match!");
+        "Common data of overlay %s does not match!", overlay_ucode->name);
 
     void *overlay_code = overlay_ucode->code + rspq_text_size;
     void *overlay_data = overlay_ucode->data + rspq_data_size;
@@ -877,6 +905,9 @@ static uint32_t rspq_overlay_register_internal(rsp_ucode_t *overlay_ucode, uint3
     // Set the command base in the overlay header
     overlay_header->command_base = id << 5;
     data_cache_hit_writeback_invalidate(overlay_header, sizeof(rspq_overlay_header_t));
+
+    // Save the overlay pointer
+    rspq_overlay_ucodes[overlay_index] = overlay_ucode;
 
     rspq_update_tables(true);
 
@@ -1073,7 +1104,7 @@ void rspq_highpri_end(void)
     // Write the highpri epilog. The epilog starts with a JUMP to the next
     // instruction because we want to force the RSP to reload the buffer
     // from RDRAM in case the epilog has been overwritten by a new highpri
-    // queue (see rsqp_highpri_begin).
+    // queue (see rspq_highpri_begin).
     rspq_append1(rspq_cur_pointer, RSPQ_CMD_JUMP, PhysicalAddr(rspq_cur_pointer+1));
     rspq_append3(rspq_cur_pointer, RSPQ_CMD_SWAP_BUFFERS,
         RSPQ_LOWPRI_CALL_SLOT<<2, RSPQ_HIGHPRI_CALL_SLOT<<2,
@@ -1245,3 +1276,9 @@ void rspq_dma_to_dmem(uint32_t dmem_addr, void *rdram_addr, uint32_t len, bool i
 {
     rspq_dma(rdram_addr, dmem_addr, len - 1, is_async ? 0 : SP_STATUS_DMA_BUSY | SP_STATUS_DMA_FULL);
 }
+
+
+/* Extern inline instantiations. */
+extern inline rspq_write_t rspq_write_begin(uint32_t ovl_id, uint32_t cmd_id, int size);
+extern inline void rspq_write_arg(rspq_write_t *w, uint32_t value);
+extern inline void rspq_write_end(rspq_write_t *w);

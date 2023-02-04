@@ -10,7 +10,7 @@
 #include "dragonfs.h"
 #include "dfsinternal.h"
 
-#if BYTE_ORDER == BIG_ENDIAN
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 #define SWAPLONG(i) (i)
 #else
 #define SWAPLONG(i) (((uint32_t)((i) & 0xFF000000) >> 24) | ((uint32_t)((i) & 0x00FF0000) >>  8) | ((uint32_t)((i) & 0x0000FF00) <<  8) | ((uint32_t)((i) & 0x000000FF) << 24))
@@ -221,8 +221,9 @@ uint32_t add_directory(const char * const path)
 
                     if(!new_directory)
                     {
+                        fprintf(stderr, "Skipping empty directory: %s\n", file);
                         free(file);
-                        return 0;
+                        continue;
                     }
 
                     tmp_entry = sector_to_memory(new_entry);
@@ -281,7 +282,7 @@ int main(int argc, char *argv[])
     if(!add_directory(argv[2]))
     {
         /* Error adding directory */
-        fprintf(stderr, "Error creating filesystem.\n");
+        fprintf(stderr, "Error creating filesystem: directory is empty or does not exist: %s\n", argv[2]);
 
         kill_fs();
 
@@ -297,6 +298,8 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Error opening '%s' for writing.\n", argv[1]);
 
         kill_fs();
+
+        return -1;
     }
 
     fwrite(dfs, 1, fs_size, fp);

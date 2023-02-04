@@ -10,10 +10,10 @@ static void test_assert_handler(rsp_snapshot_t *state, uint16_t assert_code)
 {
     switch (assert_code) {
         case ASSERT_GP_BACKWARD:
-            printf("GP moved backward");
+            printf("GP moved backward\n");
             break;
         default:
-            printf("Unknown assert");
+            printf("Unknown assert\n");
             break;
     }
 }
@@ -86,6 +86,11 @@ void rspq_test_reset_log(void)
     rspq_write(test_ovl_id, 0x7);
 }
 
+void rspq_test_big_out(void *dest)
+{
+    rspq_write(test_ovl_id, 0x9, 0, PhysicalAddr(dest));
+}
+
 void rspq_test2(uint32_t v0, uint32_t v1)
 {
     rspq_write(test2_ovl_id, 0x0, v0, v1);
@@ -98,7 +103,8 @@ void dump_mem(void* ptr, uint32_t size)
     for (uint32_t i = 0; i < size / sizeof(uint32_t); i += 8)
     {
         uint32_t *ints = ptr + i * sizeof(uint32_t);
-        debugf("%#010lX: %08lX %08lX %08lX %08lX %08lX %08lX %08lX %08lX\n", (uint32_t)ints, ints[0], ints[1], ints[2], ints[3], ints[4], ints[5], ints[6], ints[7]);
+        debugf("%08lX: %08lX %08lX %08lX %08lX %08lX %08lX %08lX %08lX\n",
+            (uint32_t)(ints) - (uint32_t)(ptr), ints[0], ints[1], ints[2], ints[3], ints[4], ints[5], ints[6], ints[7]);
     }
 }
 
@@ -238,14 +244,16 @@ void test_rspq_flush(TestContext *ctx)
     test_ovl_init();
     DEFER(test_ovl_close());
 
+    // This is meant to verify that the fix in rspq_flush actually
+    // prevents the race condition (see the comment in that function).
+    // If the race condition does happen, this test will fail very quickly.
     uint32_t t0 = TICKS_READ();
-    while (TICKS_DISTANCE(t0, TICKS_READ()) < TICKS_FROM_MS(10000)) {
+    while (TICKS_DISTANCE(t0, TICKS_READ()) < TICKS_FROM_MS(1000)) {
         rspq_test_wait(RANDN(50));
         rspq_flush();
 
-        wait_ticks(90);
+        wait_ticks(80 + RANDN(20));
 
-        //rspq_wait();
         rspq_syncpoint_t sp = rspq_syncpoint_new();
         rspq_flush();
         ASSERT(wait_for_syncpoint(sp, 100), "syncpoint was not flushed!, PC:%03lx, STATUS:%04lx", *SP_PC, *SP_STATUS);
@@ -260,6 +268,11 @@ void test_rspq_rapid_flush(TestContext *ctx)
     
     test_ovl_init();
     DEFER(test_ovl_close());
+
+    // This test is meant to verify that a specific hardware bug
+    // does not occur (see rsp_queue.inc). The exact conditions
+    // for the bug to happen are not known and this test setup was
+    // found by pure experimentation.
 
     uint64_t actual_sum[2] __attribute__((aligned(16))) = {0};
     data_cache_hit_writeback_invalidate(actual_sum, 16);
@@ -684,4 +697,50 @@ void test_rspq_highpri_overlay(TestContext *ctx)
         
     ASSERT_EQUAL_UNSIGNED(actual_sum[1], 123, "highpri sum is not correct");
     TEST_RSPQ_EPILOG(0, rspq_timeout);
+}
+
+void test_rspq_big_command(TestContext *ctx)
+{
+    TEST_RSPQ_PROLOG();
+    test_ovl_init();
+    DEFER(test_ovl_close());
+
+    uint32_t values[32];
+    for (uint32_t i = 0; i < 32; i++)
+    {
+        values[i] = RANDN(0xFFFFFFFF);
+    }
+    
+
+    uint32_t output[32] __attribute__((aligned(16)));
+    data_cache_hit_writeback_invalidate(output, 128);
+
+    rspq_write_t wptr = rspq_write_begin(test_ovl_id, 0x8, 33);
+    rspq_write_arg(&wptr, 0);
+    for (uint32_t i = 0; i < 32; i++)
+    {
+        rspq_write_arg(&wptr, i | i << 8 | i << 16 | i << 24);
+    }
+    rspq_write_end(&wptr);
+
+    wptr = rspq_write_begin(test_ovl_id, 0x8, 33);
+    rspq_write_arg(&wptr, 0);
+    for (uint32_t i = 0; i < 32; i++)
+    {
+        rspq_write_arg(&wptr, values[i]);
+    }
+    rspq_write_end(&wptr);
+
+    rspq_test_big_out(output);
+
+    TEST_RSPQ_EPILOG(0, rspq_timeout);
+
+    uint32_t expected[32];
+    for (uint32_t i = 0; i < 32; i++)
+    {
+        uint32_t x = i | i << 8 | i << 16 | i << 24;
+        expected[i] = x ^ values[i];
+    }
+    
+    ASSERT_EQUAL_MEM((uint8_t*)output, (uint8_t*)expected, 128, "Output does not match!");
 }

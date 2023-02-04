@@ -13,6 +13,7 @@
 #include "regsinternal.h"
 #include "system.h"
 #include "usb.h"
+#include "utils.h"
 #include "fatfs/ff.h"
 #include "fatfs/ffconf.h"
 #include "fatfs/diskio.h"
@@ -20,6 +21,7 @@
 // SD implementations
 #include "debug_sdfs_ed64.c"
 #include "debug_sdfs_64drive.c"
+#include "debug_sdfs_sc64.c"
 
 /**
  * @defgroup debug Debugging Support
@@ -214,6 +216,15 @@ static fat_disk_t fat_disk_64drive =
 	fat_disk_ioctl_default
 };
 
+static fat_disk_t fat_disk_sc64 =
+{
+	fat_disk_initialize_sc64,
+	fat_disk_status_default,
+	fat_disk_read_sc64,
+	fat_disk_write_sc64,
+	fat_disk_ioctl_default
+};
+
 /*********************************************************************
  * FAT newlib wrappers
  *********************************************************************/
@@ -315,7 +326,7 @@ static int __fat_lseek(void *file, int offset, int whence)
 	}
 	if (res != FR_OK)
 		return -1;
-	return 0;
+	return f_tell(f);
 }
 
 static int __fat_unlink(char *name)
@@ -458,6 +469,9 @@ bool debug_init_sdfs(const char *prefix, int npart)
 	case CART_EVERDRIVE:
 		fat_disks[FAT_VOLUME_SD] = fat_disk_everdrive;
 		break;
+	case CART_SC64:
+		fat_disks[FAT_VOLUME_SD] = fat_disk_sc64;
+		break;
 	default:
 		return false;
 	}
@@ -550,4 +564,37 @@ void debug_assert_func_f(const char *file, int line, const char *func, const cha
 void debug_assert_func(const char *file, int line, const char *func, const char *failedexpr)
 {
 	debug_assert_func_f(file, line, func, failedexpr, NULL);
+}
+
+void debug_hexdump(const void *vbuf, int size)
+{
+	const uint8_t *buf = vbuf;
+    bool lineskip = false;
+    for (int i = 0; i < size; i+=16) {
+        const uint8_t *d = buf + i;
+        // If the current line of data is identical to the previous one,
+        // just dump one "*" and skip all other similar lines
+        if (i!=0 && memcmp(d, d-16, 16) == 0) {
+            if (!lineskip) debugf("*\n");
+            lineskip = true;
+        } else {
+            lineskip = false;
+            debugf("%04x  ", i);
+            for (int j=0;j<16;j++) {
+				if (i+j < size)
+					debugf("%02x ", d[j]);
+				else
+					debugf("   ");
+                if (j==7) debugf(" ");
+            }
+            debugf("  |");
+            for (int j=0;j<16;j++) {
+				if (i+j < size)
+					debugf("%c", d[j] >= 32 && d[j] < 127 ? d[j] : '.');
+				else
+					debugf(" ");
+			}
+            debugf("|\n");
+        }
+    }
 }

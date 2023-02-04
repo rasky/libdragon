@@ -6,7 +6,8 @@
 #include "exception.h"
 #include "console.h"
 #include "n64sys.h"
-
+#include "debug.h"
+#include "regsinternal.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -26,10 +27,17 @@
  * @{
  */
 
-/** @brief Exception handler currently registered with exception system */
+/** @brief Maximum number of reset handlers that can be registered. */
+#define MAX_RESET_HANDLERS 4
+
+/** @brief Unhandled exception handler currently registered with exception system */
 static void (*__exception_handler)(exception_t*) = exception_default_handler;
 /** @brief Base register offset as defined by the interrupt controller */
-extern const void* __baseRegAddr;
+extern volatile reg_block_t __baseRegAddr;
+/** @brief Pre-NMI exception handlers */
+static void (*__prenmi_handlers[MAX_RESET_HANDLERS])(void);
+/** @brief Tick at which the pre-NMI was triggered */
+static uint32_t __prenmi_tick;
 
 /**
  * @brief Register an exception handler to handle exceptions
@@ -85,18 +93,7 @@ void exception_default_handler(exception_t* ex) {
 		case EXCEPTION_CODE_TLB_STORE_MISS:
 		case EXCEPTION_CODE_TLB_LOAD_I_MISS:
 		case EXCEPTION_CODE_COPROCESSOR_UNUSABLE:
-		break;
 		case EXCEPTION_CODE_FLOATING_POINT:
-			// Clear FP interrupt cause bits so that it is not retriggered when we return to exception_halt
-			ex->regs->fc31 &= ~(
-				C1_CAUSE_INEXACT_OP |
-				C1_CAUSE_UNDERFLOW |
-				C1_CAUSE_OVERFLOW |
-				C1_CAUSE_DIV_BY_0 |
-				C1_CAUSE_INVALID_OP |
-				C1_CAUSE_NOT_IMPLEMENTED
-			);
-		break;
 		case EXCEPTION_CODE_WATCH:
 		case EXCEPTION_CODE_ARITHMETIC_OVERFLOW:
 		case EXCEPTION_CODE_TRAP:
@@ -267,10 +264,12 @@ static const char* __get_exception_name(exception_code_t code)
  * @param[in]  type
  *             Exception type.  Either #EXCEPTION_TYPE_CRITICAL or 
  *             #EXCEPTION_TYPE_RESET
+ * @param[in]  regs
+ *             CPU register status at exception time
  */
-static void __fetch_regs(exception_t* e,int32_t type)
+static void __fetch_regs(exception_t* e, int32_t type, volatile reg_block_t *regs)
 {
-	e->regs = (volatile reg_block_t*) &__baseRegAddr;
+	e->regs = regs;
 	e->type = type;
 	e->code = C0_GET_CAUSE_EXC_CODE(e->regs->cr);
 	e->info = __get_exception_name(e->code);
@@ -279,27 +278,115 @@ static void __fetch_regs(exception_t* e,int32_t type)
 /**
  * @brief Respond to a critical exception
  */
-void __onCriticalException()
+void __onCriticalException(volatile reg_block_t* regs)
 {
 	exception_t e;
 
 	if(!__exception_handler) { return; }
 
-	__fetch_regs(&e,EXCEPTION_TYPE_CRITICAL);
+	__fetch_regs(&e, EXCEPTION_TYPE_CRITICAL, regs);
 	__exception_handler(&e);
 }
 
 /**
- * @brief Respond to a reset exception
+ * @brief Register a handler that will be called when the user
+ *        presses the RESET button. 
+ * 
+ * The N64 sends an interrupt when the RESET button is pressed,
+ * and then actually resets the console after about ~500ms (but less
+ * on some models, see #RESET_TIME_LENGTH).
+ * 
+ * Registering a handler can be used to perform a clean reset.
+ * Technically, at the hardware level, it is important that the RCP
+ * is completely idle when the reset happens, or it might freeze
+ * and require a power-cycle to unfreeze. This means that any
+ * I/O, audio, video activity must cease before #RESET_TIME_LENGTH
+ * has elapsed.
+ * 
+ * This entry point can be used by the game code to basically
+ * halts itself and stops issuing commands. Libdragon itself will
+ * register handlers to halt internal modules so to provide a basic
+ * good reset experience.
+ * 
+ * Handlers can use #exception_reset_time to read how much has passed
+ * since the RESET button was pressed.
+ * 
+ * @param cb    Callback to invoke when the reset button is pressed.
+ * 
+ * @note  Reset handlers are called under interrupt.
+ * 
  */
-void __onResetException()
+void register_reset_handler( void (*cb)(void) )
 {
-	exception_t e;
-	
-	if(!__exception_handler) { return; }
-
-	__fetch_regs(&e,EXCEPTION_TYPE_RESET);
-	__exception_handler(&e);
+	for (int i=0;i<MAX_RESET_HANDLERS;i++)
+	{		
+		if (!__prenmi_handlers[i])
+		{
+			__prenmi_handlers[i] = cb;
+			return;
+		}
+	}
+	assertf(0, "Too many pre-NMI handlers\n");
 }
+
+/** 
+ * @brief Check whether the RESET button was pressed and how long we are into
+ *        the reset process.
+ * 
+ * This function returns how many ticks have elapsed since the user has pressed
+ * the RESET button, or 0 if the user has not pressed it.
+ * 
+ * It can be used by user code to perform actions during the RESET
+ * process (see #register_reset_handler). It is also possible to simply
+ * poll this value to check at any time if the button has been pressed or not.
+ * 
+ * The reset process takes about 500ms between the user pressing the
+ * RESET button and the CPU being actually reset, though on some consoles
+ * it seems to be much less. See #RESET_TIME_LENGTH for more information.
+ * For the broadest compatibility, please use #RESET_TIME_LENGTH to implement
+ * the reset logic.
+ * 
+ * Notice also that the reset process is initiated when the user presses the
+ * button, but the reset will not happen until the user releases the button.
+ * So keeping the button pressed is a good way to check if the application
+ * actually winds down correctly.
+ * 
+ * @return Ticks elapsed since RESET button was pressed, or 0 if the RESET button
+ *         was not pressed.
+ * 
+ * @see register_reset_handler
+ * @see #RESET_TIME_LENGTH
+ */
+uint32_t exception_reset_time( void )
+{
+	if (!__prenmi_tick) return 0;
+	return TICKS_SINCE(__prenmi_tick);
+}
+
+
+/**
+ * @brief Respond to a reset exception.
+ * 
+ * Calls the handlers registered by #register_reset_handler.
+ */
+void __onResetException( volatile reg_block_t* regs )
+{
+	/* This function will be called many times becuase there is no way
+	   to acknowledge the pre-NMI interrupt. So make sure it does nothing
+	   after the first call. */
+	if (__prenmi_tick) return;
+
+	/* Store the tick at which we saw the exception. Make sure
+	 * we never store 0 as we use that for "no reset happened". */
+	__prenmi_tick = TICKS_READ() | 1;
+
+	/* Call the registered handlers. */
+	for (int i=0;i<MAX_RESET_HANDLERS;i++)
+	{
+		if (__prenmi_handlers[i])
+			__prenmi_handlers[i]();
+	}
+}
+
 
 /** @} */

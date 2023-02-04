@@ -12,18 +12,19 @@ libdragon: AS=$(N64_AS)
 libdragon: LD=$(N64_LD)
 libdragon: CFLAGS+=$(N64_CFLAGS) -I$(CURDIR)/src -I$(CURDIR)/include 
 libdragon: ASFLAGS+=$(N64_ASFLAGS) -I$(CURDIR)/src -I$(CURDIR)/include
+libdragon: RSPASFLAGS+=$(N64_RSPASFLAGS) -I$(CURDIR)/src -I$(CURDIR)/include
 libdragon: LDFLAGS+=$(N64_LDFLAGS)
 libdragon: libdragon.a libdragonsys.a
 
 libdragonsys.a: $(BUILD_DIR)/system.o
 	@echo "    [AR] $@"
-	$(AR) -rcs -o $@ $^
+	$(N64_AR) -rcs -o $@ $^
 
 libdragon.a: $(BUILD_DIR)/n64sys.o $(BUILD_DIR)/interrupt.o \
 			 $(BUILD_DIR)/inthandler.o $(BUILD_DIR)/entrypoint.o \
 			 $(BUILD_DIR)/debug.o $(BUILD_DIR)/usb.o $(BUILD_DIR)/fatfs/ff.o \
 			 $(BUILD_DIR)/fatfs/ffunicode.o $(BUILD_DIR)/dragonfs.o \
-			 $(BUILD_DIR)/audio.o $(BUILD_DIR)/display.o \
+			 $(BUILD_DIR)/audio.o $(BUILD_DIR)/display.o $(BUILD_DIR)/surface.o \
 			 $(BUILD_DIR)/console.o $(BUILD_DIR)/joybus.o \
 			 $(BUILD_DIR)/controller.o $(BUILD_DIR)/rtc.o \
 			 $(BUILD_DIR)/eeprom.o $(BUILD_DIR)/eepromfs.o $(BUILD_DIR)/mempak.o \
@@ -38,7 +39,7 @@ libdragon.a: $(BUILD_DIR)/n64sys.o $(BUILD_DIR)/interrupt.o \
 			 $(BUILD_DIR)/audio/ym64.o $(BUILD_DIR)/audio/ay8910.o \
 			 $(BUILD_DIR)/rspq/rspq.o $(BUILD_DIR)/rspq/rsp_queue.o
 	@echo "    [AR] $@"
-	$(AR) -rcs -o $@ $^
+	$(N64_AR) -rcs -o $@ $^
 
 examples:
 	$(MAKE) -C examples
@@ -69,6 +70,7 @@ install-mk: n64.mk
 install: install-mk libdragon
 	install -Cv -m 0644 libdragon.a $(INSTALLDIR)/mips64-elf/lib/libdragon.a
 	install -Cv -m 0644 n64.ld $(INSTALLDIR)/mips64-elf/lib/n64.ld
+	install -Cv -m 0644 rsp.ld $(INSTALLDIR)/mips64-elf/lib/rsp.ld
 	install -Cv -m 0644 header $(INSTALLDIR)/mips64-elf/lib/header
 	install -Cv -m 0644 libdragonsys.a $(INSTALLDIR)/mips64-elf/lib/libdragonsys.a
 	install -Cv -m 0644 include/pputils.h $(INSTALLDIR)/mips64-elf/include/pputils.h
@@ -79,6 +81,7 @@ install: install-mk libdragon
 	install -Cv -m 0644 include/dma.h $(INSTALLDIR)/mips64-elf/include/dma.h
 	install -Cv -m 0644 include/dragonfs.h $(INSTALLDIR)/mips64-elf/include/dragonfs.h
 	install -Cv -m 0644 include/audio.h $(INSTALLDIR)/mips64-elf/include/audio.h
+	install -Cv -m 0644 include/surface.h $(INSTALLDIR)/mips64-elf/include/surface.h
 	install -Cv -m 0644 include/display.h $(INSTALLDIR)/mips64-elf/include/display.h
 	install -Cv -m 0644 include/debug.h $(INSTALLDIR)/mips64-elf/include/debug.h
 	install -Cv -m 0644 include/usb.h $(INSTALLDIR)/mips64-elf/include/usb.h
@@ -117,9 +120,15 @@ clean:
 	rm -f *.o *.a
 	rm -rf $(CURDIR)/build
 
-clobber: clean doxygen-clean examples-clean tools-clean
+test:
+	$(MAKE) -C tests
 
-.PHONY : clobber clean doxygen-clean doxygen doxygen-api examples examples-clean tools tools-clean tools-install
+test-clean: install-mk
+	$(MAKE) -C tests clean
+
+clobber: clean doxygen-clean examples-clean tools-clean test-clean
+
+.PHONY : clobber clean doxygen-clean doxygen doxygen-api examples examples-clean tools tools-clean tools-install test test-clean
 
 # Automatic dependency tracking
 -include $(wildcard $(BUILD_DIR)/*.d) $(wildcard $(BUILD_DIR)/*/*.d)

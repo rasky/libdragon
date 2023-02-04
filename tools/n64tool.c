@@ -38,9 +38,9 @@
 //    tools like UNFloader and g64drive work around this bug by padding ROMs,
 //    but others (like the official one) don't. So it's better in general to
 //    pad to 512 bytes.
-//  * iQue player only allows loading ROMs which are multiple of 16 Kbyte in size.
+//  * iQue player only allows loading ROMs which are multiple of 16 KiB in size.
 //  
-// To allow the maximum compatibility, we pad to 16Kb by default. Users can still
+// To allow the maximum compatibility, we pad to 16 KiB by default. Users can still
 // force a specific length with --size, if they need to.
 #define PAD_ALIGN    16384
 
@@ -468,6 +468,10 @@ int main(int argc, char *argv[])
 	fclose(write_file);
 
 	/* Rename to the final name */
+	#ifdef _WIN32
+	/* Windows doesn't support atomic renames, so we have to delete the old file first */
+	remove(output);
+	#endif
 	if(rename(tmp_output, output) != 0) {
 		fprintf(stderr, "Couldn't rename temporary output file '%s' to '%s': %s", tmp_output, output, strerror(errno));
 		return STATUS_ERROR;

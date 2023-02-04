@@ -70,6 +70,8 @@
 
 /** @brief Number of buffers the audio subsytem allocates and manages */
 #define NUM_BUFFERS     4
+/** @brief How many different audio buffers we want to schedule in one second. */
+#define BUFFERS_PER_SECOND    25
 /**
  * @brief Macro that calculates the size of a buffer based on frequency
  *
@@ -78,7 +80,7 @@
  *
  * @return The size of the buffer in bytes rounded to an 8 byte boundary
  */
-#define CALC_BUFFER(x)  ( ( ( ( x ) / 25 ) >> 3 ) << 3 )
+#define CALC_BUFFER(x)  ( ( ( ( x ) / BUFFERS_PER_SECOND ) >> 3 ) << 3 )
 
 /** @brief The actual frequency the AI will run at */
 static int _frequency = 0;
@@ -88,6 +90,8 @@ static int _num_buf = NUM_BUFFERS;
 static int _buf_size = 0;
 /** @brief Array of pointers to the allocated buffers */
 static short **buffers = NULL;
+/** @brief Array of pointers to the allocated buffers (original pointers to free) */
+static short **buffers_orig = NULL;
 
 static audio_fill_buffer_callback _fill_buffer_callback = NULL;
 static audio_fill_buffer_callback _orig_fill_buffer_callback = NULL;
@@ -138,6 +142,13 @@ static void audio_callback()
 {
     /* Do not copy more data if we've freed the audio system */
     if(!buffers)
+    {
+        return;
+    }
+
+    /* Check if there is enough time left in the reset process to schedule 
+       another buffer, otherwise just exit. */
+    if(exception_reset_time() > RESET_TIME_LENGTH - TICKS_FROM_MS(1000 / BUFFERS_PER_SECOND))
     {
         return;
     }
@@ -253,11 +264,23 @@ void audio_init(const int frequency, int numbuffers)
     _buf_size = CALC_BUFFER(_frequency);
     _num_buf = (numbuffers > 1) ? numbuffers : NUM_BUFFERS;
     buffers = malloc(_num_buf * sizeof(short *));
+    buffers_orig = malloc(_num_buf * sizeof(short *));
 
     for(int i = 0; i < _num_buf; i++)
     {
-        /* Stereo buffers, interleaved */
-        buffers[i] = malloc_uncached(sizeof(short) * 2 * _buf_size);
+        /* Stereo buffers, interleaved, plus 8 bytes of padding */
+        buffers_orig[i] = buffers[i] =
+            malloc_uncached(sizeof(short) * 2 * _buf_size + 8);
+
+        /* Workaround AI DMA hardware bug. If a buffer ends exactly
+         * at a 0x2000 address boundary, AI DMA gets confused because
+         * of a delayed internal carry. Avoid using such buffers,
+         * and since we allocated 8 bytes of padding, we can move
+         * our pointer a bit.
+         */
+        if (((uint32_t)(buffers[i] + 2 * _buf_size) & 0x1FFF) == 0)
+            buffers[i] += 4;
+
         memset(buffers[i], 0, sizeof(short) * 2 * _buf_size);
     }
 
@@ -305,16 +328,18 @@ void audio_close()
         for(int i = 0; i < _num_buf; i++)
         {
             /* Nuke anything that isn't freed */
-            if(buffers[i])
+            if(buffers_orig[i])
             {
-                free_uncached(buffers[i]);
-                buffers[i] = 0;
+                free_uncached(buffers_orig[i]);
+                buffers_orig[i] = buffers[i] = 0;
             }
         }
 
         /* Nuke array of buffers we init'd earlier */
         free(buffers);
         buffers = 0;
+        free(buffers_orig);
+        buffers_orig = 0;
     }
 
     _frequency = 0;

@@ -142,12 +142,13 @@ void rsp_read_data(void* start, unsigned long size, unsigned int dmem_offset)
     enable_interrupts();
 }
 
-void rsp_run_async(void)
+/** @brief Internal implementation of #rsp_run_async */
+void __rsp_run_async(uint32_t status_flags)
 {
     // set RSP program counter
     *SP_PC = cur_ucode ? cur_ucode->start_pc : 0;
     MEMORY_BARRIER();
-    *SP_STATUS = SP_WSTATUS_CLEAR_HALT | SP_WSTATUS_CLEAR_BROKE | SP_WSTATUS_SET_INTR_BREAK;
+    *SP_STATUS = SP_WSTATUS_CLEAR_HALT | SP_WSTATUS_CLEAR_BROKE | status_flags;
 }
 
 void rsp_wait(void)
@@ -200,6 +201,7 @@ __attribute__((noreturn, format(printf, 4, 5)))
 void __rsp_crash(const char *file, int line, const char *func, const char *msg, ...)
 {
     volatile uint32_t *DP_STATUS = (volatile uint32_t*)0xA410000C;
+    volatile uint32_t *SP_REGS = (volatile uint32_t*)0xA4040000;
 
     rsp_snapshot_t state __attribute__((aligned(8)));
     rsp_ucode_t *uc = cur_ucode;
@@ -212,6 +214,14 @@ void __rsp_crash(const char *file, int line, const char *func, const char *msg, 
     // so the earlier the better.
     uint32_t sp_status = *SP_STATUS;
     uint32_t dp_status = *DP_STATUS;
+    MEMORY_BARRIER();
+
+    // Now read all SP registers. Most of them are DMA-related so the earlier
+    // we read them the better. We can't freeze the DMA transfer so they might
+    // be slightly incoherent.
+    uint32_t sp_regs[8];
+    for (int i=0;i<8;i++)
+        sp_regs[i] = i==4 ? sp_status : SP_REGS[i];
     MEMORY_BARRIER();
 
     // Freeze the RDP
@@ -242,9 +252,10 @@ void __rsp_crash(const char *file, int line, const char *func, const char *msg, 
     rsp_run();
     rsp_read_data(&state, 764, 0);
  
-    // Overwrite the status register information with the read we did at
+    // Overwrite the status register information with the reads we did at
     // the beginning of the handler
-    state.cop0[4] = sp_status;
+    for (int i=0;i<8;i++)
+        state.cop0[i] = sp_regs[i];
     state.cop0[11] = dp_status;
 
     // Write the PC now so it doesn't get overwritten by the DMA
@@ -381,30 +392,13 @@ void __rsp_crash(const char *file, int line, const char *func, const char *msg, 
     }
 
     // Full dump of DMEM into the debug log.
-    bool lineskip = false;
     debugf("DMEM:\n");
-    for (int i = 0; i < 4096/16; i++) {
-        uint8_t *d = state.dmem + i*16;
-        // If the current line of data is identical to the previous one,
-        // just dump one "*" and skip all other similar lines
-        if (i!=0 && memcmp(d, d-16, 16) == 0) {
-            if (!lineskip) debugf("*\n");
-            lineskip = true;
-        } else {
-            lineskip = false;
-            debugf("%04x  ", i*16);
-            for (int j=0;j<16;j++) {
-                debugf("%02x ", d[j]);
-                if (j==7) debugf(" ");
-            }
-            debugf("  |");
-            for (int j=0;j<16;j++) debugf("%c", d[j] >= 32 && d[j] < 127 ? d[j] : '.');
-            debugf("|\n");
-        }
-    }
+    debug_hexdump(state.dmem, 4096);
 
     // OK we're done. Render on the screen and abort
     console_render();
     abort();
 }
 /// @endcond
+
+extern inline void rsp_run_async(void);

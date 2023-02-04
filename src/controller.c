@@ -4,9 +4,13 @@
  * @ingroup controller
  */
 
-#include <string.h>
-#include "libdragon.h"
+#include "controller.h"
+#include "interrupt.h"
+#include "joybus.h"
 #include "joybusinternal.h"
+#include "debug.h"
+#include <string.h>
+#include <stdbool.h>
 
 /**
  * @defgroup controller Controller Subsystem
@@ -65,6 +69,8 @@ static struct controller_data current;
 static struct controller_data prev;
 /** @brief True if there is a pending controller autoscan */
 static volatile bool controller_autoscan_in_progress = false;
+/** @brief True if the module was initialized */
+static bool controller_inited = false;
 
 static void controller_interrupt_update(uint64_t *output, void *ctx)
 {
@@ -106,6 +112,7 @@ void controller_init( void )
     memset(&current, 0, sizeof(struct controller_data));
     memset((void*)&next, 0, sizeof(struct controller_data));
     register_VI_handler(controller_interrupt);
+    controller_inited = true;
 }
 
 /**
@@ -232,6 +239,7 @@ void controller_read_gc_origin( struct controller_origin_data * outdata )
  */
 void controller_scan( void )
 {
+    assertf(controller_inited, "controller_init() was not called");
     prev = current;
 
     disable_interrupts();
