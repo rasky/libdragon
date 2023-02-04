@@ -1,4 +1,4 @@
-name: Build-Tools
+name: Build-Tools-Windows
 
 on: [push, pull_request]
 
