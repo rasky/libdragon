@@ -1,13 +1,6 @@
 name: Build-Tools-Windows
 
-on:
-  # It is designed to only fire if the tools change.
-  push:
-    paths:
-      - 'tools/**'
-  pull_request:
-    paths:
-      - 'tools/**'
+on: [push, pull_request]
 
 jobs:
   Build-Tools-Windows:

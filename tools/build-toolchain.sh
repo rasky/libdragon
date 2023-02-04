@@ -38,9 +38,9 @@ GCC_CONFIGURE_ARGS=()
 BINUTILS_V=2.40
 GCC_V=12.2.0
 NEWLIB_V=4.3.0.20230120
-GMP_V=6.2.0 
-MPC_V=1.2.1 
-MPFR_V=4.1.0
+GMP_V=6.2.1 
+MPC_V=1.3.1 
+MPFR_V=4.2.0
 MAKE_V=${MAKE_V:-""}
 
 # Check if a command-line tool is available: status 0 means "yes"; status 1 means "no"
@@ -105,32 +105,32 @@ test -f "newlib-$NEWLIB_V.tar.gz"     || download "https://sourceware.org/pub/ne
 test -d "newlib-$NEWLIB_V"            || tar -xzf "newlib-$NEWLIB_V.tar.gz"
 
 if [ "$GMP_V" != "" ]; then
-    test -f "gmp-$GMP_V.tar.bz2"           || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.bz2"
-    test -d "gmp-$GMP_V"                  || tar -xf "gmp-$GMP_V.tar.bz2" # note: no .gz download file currently available
+    test -f "gmp-$GMP_V.tar.bz2"      || download "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_V.tar.bz2"
+    test -d "gmp-$GMP_V"              || tar -xf "gmp-$GMP_V.tar.bz2" # note: no .gz download file currently available
     pushd "gcc-$GCC_V"
     ln -sf ../"gmp-$GMP_V" "gmp"
     popd
 fi
 
 if [ "$MPC_V" != "" ]; then
-    test -f "mpc-$MPC_V.tar.gz"           || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
-    test -d "mpc-$MPC_V"                  || tar -xzf "mpc-$MPC_V.tar.gz"
+    test -f "mpc-$MPC_V.tar.gz"       || download "https://ftp.gnu.org/gnu/mpc/mpc-$MPC_V.tar.gz"
+    test -d "mpc-$MPC_V"              || tar -xzf "mpc-$MPC_V.tar.gz"
     pushd "gcc-$GCC_V"
     ln -sf ../"mpc-$MPC_V" "mpc"
     popd
 fi
 
 if [ "$MPFR_V" != "" ]; then
-    test -f "mpfr-$MPFR_V.tar.gz"         || download "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_V.tar.gz"
-    test -d "mpfr-$MPFR_V"                || tar -xzf "mpfr-$MPFR_V.tar.gz"
+    test -f "mpfr-$MPFR_V.tar.gz"     || download "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_V.tar.gz"
+    test -d "mpfr-$MPFR_V"            || tar -xzf "mpfr-$MPFR_V.tar.gz"
     pushd "gcc-$GCC_V"
     ln -sf ../"mpfr-$MPFR_V" "mpfr"
     popd
 fi
 
 if [ "$MAKE_V" != "" ]; then
-    test -f "make-$MAKE_V.tar.gz"       || download "https://ftp.gnu.org/gnu/make/make-$MAKE_V.tar.gz"
-    test -d "make-$MAKE_V"              || tar -xzf "make-$MAKE_V.tar.gz"
+    test -f "make-$MAKE_V.tar.gz"     || download "https://ftp.gnu.org/gnu/make/make-$MAKE_V.tar.gz"
+    test -d "make-$MAKE_V"            || tar -xzf "make-$MAKE_V.tar.gz"
 fi
 
 # Deduce build triplet using config.guess (if not specified)
