@@ -16,13 +16,15 @@ int main(void)
 
     console_clear();
 
-    printf( "Press A on a controller\n"
-                    "to read the inserted\n"
-                    "ControllerPak (mempak).\n\n"
-                    "Press B to format CPak.\n\n"
-                    "Press Z to corrupt CPak.\n\n"
-                    "Press L to copy CPak.\n\n"
-                    "Press R to paste CPak." );
+    printf(
+                "To test the inserted\n"
+                "ControllerPak (mempak):\n\n"
+                "Press A on a controller\n"
+                "Press B to format CPak.\n\n"
+                "Press Z to corrupt CPak.\n\n"
+                "Press L to copy CPak.\n\n" // CPak to RAM
+                "Press R to paste CPak." // RAM to CPak
+            );
     
     console_render();
 
@@ -161,7 +163,7 @@ int main(void)
                             break;
                         }
                         case ACCESSORY_RUMBLEPAK:
-                            printf( "Cannot erase data from a RumblePak!" );
+                            printf( "Cannot erase data on a RumblePak!" );
                             break;
                     }
 
@@ -198,7 +200,7 @@ int main(void)
                             break;
                         }
                         case ACCESSORY_RUMBLEPAK:
-                            printf( "Cannot erase data from a RumblePak!" );
+                            printf( "Cannot erase data on a RumblePak!" );
                             break;
                     }
 
@@ -235,7 +237,7 @@ int main(void)
                             break;
                         }
                         case ACCESSORY_RUMBLEPAK:
-                            printf( "Cannot erase data from a RumblePak!" );
+                            printf( "Cannot erase data om a RumblePak!" );
                             break;
                     }
 
