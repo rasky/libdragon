@@ -1,21 +1,21 @@
 /**
  * @file mempak.h
- * @brief Mempak Filesystem Routines
- * @ingroup mempak
+ * @brief ControllerPak (mempak) Filesystem Routines
+ * @ingroup mempak, cpak, ControllerPak
  */
 #ifndef __LIBDRAGON_MEMPAK_H
 #define __LIBDRAGON_MEMPAK_H
 
 /**
- * @addtogroup mempak
+ * @addtogroup mempak, cpak, ControllerPak
  * @{
  */
 
-/** @brief Size in bytes of a Mempak block */
+/** @brief Size in bytes of a ControllerPak block */
 #define MEMPAK_BLOCK_SIZE   256
 
 /**
- * @brief Structure representing a save entry in a mempak
+ * @brief Structure representing a save entry in a ControllerPak (mempak)
  */
 typedef struct entry_structure
 {
@@ -44,7 +44,7 @@ typedef struct entry_structure
      * </pre>
      *
      * The space character is also allowed.  Any other character will be
-     * converted to a space before writing to the mempak.
+     * converted to a space before writing to the CPak.
      */
     char name[19];
 } entry_structure_t;

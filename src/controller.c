@@ -49,13 +49,13 @@
  * different rumble effects are desired, consider using the @ref timer for accurate
  * timing.
  *
- * A mempak attached to a controller can be treated in one of two ways: as a raw binary
- * string, or as a formatted mempak with notes.  The former allows storage of any
+ * A ControllerPak (mempak) attached to a controller can be treated in one of two ways: as a raw binary
+ * string, or as a formatted CPak with notes.  The former allows storage of any
  * data as long as it fits, in any format convenient to the coder, but destroys any
- * non-homebrew data on the mempak.  The latter is recommended as it is completely
+ * non-homebrew data on the CPak.  The latter is recommended as it is completely
  * compatible with official N64 games, though it allows less data to be stored due to
- * filesystem overhead.  To read and write raw sectors, use #read_mempak_address and
- * #write_mempak_address.  The @ref mempak handles reading and writing from the mempak
+ * filesystem overhead. To read and write raw sectors, use #read_mempak_address and
+ * #write_mempak_address. The @ref mempak handles reading and writing from the CPak
  * in a way compatible with official games.
  *
  * @{
@@ -537,15 +537,15 @@ int get_accessories_present(struct controller_data *out)
 }
 
 /**
- * @brief Calculate the 5 bit CRC on a mempak address
+ * @brief Calculate the 5 bit CRC on a ControllerPak (mempak) address
  *
- * This function, given an address intended for a mempak read or write, will
+ * This function, given an address intended for a CPak read or write, will
  * calculate the CRC on the address, returning the corrected address | CRC.
  *
  * @param[in] address
- *            The mempak address to calculate CRC over
+ *            The CPak address to calculate CRC over
  *
- * @return The mempak address | CRC
+ * @return The CPak address | CRC
  */
 static uint16_t __calc_address_crc( uint16_t address )
 {
@@ -577,7 +577,7 @@ static uint16_t __calc_address_crc( uint16_t address )
  * @brief Calculate the 8 bit CRC over a 32-byte block of data
  *
  * This function calculates the 8 bit CRC appropriate for checking a 32-byte
- * block of data intended for or retrieved from a mempak.
+ * block of data intended for or retrieved from a CPak.
  *
  * @param[in] data
  *            Pointer to 32 bytes of data to run the CRC over
@@ -617,22 +617,22 @@ static uint8_t __calc_data_crc( uint8_t *data )
 }
 
 /**
- * @brief Read a chunk of data from a mempak
+ * @brief Read a chunk of data from a ControllerPak (mempak)
  *
- * Given a controller and an address, read 32 bytes from a mempak and
+ * Given a controller and an address, read 32 bytes from a CPak and
  * return them in data.
  *
  * @param[in]  controller
  *             Which controller to read the data from (0-3)
  * @param[in]  address
- *             A 32 byte aligned offset to read from on the mempak
+ *             A 32 byte aligned offset to read from on the CPak
  * @param[out] data
- *             Buffer to place 32 bytes of data read from the mempak
+ *             Buffer to place 32 bytes of data read from the CPak
  *
  * @retval 0  if reading was successful
  * @retval -1 if the controller was out of range
- * @retval -2 if there was no mempak present in the controller
- * @retval -3 if the mempak returned invalid data
+ * @retval -2 if there was no CPak present in the controller
+ * @retval -3 if the CPak returned invalid data
  */
 int read_mempak_address( int controller, uint16_t address, uint8_t *data )
 {
