@@ -12,7 +12,7 @@
  */
 
 /** @brief Size in bytes of a ControllerPak block */
-#define MEMPAK_BLOCK_SIZE   256
+#define CPAK_BLOCK_SIZE   256
 
 /**
  * @brief Structure representing a save entry in a ControllerPak (mempak)
@@ -28,7 +28,7 @@ typedef struct entry_structure
     /** @brief Intended region */
     uint8_t region;
     /** @brief Number of blocks used by this entry.
-     * @see MEMPAK_BLOCK_SIZE */
+     * @see CPAK_BLOCK_SIZE */
     uint8_t blocks;
     /** @brief Validity of this entry. */
     uint8_t valid;

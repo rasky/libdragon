@@ -158,7 +158,7 @@ int main(void)
 
                                     if( entry.valid )
                                     {
-                                        uint8_t *data = malloc( entry.blocks * MEMPAK_BLOCK_SIZE );
+                                        uint8_t *data = malloc( entry.blocks * CPAK_BLOCK_SIZE );
 
                                         printf( "Reading %s - %d blocks\n", entry.name, entry.blocks );
                                         printf( "Return: %d\n", read_mempak_entry_data( i, &entry, data ) );
@@ -224,8 +224,8 @@ int main(void)
 
                                     if( !entry.valid )
                                     {
-                                        uint8_t *data = malloc( MEMPAK_BLOCK_SIZE );
-                                        for( int k = 0; k < MEMPAK_BLOCK_SIZE; k++ )
+                                        uint8_t *data = malloc( CPAK_BLOCK_SIZE );
+                                        for( int k = 0; k < CPAK_BLOCK_SIZE; k++ )
                                         {
                                             data[k] = k & 0xFF;
                                         }

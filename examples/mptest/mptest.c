@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <libdragon.h>
 
-static uint8_t mempak_data[128 * MEMPAK_BLOCK_SIZE];
+static uint8_t mempak_data[128 * CPAK_BLOCK_SIZE];
 
 int main(void)
 {
@@ -183,7 +183,7 @@ int main(void)
 
                             for( int j = 0; j < 128; j++ )
                             {
-                                err |= read_mempak_sector( i, j, &mempak_data[j * MEMPAK_BLOCK_SIZE]  );
+                                err |= read_mempak_sector( i, j, &mempak_data[j * CPAK_BLOCK_SIZE]  );
                             }
 
                             if( err )
@@ -220,7 +220,7 @@ int main(void)
 
                             for( int j = 0; j < 128; j++ )
                             {
-                                err |= write_mempak_sector( i, j, &mempak_data[j * MEMPAK_BLOCK_SIZE]  );
+                                err |= write_mempak_sector( i, j, &mempak_data[j * CPAK_BLOCK_SIZE]  );
                             }
 
                             if( err )

@@ -1,7 +1,7 @@
 /**
  * @file mempak.c
  * @brief ControllerPak (mempak) Filesystem Routine
- * @ingroup mempak
+ * @ingroup mempak, cpak, ControllerPak
  */
 #include <string.h>
 #include "libdragon.h"
@@ -70,7 +70,7 @@ int read_mempak_sector( int controller, int sector, uint8_t *sector_data )
     /* Sectors are 256 bytes, a CPak reads 32 bytes at a time */
     for( int i = 0; i < 8; i++ )
     {
-        if( read_mempak_address( controller, (sector * MEMPAK_BLOCK_SIZE) + (i * 32), sector_data + (i * 32) ) )
+        if( read_mempak_address( controller, (sector * CPAK_BLOCK_SIZE) + (i * 32), sector_data + (i * 32) ) )
         {
             /* Failed to read a block */
             return -2;
@@ -105,7 +105,7 @@ int write_mempak_sector( int controller, int sector, uint8_t *sector_data )
     /* Sectors are 256 bytes, a CPak writes 32 bytes at a time */
     for( int i = 0; i < 8; i++ )
     {
-        if( write_mempak_address( controller, (sector * MEMPAK_BLOCK_SIZE) + (i * 32), sector_data + (i * 32) ) )
+        if( write_mempak_address( controller, (sector * CPAK_BLOCK_SIZE) + (i * 32), sector_data + (i * 32) ) )
         {
             /* Failed to read a block */
             return -2;
@@ -656,7 +656,7 @@ static int __get_note_block( uint8_t *sector, int inode, int block )
 static int __get_valid_toc( int controller )
 {
     /* We will need only one sector at a time */
-    uint8_t data[MEMPAK_BLOCK_SIZE];
+    uint8_t data[CPAK_BLOCK_SIZE];
 
     /* First check to see that the header block is valid */
     if( read_mempak_sector( controller, 0, data ) )
@@ -753,7 +753,7 @@ int validate_mempak( int controller )
  */
 int get_mempak_entry( int controller, int entry, entry_structure_t *entry_data )
 {
-    uint8_t data[MEMPAK_BLOCK_SIZE];
+    uint8_t data[CPAK_BLOCK_SIZE];
     int toc;
 
     if( entry < 0 || entry > 15 ) { return -1; }
@@ -768,7 +768,7 @@ int get_mempak_entry( int controller, int entry, entry_structure_t *entry_data )
 
     /* Entries are spread across two sectors, but we can luckly grab just one
        with a single CPak read */
-    if( read_mempak_address( controller, (3 * MEMPAK_BLOCK_SIZE) + (entry * 32), data ) )
+    if( read_mempak_address( controller, (3 * CPAK_BLOCK_SIZE) + (entry * 32), data ) )
     {
         /* Couldn't read note database */
         return -2;
@@ -809,7 +809,7 @@ int get_mempak_entry( int controller, int entry, entry_structure_t *entry_data )
  * @brief Return the number of free blocks on a ControllerPak (mempak)
  *
  * Note that a block is identical in size to a sector.  To calculate the number of
- * bytes free, multiply the return of this function by #MEMPAK_BLOCK_SIZE.
+ * bytes free, multiply the return of this function by #CPAK_BLOCK_SIZE.
  *
  * @param[in] controller
  *            The controller (0-3) to read the free space from
@@ -818,7 +818,7 @@ int get_mempak_entry( int controller, int entry, entry_structure_t *entry_data )
  */
 int get_mempak_free_space( int controller )
 {
-    uint8_t data[MEMPAK_BLOCK_SIZE];
+    uint8_t data[CPAK_BLOCK_SIZE];
     int toc;
 
     /* Make sure CPak is valid */
@@ -1077,7 +1077,7 @@ int format_mempak( int controller )
  * of the entry.  The calling function must ensure that enough room is available in
  * the passed in buffer for the entire entry.  The entry structure itself contains
  * the number of blocks used to store the data which can be multiplied by
- * #MEMPAK_BLOCK_SIZE to calculate the size of the buffer needed.
+ * #CPAK_BLOCK_SIZE to calculate the size of the buffer needed.
  *
  * @param[in]  controller
  *             The controller (0-3) to read the entry data from
@@ -1095,7 +1095,7 @@ int format_mempak( int controller )
 int read_mempak_entry_data( int controller, entry_structure_t *entry, uint8_t *data )
 {
     int toc;
-    uint8_t tocdata[MEMPAK_BLOCK_SIZE];
+    uint8_t tocdata[CPAK_BLOCK_SIZE];
 
     /* Some serious sanity checking */
     if( entry == 0 || data == 0 ) { return -1; }
@@ -1122,7 +1122,7 @@ int read_mempak_entry_data( int controller, entry_structure_t *entry, uint8_t *d
     {
         int block = __get_note_block( tocdata, entry->inode, i );
 
-        if( read_mempak_sector( controller, block, data + (i * MEMPAK_BLOCK_SIZE) ) )
+        if( read_mempak_sector( controller, block, data + (i * CPAK_BLOCK_SIZE) ) )
         {
             /* Couldn't read a sector */
             return -3;
@@ -1157,7 +1157,7 @@ int read_mempak_entry_data( int controller, entry_structure_t *entry, uint8_t *d
  */
 int write_mempak_entry_data( int controller, entry_structure_t *entry, uint8_t *data )
 {
-    uint8_t sector[MEMPAK_BLOCK_SIZE];
+    uint8_t sector[CPAK_BLOCK_SIZE];
     uint8_t tmp_data[32];
     int toc;
 
@@ -1231,7 +1231,7 @@ int write_mempak_entry_data( int controller, entry_structure_t *entry, uint8_t *
     {
         int block = __get_note_block( sector, entry->inode, i );
 
-        if( write_mempak_sector( controller, block, data + (i * MEMPAK_BLOCK_SIZE) ) )
+        if( write_mempak_sector( controller, block, data + (i * CPAK_BLOCK_SIZE) ) )
         {
             /* Couldn't write a sector */
             return -3;
@@ -1243,7 +1243,7 @@ int write_mempak_entry_data( int controller, entry_structure_t *entry, uint8_t *
     {
         entry_structure_t tmp_entry;
 
-        if( read_mempak_address( controller, (3 * MEMPAK_BLOCK_SIZE) + (i * 32), tmp_data ) )
+        if( read_mempak_address( controller, (3 * CPAK_BLOCK_SIZE) + (i * 32), tmp_data ) )
         {
             /* Couldn't read note database */
             return -2;
@@ -1286,7 +1286,7 @@ int write_mempak_entry_data( int controller, entry_structure_t *entry, uint8_t *
     __write_note( entry, tmp_data );
 
     /* Store entry to empty slot on CPak */
-    if( write_mempak_address( controller, (3 * MEMPAK_BLOCK_SIZE) + (entry->entry_id * 32), tmp_data ) )
+    if( write_mempak_address( controller, (3 * CPAK_BLOCK_SIZE) + (entry->entry_id * 32), tmp_data ) )
     {
         /* Couldn't update note database */
         return -2;
@@ -1313,7 +1313,7 @@ int write_mempak_entry_data( int controller, entry_structure_t *entry, uint8_t *
 int delete_mempak_entry( int controller, entry_structure_t *entry )
 {
     entry_structure_t tmp_entry;
-    uint8_t data[MEMPAK_BLOCK_SIZE];
+    uint8_t data[CPAK_BLOCK_SIZE];
     int toc;
 
     /* Some serious sanity checking */
@@ -1323,7 +1323,7 @@ int delete_mempak_entry( int controller, entry_structure_t *entry )
     if( entry->inode < BLOCK_VALID_FIRST || entry->inode > BLOCK_VALID_LAST ) { return -1; }
 
     /* Ensure that the entry passed in matches what's on the CPak */
-    if( read_mempak_address( controller, (3 * MEMPAK_BLOCK_SIZE) + (entry->entry_id * 32), data ) )
+    if( read_mempak_address( controller, (3 * CPAK_BLOCK_SIZE) + (entry->entry_id * 32), data ) )
     {
         /* Couldn't read note database */
         return -2;
@@ -1343,7 +1343,7 @@ int delete_mempak_entry( int controller, entry_structure_t *entry )
 
     /* The entry matches, so blank it */
     memset( data, 0, 32 );
-    if( write_mempak_address( controller, (3 * MEMPAK_BLOCK_SIZE) + (entry->entry_id * 32), data ) )
+    if( write_mempak_address( controller, (3 * CPAK_BLOCK_SIZE) + (entry->entry_id * 32), data ) )
     {
         /* Couldn't update note database */
         return -2;
