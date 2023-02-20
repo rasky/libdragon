@@ -117,8 +117,6 @@ jobs:
           echo 'export N64_INST=${{ env.Package_Installation_Directory }}' > "$Package_Name-env.sh"
           chmod 755 "$Package_Name-env.sh"
 
-          # TODO: there is currently a dependency on makefile. but it is not added.
-          # packages need something like `--depends bash \`
           echo Generating debian package
           # TODO: a warning is generated when adding files to `\etc`. The current workaround is: --deb-no-default-config-files
           fpm \
@@ -133,6 +131,7 @@ jobs:
             --url "$Package_Url" \
             --maintainer "$Package_Maintainer" \
             --deb-no-default-config-files \
+            --depends build-essential libpng-dev \
             $Package_Source_Directory=$Package_Installation_Directory/ \
             $Package_Name-env.sh=/etc/profile.d/$Package_Name-env.sh
 
@@ -148,6 +147,7 @@ jobs:
             --description "$Package_Description" \
             --url "$Package_Url" \
             --maintainer "$Package_Maintainer" \
+            --depends build-essential libpng-dev \
             $Package_Source_Directory=$Package_Installation_Directory/ \
             $Package_Name-env.sh=/etc/profile.d/$Package_Name-env.sh
         continue-on-error: true
