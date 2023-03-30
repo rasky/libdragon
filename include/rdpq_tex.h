@@ -65,13 +65,14 @@ enum tex_load_mode {
 typedef struct tex_loader_s {
     const surface_t *tex;
     rdpq_tile_t tile;
+    const rdpq_texparms_t *texparms;
     rdpq_tileparms_t tileparms;
-    rdpq_tilesize_t  tilesize;
     struct {
         int width, height;
         int num_texels, tmem_pitch;
         int block_max_lines;
         bool can_load_block;
+        int s0fx, t0fx, s1fx, t1fx;
     } rect;
     int tmem_addr;
     enum tex_load_mode load_mode;
