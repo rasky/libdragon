@@ -36,7 +36,7 @@ GCC_CONFIGURE_ARGS=()
 
 # Dependency source libs (Versions)
 BINUTILS_V=2.40
-GCC_V=13.1.0
+GCC_V=13.2.0
 NEWLIB_V=4.3.0.20230120
 GMP_V=6.2.1 
 MPC_V=1.3.1 
