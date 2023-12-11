@@ -78,9 +78,6 @@
 #include "entropy.h"
 #include "loader.h"
 
-__attribute__((section(".banner"), used))
-const char banner[32] = " Libdragon IPL3 " " Coded by Rasky ";
-
 // These register contains boot flags passed by IPL2. Define them globally
 // during the first stage of IPL3, so that the registers are not reused.
 register uint32_t ipl2_romType   asm ("s3");
@@ -88,34 +85,6 @@ register uint32_t ipl2_tvType    asm ("s4");
 register uint32_t ipl2_resetType asm ("s5");
 register uint32_t ipl2_romSeed   asm ("s6");
 register uint32_t ipl2_version   asm ("s7");
-
-typedef struct __attribute__((packed)) {
-    uint32_t pi_dom1_config;
-    uint32_t clock_rate;
-    uint32_t boot_address;
-    uint32_t sdk_version;
-    uint64_t checksum;
-    uint64_t reserved1;
-    char title[20];
-    char reserved2[7];
-    uint32_t gamecode;
-    uint8_t rom_version;
-} rom_header_t;
-
-_Static_assert(sizeof(rom_header_t) == 64, "invalid sizeof(rom_header_t)");
-
-__attribute__((section(".header"), used))
-const rom_header_t header = {
-    // Standard PI DOM1 config
-    .pi_dom1_config = 0x80371240,
-    // Our IPL3 does not use directly this field. We do set it
-    // mainly for iQue, so that the special iQue trampoline is run,
-    // which jumps to our IPL3.
-    .boot_address = 0x80000400,
-    // Default title name
-    .title = "Libdragon           ",
-};
-
 
 #if 0
 void memtest(int memsize)
@@ -221,8 +190,8 @@ static void mem_bank_init(int chip_id, bool last)
     // If this is the last memory bank, don't do anything.
     // We keep the RSP DMA idle to be able to quickly load
     // the loader into it. We will clear this later.
-    if (last)
-        return;
+    // if (last)
+    //     return;
 
     uint32_t base = chip_id*1024*1024;
     int size = 2*1024*1024;
@@ -238,25 +207,19 @@ static void mem_bank_init(int chip_id, bool last)
     if (chip_id == 0 && ipl2_resetType != 0) {
         base += 0x400;
         size -= 0x400;
+    } else if (last) {
+        // If this is the last memory bank, we need to clear the
+        // last 2 MiB of RDRAM. This is where the loader will be copied,
+        // so avoid touching the last 32 KiB.
+        size -= TOTAL_RESERVED_SIZE;
     }
     rsp_bzero_async(base, size);
 }
 
-// This function is placed by the linker script immediately below the stage1()
-// function. We just change the stack pointer here, as very first thing.
-__attribute__((noreturn, section(".stage1.pre")))
-void stage1pre(void)
+__attribute__((section(".stage1")))
+int stage1(void)
 {
-    // Move the stack to the data cache. Notice that RAM is not initialized
-    // yet but we don't care: if sp points to a cached location, it will
-    // just use the cache for that.
-    asm ("li $sp, %0"::"i"(STACK1_TOP));
-    __builtin_unreachable(); // avoid function epilog, we don't need it
-}
-
-__attribute__((noreturn, section(".stage1")))
-void stage1(void)
-{
+    asm("tne $0, $0, 0x10");
     // Clear IMEM (contains IPL2). We don't need it anymore, and we can
     // instead use IMEM as a zero-buffer for RSP DMA.
     rsp_clear_mem((uint32_t)SP_IMEM, 4096);
@@ -267,14 +230,20 @@ void stage1(void)
     
     entropy_add(C0_COUNT());
     C0_WRITE_CAUSE(0);
-    C0_WRITE_COUNT(0);
+//    C0_WRITE_COUNT(0);
     C0_WRITE_COMPARE(0);
 	C0_WRITE_WATCHLO(0);
+
+    // Clear D/I-cache, useful after warm boot. Maybe not useful for cold
+    // boots, but the manual says that the cache state is invalid at boot,
+    // so a reset won't hurt.
+    // cop0_clear_cache();
 
     int memsize;
     bool bbplayer = (*MI_VERSION & 0xF0) == 0xB0;
     if (!bbplayer) {
         memsize = rdram_init(mem_bank_init);
+        memsize = 8<<20;
     } else {
         // iQue OS put the memory size in a special location. This is the
         // amount of memory that the OS has assigned to the application, so it
@@ -288,10 +257,12 @@ void stage1(void)
             memsize = 0x7C0000;
     }
 
-    // Clear D/I-cache, useful after warm boot. Maybe not useful for cold
-    // boots, but the manual says that the cache state is invalid at boot,
-    // so a reset won't hurt.
-    cop0_clear_cache();
+    // Prepare TLB for stage2. We separate these from TLBWI because of COP0 hazards.
+    C0_WRITE_PAGEMASK(0x03 << 13); // 16 KiB / 0x4000
+    C0_WRITE_ENTRYHI(LOADER_VADDR);
+    C0_WRITE_ENTRYLO0(((memsize - 16*1024) >> 6) | 0x7);
+    C0_WRITE_ENTRYLO1_ZERO();
+    C0_WRITE_INDEX_ZERO();
 
     // Fill boot information at beginning of DMEM. The rest of IMEM has been
     // cleared by now anyway. Notice that we also store BSS in IMEM, so the
@@ -304,6 +275,20 @@ void stage1(void)
     // Perform a memtest
     // memtest(memsize);
 
+
+    // Clear the last 2 MiB of RDRAM. This is where the loader was just
+    // copied, so make sure not to step over the the loader itself.
+    // NOTE: this wouldn't be necessary if we played games with cache, but
+    // that would be largely emulator unfriendly, and it seems not worth to
+    // break most emulators for a minor performance gain.
+    // rsp_bzero_async(memsize-2*1024*1024, 2*1024*1024-TOTAL_RESERVED_SIZE);
+
+    // Enable TLB for stage 2
+    C0_TLBWI();
+    C0_WRITE_COUNT(0);
+
+    return memsize;
+#if 0
     // Copy the IPL3 stage2 (loader.c) from DMEM to the end of RDRAM.
     extern uint32_t __stage2_start[]; extern int __stage2_size;
     int stage2_size = (int)&__stage2_size;
@@ -317,15 +302,10 @@ void stage1(void)
     while (*PI_STATUS & 1) {}
     #endif
 
-    // Clear the last 2 MiB of RDRAM. This is where the loader was just
-    // copied, so make sure not to step over the the loader itself.
-    // NOTE: this wouldn't be necessary if we played games with cache, but
-    // that would be largely emulator unfriendly, and it seems not worth to
-    // break most emulators for a minor performance gain.
-    rsp_bzero_async(memsize-2*1024*1024, 2*1024*1024-TOTAL_RESERVED_SIZE);
 
     // Jump to stage 2 in RDRAM.
     MEMORY_BARRIER();
     asm("move $sp, %0"::"r"(STACK2_TOP(memsize, stage2_size)));
     goto *rdram_stage2;
+#endif
 }

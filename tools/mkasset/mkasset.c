@@ -24,6 +24,7 @@ void print_args(char * name)
     fprintf(stderr, "   -o/--output <dir>       Specify output directory (default: .)\n");
     fprintf(stderr, "   -c/--compress <algo>    Compression: 0=none, 1=lz4, 2=lzh5 (default: %d)\n", DEFAULT_COMPRESSION);
     fprintf(stderr, "   -w/--winsize <window>   Maximum size of the matching window in KiB. (default: %d)\n", DEFAULT_WINSIZE_STREAMING/1024);
+    fprintf(stderr, "   -r/--raw                Raw mode: don't write the header\n");
     fprintf(stderr, "\nSupported window sizes: 2, 4, 8, 16, 32, 64, 128, 256\n");
     fprintf(stderr, "The window size affects the memory used by asset_fopen() only.\n");
     fprintf(stderr, "If you only use asset_load(), use the biggest window (256 KiB) to improve ratio.\n");
@@ -64,6 +65,8 @@ int main(int argc, char *argv[])
                     fprintf(stderr, "supported window sizes: 2, 4, 8, 16, 32, 64, 128, 256\n");
                     return 1;
                 }    
+            } else if (!strcmp(argv[i], "-r") || !strcmp(argv[i], "--raw")) {
+                asset_write_header = false;
             } else if (!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {
                 if (++i == argc) {
                     fprintf(stderr, "missing argument for %s\n", argv[i-1]);

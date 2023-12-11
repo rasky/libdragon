@@ -5,11 +5,20 @@
 
 typedef uint64_t u_uint64_t __attribute__((aligned(1)));
 
-#define MEMORY_BARRIER()    asm volatile ("" : : : "memory")
-#define C0_WRITE_CAUSE(x)   asm volatile("mtc0 %0,$13"::"r"(x))
-#define C0_WRITE_COUNT(x)   asm volatile("mtc0 %0,$9"::"r"(x))
-#define C0_WRITE_COMPARE(x) asm volatile("mtc0 %0,$11"::"r"(x))
-#define C0_WRITE_WATCHLO(x) asm volatile("mtc0 %0,$18"::"r"(x))
+#define MEMORY_BARRIER()            asm volatile ("" : : : "memory")
+#define C0_WRITE_CAUSE(x)           asm volatile("mtc0 %0,$13"::"r"(x))
+#define C0_WRITE_COUNT(x)           asm volatile("mtc0 %0,$9"::"r"(x))
+#define C0_WRITE_COMPARE(x)         asm volatile("mtc0 %0,$11"::"r"(x))
+#define C0_WRITE_WATCHLO(x)         asm volatile("mtc0 %0,$18"::"r"(x))
+#define C0_WRITE_ENTRYLO0(x)        asm volatile("mtc0 %0,$2"::"r"(x))
+#define C0_WRITE_ENTRYLO1(x)        asm volatile("mtc0 %0,$3"::"r"(x))
+#define C0_WRITE_ENTRYLO1_ZERO()    asm volatile("mtc0 $0,$3")
+#define C0_WRITE_PAGEMASK(x)        asm volatile("mtc0 %0,$5"::"r"(x))
+#define C0_WRITE_ENTRYHI(x)         asm volatile("mtc0 %0,$10"::"r"(x))
+#define C0_WRITE_INDEX(x)           asm volatile("mtc0 %0,$0"::"r"(x))
+#define C0_WRITE_INDEX_ZERO()       asm volatile("mtc0 $0,$0")
+#define C0_TLBWI()                  asm volatile("tlbwi")
+
 #define C0_COUNT() ({ \
     uint32_t x; \
     asm volatile("mfc0 %0,$9":"=r"(x)); \

@@ -21,6 +21,8 @@
 
 #include "lz4_compress.h"
 
+bool asset_write_header = true;
+
 void asset_compress_mem(int compression, const uint8_t *data, int sz, uint8_t **output, int *cmp_size, int *winsize, int *margin)
 {
     switch (compression) {
@@ -152,12 +154,14 @@ bool asset_compress(const char *infn, const char *outfn, int compression, int wi
         inplace_margin = inplace_margin > 0 ? inplace_margin : 0;
 
         FILE *out = fopen(outfn, "wb");
-        fwrite("DCA3", 1, 4, out);
-        w16(out, 3); // algo
-        w16(out, asset_winsize_to_flags(winsize) | ASSET_FLAG_INPLACE); // flags
-        w32(out, cmp_size); // cmp_size
-        w32(out, sz); // dec_size
-        w32(out, inplace_margin); // inplace margin
+        if (asset_write_header) {
+            fwrite("DCA3", 1, 4, out);
+            w16(out, 3); // algo
+            w16(out, asset_winsize_to_flags(winsize) | ASSET_FLAG_INPLACE); // flags
+            w32(out, cmp_size); // cmp_size
+            w32(out, sz); // dec_size
+            w32(out, inplace_margin); // inplace margin
+        }
         fwrite(output, 1, cmp_size, out);
         fclose(out);
         free(output);
@@ -181,12 +185,14 @@ bool asset_compress(const char *infn, const char *outfn, int compression, int wi
 
         int inplace_margin = stats.safe_dist + cmp_size - sz;
         FILE *out = fopen(outfn, "wb");
-        fwrite("DCA3", 1, 4, out);
-        w16(out, 2); // algo
-        w16(out, asset_winsize_to_flags(winsize) | ASSET_FLAG_INPLACE); // flags
-        w32(out, cmp_size); // cmp_size
-        w32(out, sz); // dec_size
-        w32(out, inplace_margin); // inplace margin
+        if (asset_write_header) {
+            fwrite("DCA3", 1, 4, out);
+            w16(out, 2); // algo
+            w16(out, asset_winsize_to_flags(winsize) | ASSET_FLAG_INPLACE); // flags
+            w32(out, cmp_size); // cmp_size
+            w32(out, sz); // dec_size
+            w32(out, inplace_margin); // inplace margin
+        }
         fwrite(output, 1, cmp_size, out);
         fclose(out);
         free(output);
@@ -220,12 +226,14 @@ bool asset_compress(const char *infn, const char *outfn, int compression, int wi
         assert(cmp_size <= cmp_max_size);
 
         FILE *out = fopen(outfn, "wb");
-        fwrite("DCA3", 1, 4, out);
-        w16(out, 1); // algo
-        w16(out, asset_winsize_to_flags(winsize) | ASSET_FLAG_INPLACE); // flags
-        w32(out, cmp_size); // cmp_size
-        w32(out, sz); // dec_size
-        w32(out, LZ4_DECOMPRESS_INPLACE_MARGIN(cmp_size)); // inplace margin
+        if (asset_write_header) {
+            fwrite("DCA3", 1, 4, out);
+            w16(out, 1); // algo
+            w16(out, asset_winsize_to_flags(winsize) | ASSET_FLAG_INPLACE); // flags
+            w32(out, cmp_size); // cmp_size
+            w32(out, sz); // dec_size
+            w32(out, LZ4_DECOMPRESS_INPLACE_MARGIN(cmp_size)); // inplace margin
+        }
         fwrite(output, 1, cmp_size, out);
         fclose(out);
         free(output);

@@ -11,13 +11,17 @@
 
 #define TOTAL_RESERVED_SIZE      (LOADER_SIZE + STACK1_SIZE)
 
-#define STACK1_BASE              (void*)(0x80800000 - LOADER_SIZE - STACK1_SIZE)
-#define STACK1_TOP               (void*)(0x80800000 - LOADER_SIZE)
+#define STACK1_BASE              (0x80800000 - LOADER_SIZE - STACK1_SIZE)
+#define STACK1_TOP               (0x80800000 - LOADER_SIZE)
 
-#define LOADER_BASE(memsize, stage2size)              (void*)(0x80000000 + (memsize) - (stage2size))
+#define LOADER_BASE(memsize, stage2size)              (0x80000000 + (memsize) - (stage2size))
 #define STACK2_TOP(memsize, stage2size)               (LOADER_BASE(memsize, stage2size) - 16)
 
+#define LOADER_VADDR             0xE0000000
+
+#ifndef __ASSEMBLER__
 __attribute__((noreturn, far))
 void loader(void);
+#endif
 
 #endif /* BOOT_LOADER_H */

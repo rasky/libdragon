@@ -7,7 +7,11 @@ MEMORY
 {
     rom  : ORIGIN = 0xB0000000, LENGTH = 65536
     dmem : ORIGIN = 0xA4000000, LENGTH = 4096
+    tlb  : ORIGIN = 0xE0000000, LENGTH = 16*1024
 }
+
+/* Start of IPL3 in ROM (after trampoline) */
+__ipl3rombase = 0xB0001040;
 
 SECTIONS {
     .text.prologue 0xB0000000 : {
@@ -16,32 +20,36 @@ SECTIONS {
         KEEP(*(.text.ique_trampoline))
     } > rom
 
-    .text.dmem 0xA4000040 : AT ( 0xB0001040 ) {
+    .text.stage0 0xA4000040 : AT ( __ipl3rombase ) {
+        *(.stage0)
+    } > dmem
+
+    .text.stage1 0xA4000040 + SIZEOF(.text.stage0) : {
+        __stage1 = .;
         LONG(0x3044d236);  /* special dummy opcode to simplify hash cracking; this is not needed in dev mode, but we keep it in case it matters */
-        KEEP(*(.stage1.pre))
         KEEP(*(.stage1))
-        . = ALIGN(16);
-        KEEP(*(.banner))
-        build/ipl3.o       (.text .text.* .data)
-        build/rdram.o      (.text .text.* .data)
-        build/minidragon.o (.text .text.* .data)
-        build/entropy.o    (.text .text.* .data)
+        build/ipl3.o       
+        build/rdram.o      
+        build/minidragon.o 
+        build/entropy.o    
         *(.bss)
         . = ALIGN(8);
     } > dmem
 
-    __stage2_size = __stage2_end - __stage2_start;
-
-    .text.rom 0xB0001040 + SIZEOF ( .text.dmem ) : {
+    .text.stage2 0xE0000000 : AT( 0xB0002000 ) {
+        __stage2 = .;
         __stage2_start = .;
         KEEP(build/loader.o(.text.loader))
-        KEEP(build/loader.o(.text .text.*))
-        KEEP(build/loader.o(.data .data.*))
+        KEEP(build/loader.o)
         . = ALIGN(8);
         __stage2_end = .;
+    } > tlb
+
+    __stage2_size = __stage2_end - __stage2_start;
+
+    .text.debug 0xB0003000 : {
         build/debug.o      (.text .text.* .data)
-        *(.rodata)
-        *(.rodata.*)
+        *(.rodata.debug)
     } > rom
 
     /DISCARD/ : { *(.MIPS.abiflags) }

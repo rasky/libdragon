@@ -258,12 +258,13 @@ static void fatal(const char *str)
 __attribute__((used))
 void loader(void)
 {
+    asm("tne $0, $0, 0x10");
     debugf("Hello from RDRAM ", __builtin_frame_address(0));
 
     // Invalidate the stack1 area, where the first stage put its stack.
     // We don't need it anymore, and we don't want it to be flushed to RDRAM
     // that will be cleared anyway.
-    data_cache_hit_invalidate(STACK1_BASE, STACK1_SIZE);
+    data_cache_hit_invalidate((void*)STACK1_BASE, STACK1_SIZE);
 
     // Search for the ELF header. We search for a 256-byte aligned header
     // starting at offset 0x1000 in the ROM area (after the IPL3).
@@ -289,6 +290,7 @@ void loader(void)
 
     // Read program headers offset and number. Allocate space in the stack
     // for them.
+    asm("tne $0, $0, 0x10");
     uint32_t phoff = io_read32(elf_header + 0x1C);
     int phnum = io_read16(elf_header + 0x2C);
     uint32_t *phdr = alloca_aligned(0x20 * phnum);
@@ -396,6 +398,7 @@ void loader(void)
 
     // Wait until the PIF is done. This will also clear the interrupt, so that
     // we don't leave the interrupt pending when we go to the entrypoint.
+    asm("tne $0, $0, 0x10");
     si_wait();
 
     // Jump to the entry point

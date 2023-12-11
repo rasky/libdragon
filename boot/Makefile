@@ -23,6 +23,7 @@ N64_READELF = $(N64_GCCPREFIX_TRIPLET)readelf
 N64_ROOTDIR = $(N64_INST)
 N64_INCLUDEDIR = $(N64_ROOTDIR)/mips64-elf/include
 N64_LIBDIR = $(N64_ROOTDIR)/mips64-elf/lib
+N64_MKASSET = $(N64_ROOTDIR)/bin/mkasset
 
 N64_CFLAGS =  -march=vr4300 -mtune=vr4300 -MMD
 N64_CFLAGS += -DN64 -Os -Wall -Werror -Wno-error=deprecated-declarations -fdiagnostics-color=always
@@ -34,18 +35,19 @@ N64_CFLAGS += -mabi=32 -mgp32 -mfp32 -msingle-float # Can't compile for 64bit AB
 N64_ASFLAGS = -mtune=vr4300 -march=vr4300 -Wa,--fatal-warnings
 N64_ASFLAGS =  -mabi=32 -mgp32 -mfp32 -msingle-float -G0
 N64_RSPASFLAGS = -march=mips1 -mabi=32 -Wa,--fatal-warnings
-N64_LDFLAGS = -Wl,-T$(IPL3_LDSCRIPT) -Wl,-Map=build/ipl3.map -Wl,--gc-sections
+N64_LDFLAGS = -Wl,-T$(IPL3_LDSCRIPT).1.ld -Wl,-Map=build/ipl3.map -Wl,--gc-sections
 
-OBJS = build/ipl3.o build/minidragon.o build/rdram.o build/loader.o build/ique_trampoline.o build/entropy.o
+OBJS = build/ipl3.o build/stage0.o build/minidragon.o build/rdram.o build/loader.o build/ique_trampoline.o build/entropy.o build/header.o build/boot_trampoline.o
 
 ifeq ($(PROD),1)
+N64_ASPPFLAGS += -DNDEBUG -DPROD
 N64_CFLAGS += -DNDEBUG -DPROD
 IPL3_ROM=bin/ipl3_prod.z64
-IPL3_LDSCRIPT=ipl3_prod.ld
+IPL3_LDSCRIPT=ipl3_prod
 else
-OBJS += build/debug.o build/boot_trampoline.o 
+OBJS+=build/debug.o
 IPL3_ROM=bin/ipl3_dev.z64
-IPL3_LDSCRIPT=ipl3_dev.ld
+IPL3_LDSCRIPT=ipl3_dev
 endif
 
 all: $(IPL3_ROM)
@@ -65,13 +67,22 @@ build/%.o: %.c
 build/%.o: %.S
 	@echo "    [AS] $@"
 	@mkdir -p build
-	$(N64_CC) -c $(N64_ASFLAGS) -o $@ $<
+	$(N64_CC) -c $(N64_ASFLAGS) $(N64_ASPPFLAGS) -o $@ $<
 
-%.z64: build/ipl3.elf
+%.z64: build/ipl3.elf $(IPL3_LDSCRIPT).2.ld
 	@echo "    [Z64] $@"
-	$(N64_OBJCOPY) -O binary $< $@
+	$(N64_OBJCOPY) -O binary -j .text.stage1 $< build/stage1.bin 
+	$(N64_OBJCOPY) -O binary -j .text.stage2 $< build/stage2.bin 
+	$(N64_OBJCOPY) -O binary -j .text.debug  $< build/debug.bin 
+	$(N64_MKASSET) -o build -c 3 --raw build/stage1.bin
+	$(N64_MKASSET) -o build -c 3 --raw build/stage2.bin
+	$(N64_CC) $(N64_CFLAGS) -Wl,-T$(IPL3_LDSCRIPT).2.ld -Wl,-Map=build/ipl3.compressed.map \
+		-o build/ipl3.compressed.elf \
+		stage0_bins.S header.c build/stage0.o build/ique_trampoline.o build/boot_trampoline.o
+	$(N64_READELF) --wide --sections build/ipl3.compressed.elf | grep .text
+	$(N64_OBJCOPY) -O binary build/ipl3.compressed.elf $@
 
-build/ipl3.elf: $(IPL3_LDSCRIPT) $(OBJS)
+build/ipl3.elf: $(IPL3_LDSCRIPT).1.ld $(OBJS)
 	@echo "    [LD] $@"
 	$(N64_CC) $(N64_CFLAGS) $(N64_LDFLAGS) -o $@ $(filter %.o,$^)
 	$(N64_READELF) --wide --sections $@ | grep .text
