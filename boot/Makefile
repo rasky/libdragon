@@ -71,9 +71,11 @@ build/%.o: %.S
 
 %.z64: build/ipl3.elf $(IPL3_LDSCRIPT).2.ld
 	@echo "    [Z64] $@"
-	$(N64_OBJCOPY) -O binary -j .text.stage1 $< build/stage1.bin 
-	$(N64_OBJCOPY) -O binary -j .text.stage2 $< build/stage2.bin 
+	$(N64_OBJCOPY) -O binary -j .text.stage1 $< build/stage1.bin.raw
+	$(N64_OBJCOPY) -O binary -j .text.stage2 $< build/stage2.bin.raw
 	$(N64_OBJCOPY) -O binary -j .text.debug  $< build/debug.bin 
+	cp build/stage1.bin.raw build/stage1.bin
+	cp build/stage2.bin.raw build/stage2.bin
 	$(N64_MKASSET) -o build -c 3 --raw build/stage1.bin
 	$(N64_MKASSET) -o build -c 3 --raw build/stage2.bin
 	$(N64_CC) $(N64_CFLAGS) -Wl,-T$(IPL3_LDSCRIPT).2.ld -Wl,-Map=build/ipl3.compressed.map \
