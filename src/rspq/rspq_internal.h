@@ -216,6 +216,7 @@ typedef struct rsp_queue_s {
     uint8_t rdpq_debug;                  ///< Debug mode flag
     uint8_t padding;                     ///< Padding
     uint32_t rspq_dram_addr;             ///< Current RDRAM address being processed
+    uint32_t rspq_current_ovl_stateaddr; ///< Current overlay state address
     uint16_t current_ovl;                ///< Current overlay ID
     uint16_t padding2;                   ///< Padding
 #if RSPQ_PROFILE

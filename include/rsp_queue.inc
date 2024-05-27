@@ -92,7 +92,7 @@ _RSPQ_OVERLAY_HEADER:
     .long 0
     # 8: text RDRAM address (filled in by C code)
     .long 0
-    # 10: text size (filled in by C code)
+    # 12: text size (filled in by C code)
     .short 0
     # 14: command base (filled in by C code)
     .short 0
@@ -109,7 +109,7 @@ _RSPQ_OVERLAY_COMMAND_TABLE:
 #define RSPQ_OH_STATESIZE    2
 #define RSPQ_OH_STATEADDR    4
 #define RSPQ_OH_TEXTADDR     8
-#define RSPQ_OH_TEXTSIZE     10
+#define RSPQ_OH_TEXTSIZE     12
 #define RSPQ_OH_CMDBASE      14
 #if RSPQ_PROFILE
 #define RSPQ_OH_PROFILESLOT  16
@@ -203,6 +203,10 @@ _RSPQ_SAVED_STATE_END:
     # Put the command size (as number of 4 byte words) into the high 6 bits,
     # and the jump address shifted right by 2 bits into the lower 10.
     .short (\function - _start) >> 2 | ((\size) & RSPQ_DESCRIPTOR_SIZE_MASK) << 8
+.endm
+
+.macro RSPQ_DefineSiblingCommand
+    .short 0xffff
 .endm
 
 ########################################################
@@ -362,6 +366,9 @@ RDPQ_DEBUG:                  .byte 0
 # RDRAM address of the current command list.
 RSPQ_RDRAM_PTR:               .long 0
 
+# Pointer to save state of the current overlay
+RSPQ_CURRENT_OVL_STATEADDR:   .long 0
+
 # ID of the current overlay
 RSPQ_CURRENT_OVL:             .half 0
 
@@ -459,9 +466,9 @@ rspq_fetch_buffer_with_ptr:
 RSPQCmd_Noop:     # noop -> repeat the loop
     .func RSPQ_Loop
 RSPQ_Loop:
-    #define ovl_index t4
-    #define cmd_index t5    // referenced in rspq_assert_invalid_overlay
-    #define cmd_desc  t6
+    #define ovl_index       t4
+    #define cmd_index       t5    // referenced in rspq_assert_invalid_overlay
+    #define cmd_desc        t6
 
 #if RSPQ_PROFILE
     mfc0 t0, COP0_DP_CLOCK
@@ -535,7 +542,7 @@ rspq_overlay_loaded:
     #endif
 
 rspq_execute_command:
-    # Load second command word                                  # Calculate vshift8
+    # Load second command word                                  # Calculate vshift from vshift8
     lw a1, %lo(RSPQ_DMEM_BUFFER) + 0x4 (rspq_dmem_buf_ptr);     vsrl vshift, vshift8, 8
 
     # Prepare constant for comparison later
@@ -588,14 +595,23 @@ rspq_load_overlay:
     mfc0 t3, COP0_DP_CLOCK
 #endif
 
+    lw s0, %lo(_ovl_data_start) + RSPQ_OH_STATEADDR
+    lw s1, %lo(RSPQ_CURRENT_OVL_STATEADDR)
+
     # Restore full command index before switching overlay
     addu cmd_index, t0
 
-    # Save current overlay state
-    lhu t0, %lo(_ovl_data_start) + 2
-    lw s0, %lo(_ovl_data_start) + 4
+    # Load state size (in preparation for saving the state)
+    lhu t0, %lo(_ovl_data_start) + RSPQ_OH_STATESIZE
+
+    # If the current overlay is sibling of the new one, we can skip saving
+    # the state and loading the DMEM, and just jump directly to IMEM loading
+    beq s0, s1, rspq_load_overlay_imem
+     sw s0, %lo(RSPQ_CURRENT_OVL_STATEADDR)
+
+    # Save current state to RDRAM    
     jal DMAOutAsync
-    lhu s4, %lo(_ovl_data_start) + 0
+     lhu s4, %lo(_ovl_data_start) + RSPQ_OH_STATESTART
 
     # Load data segment
     sll s0, ovl_index, 2
@@ -603,24 +619,25 @@ rspq_load_overlay:
     li s4, %lo(_ovl_data_start)
     srl t0, s0, 24-4
     jal DMAIn
-    ori t0, 0xf
+     ori t0, 0xf
 
+rspq_load_overlay_imem:
     # Load text segment
-    lw s0, %lo(_ovl_data_start) + 8
-    lhu t0, %lo(_ovl_data_start) + 12
+    lw s0, %lo(_ovl_data_start) + RSPQ_OH_TEXTADDR
+    lhu t0, %lo(_ovl_data_start) + RSPQ_OH_TEXTSIZE
     jal DMAIn
-    li s4, %lo(_ovl_text_start)
+     li s4, %lo(_ovl_text_start)
 
 #if RSPQ_PROFILE
     mfc0 t0, COP0_DP_CLOCK
     subu t0, t3
     jal RSPQ_ProfileAccumulate
-    li s0, %lo(RSPQ_PROFILESLOT_OVLSWITCH)
+     li s0, %lo(RSPQ_PROFILESLOT_OVLSWITCH)
 #endif
     # Load new overlay command base
-    lhu t0, %lo(_ovl_data_start) + 14
+    lhu t0, %lo(_ovl_data_start) + RSPQ_OH_CMDBASE
     j rspq_overlay_loaded
-    sh ovl_index, %lo(RSPQ_CURRENT_OVL)
+     sh ovl_index, %lo(RSPQ_CURRENT_OVL)
 
 
     #undef ovl_index
@@ -928,7 +945,6 @@ RSPQ_ProfileAccumulate:
     sw t0, 0x0(s0)
     jr ra
     sw t1, 0x4(s0)
-    nop
     .endfunc
 #endif
 

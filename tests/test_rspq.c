@@ -383,6 +383,12 @@ void test_rspq_switch_overlay(TestContext *ctx)
     ASSERT_EQUAL_MEM(test2_state, (uint8_t*)expected_state, sizeof(expected_state), "State was not saved!");
 }
 
+void test_rspq_overlay_sibling(TestContext *ctx)
+{
+
+}
+
+
 void test_rspq_multiple_flush(TestContext *ctx)
 {
     TEST_RSPQ_PROLOG();

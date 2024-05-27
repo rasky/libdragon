@@ -789,11 +789,20 @@ GLCmd_DrawTriangle:
     lb trcode1, PRIM_VTX_TRCODE(vtx1)
     lb trcode2, PRIM_VTX_TRCODE(vtx2)
     lb trcode3, PRIM_VTX_TRCODE(vtx3)
+    #if 1
+    or t0, trcode1, trcode2
+    or t0, trcode3
+    andi t0, 0x3F
+    xori t0, 0xFF
+    beqz t0, JrRa
+    nop
+    #else
     and t0, trcode1, trcode2
     and t0, trcode3
     andi t0, 0x3F
     bnez t0, JrRa
     nop
+    #endif
 
     # Perform T&L for each vertex if we haven't already
     bgezal trcode1, GL_TnL
@@ -830,12 +839,12 @@ gl_draw_single_triangle:
     addi vtx1, SCREEN_VTX_X
     addi vtx2, SCREEN_VTX_X
     addi vtx3, SCREEN_VTX_X
-    
+#if 0    
     lhu a0, %lo(GL_TRI_CMD)
     lb v0, %lo(GL_TRI_CULL)
     jal RDPQ_Triangle
     li s3, %lo(RDPQ_CMD_STAGING)
-
+#endif
     jal RDPQ_Send
     li s4, %lo(RDPQ_CMD_STAGING)
 

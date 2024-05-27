@@ -1,8 +1,8 @@
 #ifndef __RSPQ_INTERNAL
 #define __RSPQ_INTERNAL
 
-#define RSPQ_DEBUG                     1
-#define RSPQ_PROFILE                   0
+#define RSPQ_DEBUG                     0
+#define RSPQ_PROFILE                   1
 
 #define RSPQ_DRAM_LOWPRI_BUFFER_SIZE   0x200   ///< Size of each RSPQ RDRAM buffer for lowpri queue (in 32-bit words)
 #define RSPQ_DRAM_HIGHPRI_BUFFER_SIZE  0x80    ///< Size of each RSPQ RDRAM buffer for highpri queue (in 32-bit words)

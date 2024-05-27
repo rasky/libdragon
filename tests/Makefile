@@ -17,7 +17,8 @@ ASSETS = filesystem/grass1.ci8.sprite \
 
 OBJS = $(BUILD_DIR)/test_constructors_cpp.o \
 	   $(BUILD_DIR)/rsp_test.o \
-	   $(BUILD_DIR)/rsp_test2.o \
+	   $(BUILD_DIR)/rsp_test2a.o \
+	   $(BUILD_DIR)/rsp_test2b.o \
 	   $(BUILD_DIR)/backtrace.o \
 
 filesystem/grass1sq.rgba32.sprite: MKSPRITE_FLAGS=--texparms 0,0,2,0

@@ -292,6 +292,21 @@ uint32_t rspq_overlay_register(rsp_ucode_t *overlay_ucode);
 void rspq_overlay_register_static(rsp_ucode_t *overlay_ucode, uint32_t overlay_id);
 
 /**
+ * @brief Register a sibling overlay into the RSP queue engine.
+ * 
+ * A sibling overlay is an overlay sharing exactly the same data segment (DMEM)
+ * with another, already registered overlay. Using sibling overlays is a very
+ * simple way to split an overlay into multiple parts when the code segment (IMEM)
+ * grows too big. Since sibling overlays also share the state (part of DMEM),
+ * they can transparently use the same data.
+ * 
+ * @param base_overlay      The overlay to register the sibling for
+ * @param sibling_ucode     The sibling overlay to register
+ * @return uint32_t         The overlay ID that has been assigned to the sibling.
+ */
+uint32_t rspq_overlay_register_sibling(uint32_t base_overlay, rsp_ucode_t *sibling_ucode);
+
+/**
  * @brief Unregister a ucode overlay from the RSP queue engine.
  * 
  * This function removes an overlay that has previously been registered

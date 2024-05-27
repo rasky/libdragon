@@ -1003,6 +1003,7 @@ GLCmd_PreInitPipeTex:
     j gl_set_texture_not_active
 1:
     lw uploaded_tex, %lo(GL_STATE_UPLOADED_TEX)
+#if 0
 
     # CHeck if the texture is complete (that is, all mipmaps have been loaded)
     # otherwise, we consider it not complete and avoid displaying it
@@ -1021,7 +1022,7 @@ GLCmd_PreInitPipeTex:
     neg t1, t1
 1:
     sh t1, %lo(GL_STATE_TEX_SIZE) + 2
-
+#endif
     # Make sure FLAG_TEXTURE_ACTIVE is set
     or state_flags, FLAG_TEXTURE_ACTIVE
     sw state_flags, %lo(GL_STATE_FLAGS)
