@@ -117,10 +117,14 @@ typedef struct {
  * to validate the consistency of next commands.
  */
 static struct {
+    uint64_t cycles;                     ///< Number of cycles since last reset (as measured at the start of the RDP pipeline)
     struct { 
-        bool pipe;                         ///< True if the pipe is busy (SYNC_PIPE required)
-        bool tile[8];                      ///< True if each tile is a busy (SYNC_TILE required)
-        uint8_t tmem[64];                  ///< Bitarray: busy state for each 8-byte word of TMEM (SYNC_LOAD required)
+        uint64_t cyc_draw;                 ///< Cycle at which the last pixel of the last draw command entered the RDP pipeline
+        uint64_t cyc_draw_tile[8];         ///< Cycle at which the last pixel of the last draw command using each tile entered the RDP pipeline
+        uint64_t cyc_read_tmem;            ///< Cycle at which the last pixel of the last draw command reading from TMEM entered the RDP pipeline
+        uint8_t read_tmem[64];             ///< Bitarray: busy-read state for each 8-byte word of TMEM
+        uint64_t cyc_write_tmem;           ///< Cycle at which the last pixel of the last TMEM upload entered the RDP pipeline
+        uint8_t write_tmem[64];            ///< Bitarray: busy-write state for each 8-byte word of TMEM
     } busy;                              ///< Busy entities (for SYNC commands)
     struct {
         bool sent_scissor : 1;               ///< True if at least one SET_SCISSOR was sent since reset
@@ -860,7 +864,7 @@ static void validate_emit_error(int flags, const char *msg, ...)
 
 /** @brief Internal validation macros (for both errors and warnings) */
 #define __VALIDATE(flags, cond, msg, ...) ({ \
-    if (!(cond)) validate_emit_error(flags, msg "\n", ##__VA_ARGS__); \
+    if (!(cond)) { validate_emit_error(flags, msg "\n", ##__VA_ARGS__); } \
 })
 
 /** 
@@ -1207,36 +1211,56 @@ static void validate_draw_cmd(bool use_colors, bool use_tex, bool use_z, bool us
     }
 }
 
-static void validate_busy_pipe(void) {
-    VALIDATE_WARN(!rdp.busy.pipe, "pipe might be busy, SYNC_PIPE is missing");
-    rdp.busy.pipe = false;
+/** @brief Check if changing pipeline state is allowed at this cycle */
+static void validate_busy_pipe(int delta) {
+    VALIDATE_ERR(rdp.cycles-delta >= rdp.busy.cyc_draw, 
+        "pipeline state changed during draw (insufficient SYNC)");
 }
 
+/** @brief Check if changing a tile is allowed at this cycle */
 static void validate_busy_tile(int tidx) {
-    VALIDATE_WARN(!rdp.busy.tile[tidx],
-        "tile %d might be busy, SYNC_TILE is missing", tidx);
-    rdp.busy.tile[tidx] = false;
+    int delta = 19; // FIXME: this is true for 1cyc mode only?
+    VALIDATE_ERR(rdp.cycles-delta >= rdp.busy.cyc_draw_tile[tidx],
+        "tile %d changed during draw (insufficient SYNC)", tidx);
+}
+
+/** @brief Mark TMEM maks as not busy */
+static void tmem_busy_clear(uint8_t *tmem_mask) {
+    memset(tmem_mask, 0, 64);
 }
 
 /** @brief Mark TMEM as busy in range [addr..addr+size] */
-static void mark_busy_tmem(int addr, int size) {
+static void tmem_busy_mark(uint8_t *tmem_mask, int addr, int size) {
     int x0 = MIN(addr, 0x1000)/8, x1 = MIN(addr+size, 0x1000)/8, x = x0;
-    while ((x&7) && x < x1) { rdp.busy.tmem[x/8] |= 1 << (x&7); x++;  }
-    while (x+8 < x1)        { rdp.busy.tmem[x/8] = 0xFF;        x+=8; }
-    while (x < x1)          { rdp.busy.tmem[x/8] |= 1 << (x&7); x++;  }
+    while ((x&7) && x < x1) { tmem_mask[x/8] |= 1 << (x&7); x++;  }
+    while (x+8 < x1)        { tmem_mask[x/8] = 0xFF;        x+=8; }
+    while (x < x1)          { tmem_mask[x/8] |= 1 << (x&7); x++;  }
 }
 
-/** @brief Check if TMEM is busy in range [addr..addr+size] */
-static bool is_busy_tmem(int addr, int size) {
-    int x0 = MIN(addr, 0x1000)/8, x1 = MIN(addr+size, 0x1000)/8, x = x0;
-    while ((x&7) && x < x1) { if (rdp.busy.tmem[x/8] & 1 << (x&7)) return true; x++;  }
-    while (x+8 < x1)        { if (rdp.busy.tmem[x/8] != 0)         return true; x+=8; }
-    while (x < x1)          { if (rdp.busy.tmem[x/8] & 1 << (x&7)) return true; x++;  }
-    return false;
+/** @brief Validate if a TMEM-writing command is conflcting with an ongoing TMEM read */
+static void validate_busyread_tmem(void) {
+    int delta = 19; // FIXME
+    if (rdp.cycles-delta < rdp.busy.cyc_read_tmem) {
+        for (int i=0; i<64; i++) {
+            uint8_t rw_conflict = rdp.busy.read_tmem[i] & rdp.busy.write_tmem[i];
+            VALIDATE_ERR(!rw_conflict,
+                "TMEM[0x%03x..0x%03x] write conflict with an ongoing draw primitive (insufficient SYNC)", i*8*8, i*8*8+7);
+            if (rw_conflict) break;
+        }
+    }
 }
 
-static void validate_busy_tmem(int addr, int size) {
-    VALIDATE_WARN(!is_busy_tmem(addr, size), "writing to TMEM[0x%x:0x%x] while busy, SYNC_LOAD missing", addr, addr+size);
+/** @brief Validate if a TMEM-reading command (aka drawing command) is conflcting with an ongoing TMEM upload */
+static void validate_busywrite_tmem(void) {
+    int delta = 19; // FIXME
+    if (rdp.cycles-delta < rdp.busy.cyc_write_tmem) {
+        for (int i=0; i<64; i++) {           
+            uint8_t wr_conflict = rdp.busy.write_tmem[i] & rdp.busy.read_tmem[i];
+            VALIDATE_ERR(!wr_conflict, 
+                "TMEM[0x%03x..0x%03x] read conflict with an ongoing TMEM upload command (insufficient SYNC)", i*8*8, i*8*8+7);
+            if (wr_conflict) break;
+        }
+    }
 }
 
 static bool check_loading_crash(int hpixels) {
@@ -1264,7 +1288,7 @@ static bool check_loading_crash(int hpixels) {
  */
 static void validate_use_tile_internal(int tidx, int cycles, float *texcoords, int ncoords) {
     struct tile_s *tile = &rdp.tile[tidx];
-    rdp.busy.tile[tidx] = true;
+    rdp.busy.cyc_draw_tile[tidx] = rdp.cycles;
     bool use_outside = false;
     float out_s, out_t;
 
@@ -1324,30 +1348,41 @@ static void validate_use_tile_internal(int tidx, int cycles, float *texcoords, i
     else
         VALIDATE_ERR_SOM(!rdp.som.tlut.enable, "tile %d is not CI (color index), but TLUT mode is active", tidx);
 
+    int tmem_addr = tile->tmem_addr + (int)tile->t0 * tile->tmem_pitch;
+    int tmem_bytes = ((int)tile->t1 - (int)tile->t0 + 1) * tile->tmem_pitch;
+
     // Mark used areas of tmem
     switch (tile->fmt) {
     case 0: case 3: case 4: // RGBA, IA, I
         if (tile->size == 3) { // 32-bit: split between lo and hi TMEM
-            mark_busy_tmem(tile->tmem_addr,         (tile->t1-tile->t0+1)*tile->tmem_pitch / 2);
-            mark_busy_tmem(tile->tmem_addr + 0x800, (tile->t1-tile->t0+1)*tile->tmem_pitch / 2);
+            tmem_busy_mark(rdp.busy.read_tmem, tmem_addr,         tmem_bytes / 2);
+            tmem_busy_mark(rdp.busy.read_tmem, tmem_addr + 0x800, tmem_bytes / 2);
         } else {
-            mark_busy_tmem(tile->tmem_addr,         (tile->t1-tile->t0+1)*tile->tmem_pitch);
+            tmem_busy_mark(rdp.busy.read_tmem, tmem_addr,         tmem_bytes);
         }
         break;
     case 1: // YUV: split between low and hi TMEM
-        mark_busy_tmem(tile->tmem_addr,         (tile->t1-tile->t0+1)*tile->tmem_pitch / 2);
-        mark_busy_tmem(tile->tmem_addr+0x800,   (tile->t1-tile->t0+1)*tile->tmem_pitch / 2);
+        tmem_busy_mark(rdp.busy.read_tmem, tmem_addr,         tmem_bytes / 2);
+        tmem_busy_mark(rdp.busy.read_tmem, tmem_addr+0x800,   tmem_bytes / 2);
         break;
     case 2: // color-index: mark also palette area of TMEM as used
-        mark_busy_tmem(tile->tmem_addr,         (tile->t1-tile->t0+1)*tile->tmem_pitch);
-        if (tile->size == 0) mark_busy_tmem(0x800 + tile->pal*64, 64);  // CI4
-        if (tile->size == 1) mark_busy_tmem(0x800, 0x800);           // CI8
+        tmem_busy_mark(rdp.busy.read_tmem, tmem_addr,         tmem_bytes);
+        if (tile->size == 0) tmem_busy_mark(rdp.busy.read_tmem, 0x800 + tile->pal*16*8, 16*8);  // CI4
+        if (tile->size == 1) tmem_busy_mark(rdp.busy.read_tmem, 0x800, 256*8);           // CI8
         break;
     }
 }
 
 /**
  * @brief Perform validation of a tile descriptor being used as part of a drawing command.
+ * 
+ * This function analyzes the tiles used by draw command that refernce @p tidx 
+ * (depending on the render mode). It checks that tile descriptors were correctly
+ * configured.
+ * 
+ * Moreover, it performs TMEM busy-write validation: it verifies that the draw
+ * command does not try to read from a portion of TMEM which is still currently
+ * being written by a prviouew upload command (see validate_busywrite_tmem).
  * 
  * @param tidx      tile ID
  * @param texcoords Array of texture coordinates (S,T) used by the drawing command.
@@ -1357,7 +1392,9 @@ static void validate_use_tile(int tidx, float *texcoords, int ncoords) {
     if (rdp.som.cycle_type == 3) return; // FILL mode does not use tiles
     if (rdp.som.cycle_type == 2) {
         // In COPY mode, the tile is used only in the first cycle
+        tmem_busy_clear(rdp.busy.read_tmem);
         validate_use_tile_internal(tidx, (1<<0), texcoords, ncoords);
+        validate_busywrite_tmem();
         return;
     }
 
@@ -1365,28 +1402,32 @@ static void validate_use_tile(int tidx, float *texcoords, int ncoords) {
     int tidx0 = tidx;
     int tidx1 = (tidx+1) & 7;
 
-    if (rdp.som.cycle_type == 1) {
+    tmem_busy_clear(rdp.busy.read_tmem);
+    if (rdp.som.cycle_type == 1) { // 2-cycle mode
         int cyc_tex0 = cc_2cyc_use_tex0();
         int cyc_tex1 = cc_2cyc_use_tex1();
         if (cyc_tex0) validate_use_tile_internal(tidx0, cyc_tex0, texcoords, ncoords);
         if (cyc_tex1) validate_use_tile_internal(tidx1, cyc_tex1, texcoords, ncoords);
-    } else {
+    } else {  // 1-cycle mode
         int cyc_tex0 = cc_1cyc_use_tex0();
         if (cyc_tex0) validate_use_tile_internal(tidx0, cyc_tex0, texcoords, ncoords);
     }
+    validate_busywrite_tmem();
 }
 
 void rdpq_validate(uint64_t *buf, uint32_t flags, int *r_errs, int *r_warns)
 {
+    enum { MAX_BUSY_PIPE_LEN = 29 };
     vctx.buf = buf;
     vctx.flags = flags;
     if (r_errs)  *r_errs  = vctx.errs;
     if (r_warns) *r_warns = vctx.warns;
 
+    rdp.cycles++;
     uint8_t cmd = CMD(buf[0]);
     switch (cmd) {
     case 0x3F: { // SET_COLOR_IMAGE
-        validate_busy_pipe();
+        validate_busy_pipe(MAX_BUSY_PIPE_LEN);
         rdp.col.fmt = BITS(buf[0], 53, 55);
         rdp.col.size = BITS(buf[0], 51, 52);
         rdp.col.width = BITS(buf[0], 32, 41)+1;
@@ -1421,7 +1462,7 @@ void rdpq_validate(uint64_t *buf, uint32_t flags, int *r_errs, int *r_warns)
         rdp.rendertarget_changed = true; // revalidate clipping extents on render target
     }   break;
     case 0x3E: { // SET_Z_IMAGE
-        validate_busy_pipe();
+        validate_busy_pipe(MAX_BUSY_PIPE_LEN);
         VALIDATE_ERR(BITS(buf[0], 0, 5) == 0, "Z image must be aligned to 64 bytes");
         uint32_t addr = BITS(buf[0], 0, 24);
         if (RDPQ_VALIDATE_DETACH_ADDR && addr == RDPQ_VALIDATE_DETACH_ADDR) {
@@ -1439,7 +1480,7 @@ void rdpq_validate(uint64_t *buf, uint32_t flags, int *r_errs, int *r_warns)
         rdp.mode_changed = true; // revalidate render mode on different Z buffer
     }   break;
     case 0x3D: // SET_TEX_IMAGE
-        validate_busy_pipe();
+        validate_busy_pipe(MAX_BUSY_PIPE_LEN);
         VALIDATE_ERR(BITS(buf[0], 0, 2) == 0, "texture image must be aligned to 8 bytes");
         rdp.tex.physaddr = BITS(buf[0], 0, 24);
         rdp.tex.fmt = BITS(buf[0], 53, 55);
@@ -1472,34 +1513,45 @@ void rdpq_validate(uint64_t *buf, uint32_t flags, int *r_errs, int *r_warns)
         bool load = cmd == 0x34;
         int tidx = BITS(buf[0], 24, 26);
         struct tile_s *t = &rdp.tile[tidx];
-        validate_busy_tile(tidx);
-        if (load) {
-            rdp.busy.tile[tidx] = true;  // mask as in use
-            VALIDATE_CRASH_TEX(rdp.tex.size != 0, "LOAD_TILE does not support 4-bit textures");
-        }
         t->has_extents = true;
         t->last_setsize = &buf[0];
         t->last_setsize_data = buf[0];
         t->s0 = BITS(buf[0], 44, 55)*FX(2); t->t0 = BITS(buf[0], 32, 43)*FX(2);
         t->s1 = BITS(buf[0], 12, 23)*FX(2); t->t1 = BITS(buf[0],  0, 11)*FX(2);
+        validate_busy_tile(tidx);
         if (load) {
             int hpixels = (int)t->s1 - (int)t->s0 + 1;
+            VALIDATE_CRASH_TEX(rdp.tex.size != 0, "LOAD_TILE does not support 4-bit textures");
             VALIDATE_CRASH_TEX(!check_loading_crash(hpixels), "loading pixels from a misaligned texture image");
-            validate_busy_tmem(t->tmem_addr, (t->t1-t->t0+1) * t->tmem_pitch);
+            tmem_busy_clear(rdp.busy.write_tmem);
+            tmem_busy_mark(rdp.busy.write_tmem, t->tmem_addr, (t->t1-t->t0+1) * t->tmem_pitch);
+            validate_busyread_tmem();
+            rdp.cycles += hpixels; // FIXME
+            rdp.busy.cyc_write_tmem = rdp.cycles;
         }
     }   break;
     case 0x33: { // LOAD_BLOCK
         int tidx = BITS(buf[0], 24, 26);
-        int hpixels = BITS(buf[0], 12, 23)+1;
+        struct tile_s *t = &rdp.tile[tidx];
+        validate_busy_tile(tidx);
+        int hpixels = BITS(buf[0], 12, 23) - BITS(buf[0], 44, 55) + 1;
+        int hbytes = hpixels * (4 << rdp.tex.size) / 8;
         VALIDATE_ERR_TEX(hpixels <= 2048, "cannot load more than 2048 texels at once");
         VALIDATE_CRASH_TEX(!check_loading_crash(hpixels), "loading pixels from a misaligned texture image");
-        rdp.busy.tile[tidx] = true;  // mask as in use
+        t->has_extents = false; // Normally, the way LOAD_BLOCK configure a tile isn't useful, so assume it's not done
+        tmem_busy_clear(rdp.busy.write_tmem);
+        tmem_busy_mark(rdp.busy.write_tmem, t->tmem_addr, hbytes); 
+        validate_busyread_tmem();
+        rdp.cycles += hpixels; // FIXME
+        rdp.busy.cyc_write_tmem = rdp.cycles;
     }   break;
     case 0x30: { // LOAD_TLUT
         int tidx = BITS(buf[0], 24, 26);
-        rdp.busy.tile[tidx] = true;  // mask as in use
         struct tile_s *t = &rdp.tile[tidx];
+        validate_busy_tile(tidx);
         int low = BITS(buf[0], 44, 55), high = BITS(buf[0], 12, 23);
+        int hpixels = ((high>>2) - (low>>2) + 1) * 4;
+        int hbytes = hpixels * 2;
         if (rdp.tex.size == 0)
             VALIDATE_CRASH_TEX(rdp.tex.size != 0, "LOAD_TLUT does not support 4-bit textures");
         else
@@ -1509,9 +1561,15 @@ void rdpq_validate(uint64_t *buf, uint32_t flags, int *r_errs, int *r_warns)
         VALIDATE_ERR(low>>2 < 256, "palette start index must be < 256");
         VALIDATE_ERR(high>>2 < 256, "palette stop index must be < 256");
         VALIDATE_CRASH(low>>2 <= high>>2, "palette stop index is lower than palette start index");
+        t->has_extents = false; // Normally, the way LOAD_BLOCK configure a tile isn't useful, so assume it's not done
+        tmem_busy_clear(rdp.busy.write_tmem);
+        tmem_busy_mark(rdp.busy.write_tmem, t->tmem_addr, hbytes);
+        validate_busyread_tmem();
+        rdp.cycles += hpixels; // FIXME
+        rdp.busy.cyc_write_tmem = rdp.cycles;
     }   break;
     case 0x2F: // SET_OTHER_MODES
-        validate_busy_pipe();
+        validate_busy_pipe(MAX_BUSY_PIPE_LEN);
         rdp.som = decode_som(buf[0]);
         rdp.last_som = &buf[0];
         rdp.last_som_data = buf[0];
@@ -1519,13 +1577,14 @@ void rdpq_validate(uint64_t *buf, uint32_t flags, int *r_errs, int *r_warns)
         rdp.rendertarget_changed = true; // revalidate clipping extents on render target (cycle mode mught be changed)
         break;
     case 0x3C: // SET_COMBINE
-        validate_busy_pipe();
+        validate_busy_pipe(MAX_BUSY_PIPE_LEN);
         rdp.cc = decode_cc(buf[0]);
         rdp.last_cc = &buf[0];
         rdp.last_cc_data = buf[0];
         rdp.mode_changed = true;
         break;
     case 0x2D: // SET_SCISSOR
+        validate_busy_pipe(MAX_BUSY_PIPE_LEN); // FIXME: is this required?
         rdp.clip.x0 = BITS(buf[0],44,55)*FX(2); rdp.clip.y0 = BITS(buf[0],32,43)*FX(2);
         rdp.clip.x1 = BITS(buf[0],12,23)*FX(2); rdp.clip.y1 = BITS(buf[0], 0,11)*FX(2);
         rdp.sent_scissor = true;
@@ -1535,18 +1594,19 @@ void rdpq_validate(uint64_t *buf, uint32_t flags, int *r_errs, int *r_warns)
         VALIDATE_ERR(rdp.som.cycle_type < 2, "cannot draw texture rectangle flip in copy/fill mode");
         // passthrough
     case 0x24: { // TEX_RECT
-        rdp.busy.pipe = true;
-        lazy_validate_rendertarget();
-        lazy_validate_rendermode();
-        validate_draw_cmd(false, true, false, false);
-        // Compute texture coordinates to validate tile usage
         int w = (BITS(buf[0], 44, 55) - BITS(buf[0], 12, 23))*FX(2);
         int h = (BITS(buf[0], 32, 43) - BITS(buf[0],  0, 11))*FX(2);
         float s0 = BITS(buf[1], 48, 63)*FX(5), t0 = BITS(buf[1], 32, 47)*FX(5);
         float sw = SBITS(buf[1], 16, 31)*FX(10), tw = SBITS(buf[1],  0, 15)*FX(10);
         if (rdp.som.cycle_type == 2) w += 1;    // copy mode has inclusive horizontal bounds
         if (rdp.som.cycle_type == 2) sw /= 4;   // copy mode has 4x horizontal scale
+        lazy_validate_rendertarget();
+        lazy_validate_rendermode();
+        validate_draw_cmd(false, true, false, false);
         validate_use_tile(BITS(buf[0], 24, 26), (float[]){s0, t0, s0+sw*(w-1), t0+tw*(h-1)}, 2);
+        rdp.cycles += w*h; // FIXME
+        rdp.busy.cyc_draw = rdp.cycles;
+        rdp.busy.cyc_read_tmem = rdp.cycles;
         if (rdp.som.cycle_type == 2) {
             uint16_t dsdx = BITS(buf[1], 16, 31);
             if (dsdx != 4<<10) {
@@ -1572,13 +1632,15 @@ void rdpq_validate(uint64_t *buf, uint32_t flags, int *r_errs, int *r_warns)
         }
     }   break;
     case 0x36: // FILL_RECTANGLE
-        rdp.busy.pipe = true;
         lazy_validate_rendertarget();
         lazy_validate_rendermode();
         validate_draw_cmd(false, false, false, false);
+        int w = (BITS(buf[0], 44, 55) - BITS(buf[0], 12, 23))*FX(2);
+        int h = (BITS(buf[0], 32, 43) - BITS(buf[0],  0, 11))*FX(2);
+        rdp.cycles += w*h; // FIXME
+        rdp.busy.cyc_draw = rdp.cycles;
         break;
     case 0x8 ... 0xF: // Triangles
-        rdp.busy.pipe = true;
         VALIDATE_ERR_SOM(rdp.som.cycle_type < 2, "cannot draw triangles in copy/fill mode");
         lazy_validate_rendertarget();
         lazy_validate_rendermode();
@@ -1587,18 +1649,23 @@ void rdpq_validate(uint64_t *buf, uint32_t flags, int *r_errs, int *r_warns)
         if (BITS(buf[0], 51, 53))
             VALIDATE_WARN_SOM(rdp.som.tex.lod, "triangle with %d mipmaps specified, but mipmapping is disabled",
                 BITS(buf[0], 51, 53)+1);
+        int y0=SBITS(buf[0], 0, 13)*FX(2), y1=SBITS(buf[0], 16, 29)*FX(2), y2=SBITS(buf[0], 32, 45)*FX(2);
+        int x0=SBITS(buf[1], 32, 63)*FX(16), x2=SBITS(buf[2], 32, 63)*FX(16), x1=SBITS(buf[3], 32, 63)*FX(16);
+        rdp.cycles += ABS(x0*(y1-y2) + x1*(y2-y0) + x2*(y0-y1))/2; // FIXME
+        rdp.busy.cyc_draw = rdp.cycles;
+        rdp.busy.cyc_read_tmem = rdp.cycles;
         break;
     case 0x27: // SYNC_PIPE
-        rdp.busy.pipe = false;
+        rdp.cycles += 50-1;
         break;
     case 0x29: // SYNC_FULL
-        memset(&rdp.busy, 0, sizeof(rdp.busy));
+        rdp.cycles += 50-1; // FIXME
         break;
     case 0x28: // SYNC_TILE
-        memset(&rdp.busy.tile, 0, sizeof(rdp.busy.tile));
+        rdp.cycles += 33-1;
         break;
     case 0x26: // SYNC_LOAD
-        memset(&rdp.busy.tmem, 0, sizeof(rdp.busy.tmem));
+        rdp.cycles += 25-1;
         break;
     case 0x2E: // SET_PRIM_DEPTH
         rdp.sent_zprim = true;
@@ -1610,7 +1677,7 @@ void rdpq_validate(uint64_t *buf, uint32_t flags, int *r_errs, int *r_warns)
     case 0x39: // SET_BLEND_COLOR
     case 0x3B: // SET_ENV_COLOR
     case 0x2C: // SET_CONVERT
-        validate_busy_pipe();
+        validate_busy_pipe(MAX_BUSY_PIPE_LEN);
         break;
     case 0x31: // RDPQ extensions
     case 0x00: // NOP
