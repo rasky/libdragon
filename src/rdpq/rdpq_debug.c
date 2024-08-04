@@ -1538,6 +1538,7 @@ void rdpq_validate(uint64_t *buf, uint32_t flags, int *r_errs, int *r_warns)
         int hbytes = hpixels * (4 << rdp.tex.size) / 8;
         VALIDATE_ERR_TEX(hpixels <= 2048, "cannot load more than 2048 texels at once");
         VALIDATE_CRASH_TEX(!check_loading_crash(hpixels), "loading pixels from a misaligned texture image");
+        VALIDATE_WARN_TILE(t->tmem_pitch == 0, tidx, "LOAD_BLOCK with non-zero TMEM pitch has a weird effect that is probably not intended");
         t->has_extents = false; // Normally, the way LOAD_BLOCK configure a tile isn't useful, so assume it's not done
         tmem_busy_clear(rdp.busy.write_tmem);
         tmem_busy_mark(rdp.busy.write_tmem, t->tmem_addr, hbytes); 
