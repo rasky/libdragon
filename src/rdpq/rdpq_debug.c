@@ -1585,7 +1585,6 @@ void rdpq_validate(uint64_t *buf, uint32_t flags, int *r_errs, int *r_warns)
         rdp.mode_changed = true;
         break;
     case 0x2D: // SET_SCISSOR
-        validate_busy_pipe(MAX_BUSY_PIPE_LEN); // FIXME: is this required?
         rdp.clip.x0 = BITS(buf[0],44,55)*FX(2); rdp.clip.y0 = BITS(buf[0],32,43)*FX(2);
         rdp.clip.x1 = BITS(buf[0],12,23)*FX(2); rdp.clip.y1 = BITS(buf[0], 0,11)*FX(2);
         rdp.sent_scissor = true;
