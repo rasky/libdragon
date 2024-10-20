@@ -258,20 +258,20 @@ RDPQ_Triangle_Send_Async:
     # Do a sort-of-three (min, mid, max), using vyN as key of the sort,
     # and vallN as values to sort. We compare the keys with vlt/vge,
     # and then use vmrg to apply the swap.
-    lbu t6, %lo(RDPQ_OTHER_MODES) + 0;          vge vytmp1, vy1, vy2;               
+    li t6, 0xff;                                vge vytmp1, vy1, vy2;
     or clip1, clip3;                            vmrg valltmp1, vall1, vall2;        
     or clip1, clip2;                            vlt vy1, vy1, vy2;                  
     cfc2 did_swap_0, COP2_CTRL_VCC;             vmrg vall1, vall1, vall2;
 
-    andi t1, clip1, 0x3F00;                     vxor vhmlupp, vhmlupp
+    andi t1, clip1, 0xFF;                       vxor vhmlupp, vhmlupp
 
-    bnez t1, RDPQ_Triangle_Clip;                vge vytmp2, vy1, vy3;
-    andi clip1, 0xFF;                           vmrg valltmp2, vall1, vall3;
-    andi t6, 0x38;                              vlt vy1, vy1, vy3;                  
+    beq t1, t6, RDPQ_Triangle_Cull;             vge vytmp2, vy1, vy3;
+    andi clip1, 0x3F00;                         vmrg valltmp2, vall1, vall3;
+    lbu t6, %lo(RDPQ_OTHER_MODES) + 0;          vlt vy1, vy1, vy3;
     cfc2 did_swap_1, COP2_CTRL_VCC;             vmrg vall1, vall1, vall3;           
 
-    xori clip1, 0xFF;                           vge vy3, vytmp1, vytmp2;            
-    or tricmd, t6;                              vmrg vall3, valltmp1, valltmp2;
+    andi did_swap_0, 1;                         vge vy3, vytmp1, vytmp2;
+    andi t6, 0x38;                              vmrg vall3, valltmp1, valltmp2;
     ssv vy1.e0, 6,s3;                           vlt vy2, vytmp1, vytmp2;
     cfc2 did_swap_2, COP2_CTRL_VCC;             vmrg vall2, valltmp1, valltmp2;
 
@@ -281,13 +281,13 @@ RDPQ_Triangle_Send_Async:
 
     # Build vhml:
     #    vhml      =   HX HY MX MY    LX LY  0  NZf
-    beqz clip1, RDPQ_Triangle_Cull;             xor did_swap_0, did_swap_1
+    bnez clip1, RDPQ_Triangle_Clip;             xor did_swap_0, did_swap_1
     vsubc vhml, vall3, vall1;                   xor did_swap_0, did_swap_2
     vsubc vm, vall2, vall1;                     mfc2 vtx1, vall1.e3
     vsubc vl, vall3, vall2;                     mfc2 vtx2, vall2.e3
 
     # vx12 = X1 -- X2 --  -- -- -- --
-    vmov vx12_f.e0, vall1.e0;                   andi did_swap_0, 1
+    vmov vx12_f.e0, vall1.e0;                   or tricmd, t6
     vmov vx12_f.e2, vall2.e0;                   xor cull, did_swap_0
 
     # Prepare -MY for crossprod
