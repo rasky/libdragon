@@ -20,7 +20,20 @@
 #if !RDPQ_TRIANGLE_CUSTOM_VTX
     #define VTX_ATTR_XY          0
     #define VTX_ATTR_Z           4
-    #define VTX_ATTR_CLIPFLAGS   6         // Clipping codes + Negated trivial-reject codes
+    /**
+     * Clipping flags:
+     * Bit 0..5:   Clipping flags for frustum planes. 1=outside, 0=inside.
+     *
+     * Given clip1,clip2,clip3, a triangle will be clipped if (clip1|clip2|clip3) & 0x3F != 0.
+     */
+    #define VTX_ATTR_CLIPFLAGS   6
+    /**
+     * Negated trivial-reject flags (clipping flags for enlarged frustum planes).
+     * Bit 0..5:   Clipping lags for enlarged frustum planes. 1=inside, 0=outside.
+     *
+     * Given rej1,rej2,rej3, a triangle will be trivially rejected if (rej1|rej2|rej3) & 0x3F != 0x3F.
+     */
+    #define VTX_ATTR_REJFLAGS    7
     #define VTX_ATTR_RGBA        8
     #define VTX_ATTR_ST         12
     #define VTX_ATTR_Wi         16
@@ -258,14 +271,14 @@ RDPQ_Triangle_Send_Async:
     # Do a sort-of-three (min, mid, max), using vyN as key of the sort,
     # and vallN as values to sort. We compare the keys with vlt/vge,
     # and then use vmrg to apply the swap.
-    li t6, 0xff;                                vge vytmp1, vy1, vy2;
+    li t6, 0x3F;                                vge vytmp1, vy1, vy2;
     or clip1, clip3;                            vmrg valltmp1, vall1, vall2;        
     or clip1, clip2;                            vlt vy1, vy1, vy2;                  
     cfc2 did_swap_0, COP2_CTRL_VCC;             vmrg vall1, vall1, vall2;
 
-    andi t1, clip1, 0xFF;                       vxor vhmlupp, vhmlupp
+    andi t1, clip1, 0x3F;                       vxor vhmlupp, vhmlupp
 
-    beq t1, t6, RDPQ_Triangle_Cull;             vge vytmp2, vy1, vy3;
+    bne t1, t6, RDPQ_Triangle_Cull;             vge vytmp2, vy1, vy3;
     andi clip1, 0x3F00;                         vmrg valltmp2, vall1, vall3;
     lbu t6, %lo(RDPQ_OTHER_MODES) + 0;          vlt vy1, vy1, vy3;
     cfc2 did_swap_1, COP2_CTRL_VCC;             vmrg vall1, vall1, vall3;           
