@@ -297,7 +297,7 @@ RDPQ_Triangle_Send_Async:
     
     # FY.e4 = Y1 (s15.16)
     vsll8 vfy_f, vy1, 14;                       ssv vy2.e0, 4,s3
-    vsra  vfy_i, vy1, 2;                        xor cull, final_cull
+    vsra  vfy_i, vy1, 2;                        xor final_cull, cull
     vmudh vnz_f, vm, hy;                        ssv vy3.e0, 2,s3
     vmadh vnz_f, vhml, v__;                     slv vm.e0,   8,s3
     vsar vnz_i, COP2_ACC_HI;                    slv vl.e0,  12,s3
@@ -330,7 +330,7 @@ RDPQ_Triangle_Send_Async:
                                         
     # Compute ISH (H slope). 1/HY  (s14.1)
     vrcp  vslope_f.e0, hy;                      slt t1, t1, zero
-    vrcph vslope_i.e0, hy;                      beq t1, cull, RDPQ_Triangle_Cull
+    vrcph vslope_i.e0, hy;                      beq t1, final_cull, RDPQ_Triangle_Cull
     # Compute ISM (M slope). 1/MY  (s14.1)
     vrcp  vslope_f.e2, my;                      # <delay slot>
     vrcph vslope_i.e2, my;                      lsv vw_i.e0, VTX_ATTR_Wi,vtx1
@@ -338,6 +338,7 @@ RDPQ_Triangle_Send_Async:
     vrcp  vslope_f.e4, ly;                      lsv vw_i.e2, VTX_ATTR_Wi,vtx2
     vrcph vslope_i.e4, ly;                      lsv vw_i.e4, VTX_ATTR_Wi,vtx3
 
+    #undef final_cull 
     #undef vm
     #undef vl
     #undef hx
@@ -368,8 +369,8 @@ RDPQ_Triangle_Send_Async:
     #    vhml      =   HX HY MX MY    LX LY  0  NZf
     #    vhmlupp   =    0 0  0  0     0  0   0  NZi
                                                 # Write left flag into tricmd
-    vmov vhml.e7, vnz_f.e0;                     xori t0, 1 
-    vmov vhmlupp.e7, vnz_i.e0;                  sll t0, 7
+    vmov vhml.e7, vnz_f.e0;                     xori t1, 1 
+    vmov vhmlupp.e7, vnz_i.e0;                  sll t1, 7
 
     # vslopem2  = X/2 * (-4) = -2*X             
     vmudn vslopem2_f, vslope_f, VKM4;           luv attr3_r, VTX_ATTR_RGBA,vtx3
@@ -377,7 +378,7 @@ RDPQ_Triangle_Send_Async:
 
     # Calculate minimum W (between e0 and e2) 
     vsubc v__,  vw_f, vw_f.e2;                  luv attr2_r, VTX_ATTR_RGBA,vtx2
-    vlt   vw_i, vw_i, vw_i.e2;                  or tricmd, t0
+    vlt   vw_i, vw_i, vw_i.e2;                  or tricmd, t1
     vmrg  vw_f, vw_f, vw_f.e2;                  lsv vinvw_f.e6, VTX_ATTR_INVWf,vtx3
 
     # NR: R*(X/2)                               # Load other invw components
