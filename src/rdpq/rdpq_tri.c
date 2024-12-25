@@ -22,6 +22,7 @@
 #include "rspq.h"
 #include "rdpq_internal.h"
 #include "rdpq_constants.h"
+#include "rdpq_autosync.h"
 #include "utils.h"
 #include "debug.h"
 
@@ -410,16 +411,6 @@ static inline void __rdpq_write_zbuf_coeffs(rspq_write_t *w, rdpq_tri_edge_data_
 /** @brief RDP triangle primitive assembled on the CPU */
 void rdpq_triangle_cpu(const rdpq_trifmt_t *fmt, const float *v1, const float *v2, const float *v3)
 {
-    uint32_t res = AUTOSYNC_PIPE;
-    if (fmt->tex_offset >= 0) {
-        // FIXME: this can be using multiple tiles depending on color combiner and texture
-        // effects such as detail and sharpen. Figure it out a way to handle these in the
-        // autosync engine.
-        res |= AUTOSYNC_TILE(fmt->tex_tile);
-        res |= AUTOSYNC_TMEMS;
-    }
-    __rdpq_autosync_use(res);
-
     uint32_t cmd_id = RDPQ_CMD_TRI;
 
     uint32_t size = 8;
@@ -465,16 +456,6 @@ void rdpq_triangle_cpu(const rdpq_trifmt_t *fmt, const float *v1, const float *v
 /** @brief RDP triangle primitive assembled on the RSP */
 void rdpq_triangle_rsp(const rdpq_trifmt_t *fmt, const float *v1, const float *v2, const float *v3)
 {
-    uint32_t res = AUTOSYNC_PIPE;
-    if (fmt->tex_offset >= 0) {
-        // FIXME: this can be using multiple tiles depending on color combiner and texture
-        // effects such as detail and sharpen. Figure it out a way to handle these in the
-        // autosync engine.
-        res |= AUTOSYNC_TILE(fmt->tex_tile);
-        res |= AUTOSYNC_TMEM(0);
-    }
-    __rdpq_autosync_use(res);
-
     uint32_t cmd_id = RDPQ_CMD_TRI;
     if (fmt->shade_offset >= 0) cmd_id |= 0x4;
     if (fmt->tex_offset >= 0)   cmd_id |= 0x2;
@@ -532,6 +513,15 @@ void rdpq_triangle_rsp(const rdpq_trifmt_t *fmt, const float *v1, const float *v
 
 void rdpq_triangle(const rdpq_trifmt_t *fmt, const float *v1, const float *v2, const float *v3)
 {
+    if (fmt->tex_offset >= 0) {
+        // FIXME: this can be using multiple tiles depending on color combiner and texture
+        // effects such as detail and sharpen. Figure it out a way to handle these in the
+        // autosync engine.
+        __rdpq_autosync_tri_tex(fmt->tex_tile, 7);
+    } else {
+        __rdpq_autosync_tri_notex();        
+    }
+
 #if RDPQ_TRIANGLE_REFERENCE
     rdpq_triangle_cpu(fmt, v1, v2, v3);
 #else

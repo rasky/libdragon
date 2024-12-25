@@ -28,7 +28,7 @@
 __attribute__((noinline))
 void __rdpq_fixup_mode(uint32_t cmd_id, uint32_t w0, uint32_t w1)
 {
-    __rdpq_autosync_change(AUTOSYNC_PIPE);
+    __rdpq_autosync_wait_after_draw(29);
     rdpq_mode_write(2, 0, RDPQ_OVL_ID, cmd_id, w0, w1);  // COMBINE+SOM
 }
 
@@ -36,16 +36,15 @@ void __rdpq_fixup_mode(uint32_t cmd_id, uint32_t w0, uint32_t w1)
 __attribute__((noinline))
 void __rdpq_fixup_mode3(uint32_t cmd_id, uint32_t w0, uint32_t w1, uint32_t w2)
 {
-    __rdpq_autosync_change(AUTOSYNC_PIPE);
+    __rdpq_autosync_wait_after_draw(29);
     rdpq_mode_write(2, 0, RDPQ_OVL_ID, cmd_id, w0, w1, w2);  // COMBINE+SOM
-
 }
 
 /** @brief Write a fixup that changes the current render mode (16-byte command) */
 __attribute__((noinline))
 void __rdpq_fixup_mode4(uint32_t cmd_id, uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3)
 {
-    __rdpq_autosync_change(AUTOSYNC_PIPE);
+    __rdpq_autosync_wait_after_draw(29);
     rdpq_mode_write(2, 0, RDPQ_OVL_ID, cmd_id, w0, w1, w2, w3);  // COMBINE+SOM
 }
 
@@ -53,7 +52,7 @@ void __rdpq_fixup_mode4(uint32_t cmd_id, uint32_t w0, uint32_t w1, uint32_t w2, 
 __attribute__((noinline))
 void __rdpq_reset_render_mode(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3)
 {
-    __rdpq_autosync_change(AUTOSYNC_PIPE);
+    __rdpq_autosync_wait_after_draw(29);
     // ResetRenderMode can generate: SCISSOR+COMBINE+SOM when not frozen,
     // or just SCISSOR when frozen.
     rdpq_mode_write(3, 1, RDPQ_OVL_ID, RDPQ_CMD_RESET_RENDER_MODE, w0, w1, w2, w3);

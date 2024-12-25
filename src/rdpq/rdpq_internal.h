@@ -10,6 +10,7 @@
 #include "pputils.h"
 #include "rspq.h"
 #include "../rspq/rspq_internal.h"
+#include "rdpq_autosync.h"
 
 /** @brief True if the rdpq module was inited */
 extern bool __rdpq_inited;
@@ -38,19 +39,6 @@ typedef struct rdpq_trifmt_s rdpq_trifmt_t;
  * and then its previous state is restored by #__rdpq_block_end.
  */
 typedef struct {
-    /** 
-     * @brief State of the autosync engine.
-     * 
-     * The state of the autosync engine is a 32-bit word, where bits are
-     * mapped to specific internal resources of the RDP that might be in
-     * use. The mapping of the bits is indicated by the `AUTOSYNC_TILE`,
-     * `AUTOSYNC_TMEM`, and `AUTOSYNC_PIPE`
-     * 
-     * When a bit is set to 1, the corresponding resource is "in use"
-     * by the RDP. For instance, drawing a textured rectangle can use
-     * a tile and the pipe (which contains most of the mode registers).
-     */ 
-    uint32_t autosync : 17;
     /** @brief True if the mode changes are currently frozen. */
     bool mode_freeze : 1;
     /** @brief 0=unknown, 1=standard, 2=copy/fill  */
@@ -116,12 +104,6 @@ void __rdpq_block_next_buffer(void);
 void __rdpq_block_update(volatile uint32_t *wptr);
 void __rdpq_block_reserve(int num_rdp_commands);
 
-inline void __rdpq_autosync_use(uint32_t res)
-{
-    rdpq_tracking.autosync |= res;
-}
-void __rdpq_autosync_change(uint32_t res);
-
 void __rdpq_write8(uint32_t cmd_id, uint32_t arg0, uint32_t arg1);
 void __rdpq_write16(uint32_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 
@@ -162,9 +144,9 @@ extern volatile int __rdpq_syncpoint_at_syncfull;
  * @hideinitializer
  */
 #define rdpq_passthrough_write(rdp_cmd) ({ \
+    int nwords = 0; __rdpcmd_count_words(rdp_cmd); \
     if (__builtin_expect(rspq_in_block(), 0)) { \
         extern rdpq_block_state_t rdpq_block_state; \
-        int nwords = 0; __rdpcmd_count_words(rdp_cmd); \
         if (__builtin_expect(rdpq_block_state.wptr + nwords > rdpq_block_state.wend, 0)) \
             __rdpq_block_next_buffer(); \
         volatile uint32_t *ptr = rdpq_block_state.wptr; \
@@ -173,6 +155,7 @@ extern volatile int __rdpq_syncpoint_at_syncfull;
     } else { \
         __rspcmd_write rdp_cmd; \
     } \
+    rdpq_autosync.gclk += nwords; \
 })
 
 #endif

@@ -149,6 +149,7 @@
 #include "graphics.h"
 #include "n64sys.h"
 #include "rdpq_macros.h"
+#include "rdpq_autosync.h"
 #include "surface.h"
 #include "debug.h"
 
@@ -292,6 +293,13 @@ extern "C" {
 
 /// @private
 extern void __rdpq_set_scissor(uint32_t, uint32_t);
+extern void __rdpq_write8(uint32_t, uint32_t, uint32_t);
+extern void __rdpq_write16(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+extern void __rdpq_fixup_write8(uint32_t, uint32_t, uint32_t);
+extern void __rdpq_autosync_wait_after_draw(int num_clk);
+extern void __rdpq_autosync_wait_after_draw_tmem(int num_clk);
+extern void __rdpq_autosync_wait_after_draw_tile(int num_clk, int tile);
+extern void __rdpq_autosync_wait_after_tmem_write(int num_clk);
 
 /**
  * @brief Initialize the RDPQ library.
@@ -491,10 +499,9 @@ inline void rdpq_set_yuv_parms(uint16_t k0, uint16_t k1, uint16_t k2, uint16_t k
  *       and specifically the prim_dz parameter, rdpq does not currently
  *       offer a higher-level function (`rdpq_set_prim_depth`).
  */
- inline void rdpq_set_prim_depth_raw(uint16_t prim_z, int16_t prim_dz)
+inline void rdpq_set_prim_depth_raw(uint16_t prim_z, int16_t prim_dz)
 {
-    // NOTE: this does not require a pipe sync
-    extern void __rdpq_write8(uint32_t, uint32_t, uint32_t);
+    // NOTE: like all "prim" commands, it does not require any syncing
     assertf(prim_z <= 0x7FFF, "prim_z must be in [0..0x7FFF]");
     assertf((prim_dz & -prim_dz) == (prim_dz >= 0 ? prim_dz : -prim_dz),
         "prim_dz must be a power of 2");
@@ -577,12 +584,11 @@ inline void rdpq_set_yuv_parms(uint16_t k0, uint16_t k1, uint16_t k2, uint16_t k
  */
 inline void rdpq_load_tile_fx(rdpq_tile_t tile, uint16_t s0, uint16_t t0, uint16_t s1, uint16_t t1)
 {
-    extern void __rdpq_write8_syncchangeuse(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
-    __rdpq_write8_syncchangeuse(RDPQ_CMD_LOAD_TILE,
+    __rdpq_autosync_wait_after_draw_tile(19, tile);
+    __rdpq_autosync_wait_after_draw_tmem(19);
+    __rdpq_write8(RDPQ_CMD_LOAD_TILE,
         _carg(s0, 0xFFF, 12) | _carg(t0, 0xFFF, 0),
-        _carg(tile, 0x7, 24) | _carg(s1-4, 0xFFF, 12) | _carg(t1-4, 0xFFF, 0),
-        AUTOSYNC_TMEM(0) | AUTOSYNC_TILE(tile),
-        AUTOSYNC_TILE(tile));
+        _carg(tile, 0x7, 24) | _carg(s1-4, 0xFFF, 12) | _carg(t1-4, 0xFFF, 0));
 }
 
 
@@ -618,12 +624,11 @@ inline void rdpq_load_tile_fx(rdpq_tile_t tile, uint16_t s0, uint16_t t0, uint16
  */
 inline void rdpq_load_tlut_raw(rdpq_tile_t tile, uint8_t color_idx, uint8_t num_colors)
 {
-    extern void __rdpq_write8_syncchangeuse(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
-    __rdpq_write8_syncchangeuse(RDPQ_CMD_LOAD_TLUT, 
+    __rdpq_autosync_wait_after_draw_tile(19, tile);
+    __rdpq_autosync_wait_after_draw_tmem(19);
+    __rdpq_write8(RDPQ_CMD_LOAD_TLUT, 
         _carg(color_idx, 0xFF, 14), 
-        _carg(tile, 0x7, 24) | _carg(color_idx+num_colors-1, 0xFF, 14),
-        AUTOSYNC_TMEM(0),
-        AUTOSYNC_TILE(tile));
+        _carg(tile, 0x7, 24) | _carg(color_idx+num_colors-1, 0xFF, 14));
 }
 
 /**
@@ -676,11 +681,10 @@ inline void rdpq_set_tile_size_fx(rdpq_tile_t tile, uint16_t s0, uint16_t t0, ui
     assertf((s0) >= 0 && (t0) >= 0 && (s1) >= 0 && (t1) >= 0, "texture coordinates must be positive");
     assertf((s0) <= 1024*4 && (t0) <= 1024*4 && (s1) <= 1024*4 && (t1) <= 1024*4, "texture coordinates must be smaller than 1024");
 
-    extern void __rdpq_write8_syncchange(uint32_t, uint32_t, uint32_t, uint32_t);
-    __rdpq_write8_syncchange(RDPQ_CMD_SET_TILE_SIZE,
+    __rdpq_autosync_wait_after_draw_tile(19, tile);
+    __rdpq_write8(RDPQ_CMD_SET_TILE_SIZE,
         _carg(s0, 0xFFF, 12) | _carg(t0, 0xFFF, 0),
-        _carg(tile, 0x7, 24) | _carg(s1-4, 0xFFF, 12) | _carg(t1-4, 0xFFF, 0),
-        AUTOSYNC_TILE(tile));
+        _carg(tile, 0x7, 24) | _carg(s1-4, 0xFFF, 12) | _carg(t1-4, 0xFFF, 0));
 }
 
 
@@ -689,12 +693,11 @@ inline void rdpq_set_tile_size_fx(rdpq_tile_t tile, uint16_t s0, uint16_t t0, ui
  */
 inline void rdpq_load_block_fx(rdpq_tile_t tile, uint16_t s0, uint16_t t0, uint16_t num_texels, uint16_t dxt)
 {
-    extern void __rdpq_write8_syncchangeuse(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
-    __rdpq_write8_syncchangeuse(RDPQ_CMD_LOAD_BLOCK,
+    __rdpq_autosync_wait_after_draw_tile(19, tile);
+    __rdpq_autosync_wait_after_draw_tmem(19);
+    __rdpq_write8(RDPQ_CMD_LOAD_BLOCK,
         _carg(s0, 0xFFF, 12) | _carg(t0, 0xFFF, 0),
-        _carg(tile, 0x7, 24) | _carg(num_texels-1, 0xFFF, 12) | _carg(dxt, 0xFFF, 0),
-        AUTOSYNC_TMEM(0),
-        AUTOSYNC_TILE(tile));
+        _carg(tile, 0x7, 24) | _carg(num_texels-1, 0xFFF, 12) | _carg(dxt, 0xFFF, 0));
 }
 
 /**
@@ -791,14 +794,12 @@ inline void rdpq_set_tile(rdpq_tile_t tile,
         tmem_addr /= 8;
     }
     assertf((tmem_pitch % 8) == 0, "invalid tmem_pitch %d: must be multiple of 8", tmem_pitch);
-    extern void __rdpq_write8_syncchange(uint32_t, uint32_t, uint32_t, uint32_t);
-    extern void __rdpq_fixup_write8_syncchange(uint32_t, uint32_t, uint32_t, uint32_t);
-    (fixup ? __rdpq_fixup_write8_syncchange : __rdpq_write8_syncchange)(cmd_id,
+    __rdpq_autosync_wait_after_draw_tile(19, tile);
+    (fixup ? __rdpq_fixup_write8 : __rdpq_write8)(cmd_id,
         _carg(format, 0x1F, 19) | _carg(reuse, 0x1, 18) | _carg(tmem_pitch/8, 0x1FF, 9) | _carg(tmem_addr, 0x1FF, 0),
         _carg(tile, 0x7, 24) | _carg(parms->palette, 0xF, 20) | 
         _carg(parms->t.clamp | (parms->t.mask == 0), 0x1, 19) | _carg(parms->t.mirror, 0x1, 18) | _carg(parms->t.mask, 0xF, 14) | _carg(parms->t.shift, 0xF, 10) | 
-        _carg(parms->s.clamp | (parms->s.mask == 0), 0x1, 9) | _carg(parms->s.mirror, 0x1, 8) | _carg(parms->s.mask, 0xF, 4) | _carg(parms->s.shift, 0xF, 0),
-        AUTOSYNC_TILE(tile));
+        _carg(parms->s.clamp | (parms->s.mask == 0), 0x1, 9) | _carg(parms->s.mirror, 0x1, 8) | _carg(parms->s.mask, 0xF, 4) | _carg(parms->s.shift, 0xF, 0));
 }
 
 /**
@@ -888,11 +889,10 @@ inline void rdpq_set_fill_color(color_t color) {
  *
  */
 inline void rdpq_set_fill_color_stripes(color_t color1, color_t color2) {
-    extern void __rdpq_write8_syncchange(uint32_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t autosync);
     uint32_t c1 = (((int)color1.r >> 3) << 11) | (((int)color1.g >> 3) << 6) | (((int)color1.b >> 3) << 1) | (color1.a >> 7);
     uint32_t c2 = (((int)color2.r >> 3) << 11) | (((int)color2.g >> 3) << 6) | (((int)color2.b >> 3) << 1) | (color2.a >> 7);
-    __rdpq_write8_syncchange(RDPQ_CMD_SET_FILL_COLOR, 0, (c1 << 16) | c2,
-        AUTOSYNC_PIPE);
+    __rdpq_autosync_wait_after_draw(29);
+    __rdpq_write8(RDPQ_CMD_SET_FILL_COLOR, 0, (c1 << 16) | c2);
 }
 
 /**
@@ -918,9 +918,8 @@ inline void rdpq_set_fill_color_stripes(color_t color1, color_t color2) {
  */
 inline void rdpq_set_fog_color(color_t color)
 {
-    extern void __rdpq_write8_syncchange(uint32_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t autosync);
-    __rdpq_write8_syncchange(RDPQ_CMD_SET_FOG_COLOR, 0, color_to_packed32(color),
-        AUTOSYNC_PIPE);
+    __rdpq_autosync_wait_after_draw(29);
+    __rdpq_write8(RDPQ_CMD_SET_FOG_COLOR, 0, color_to_packed32(color));
 }
 
 /**
@@ -946,9 +945,8 @@ inline void rdpq_set_fog_color(color_t color)
  */
 inline void rdpq_set_blend_color(color_t color)
 {
-    extern void __rdpq_write8_syncchange(uint32_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t autosync);
-    __rdpq_write8_syncchange(RDPQ_CMD_SET_BLEND_COLOR, 0, color_to_packed32(color),
-        AUTOSYNC_PIPE);
+    __rdpq_autosync_wait_after_draw(29);
+    __rdpq_write8(RDPQ_CMD_SET_BLEND_COLOR, 0, color_to_packed32(color));
 }
 
 /**
@@ -980,9 +978,8 @@ inline void rdpq_set_blend_color(color_t color)
  */
 inline void rdpq_set_prim_color(color_t color)
 {
-    // NOTE: this does not require a pipe sync
-    extern void __rdpq_fixup_write8_syncchange(uint32_t, uint32_t, uint32_t, uint32_t);
-    __rdpq_fixup_write8_syncchange(RDPQ_CMD_SET_PRIM_COLOR_COMPONENT, (0<<16), color_to_packed32(color), 0);
+    // NOTE: like all "prim" command, this does not require a sync
+    __rdpq_fixup_write8(RDPQ_CMD_SET_PRIM_COLOR_COMPONENT, (0<<16), color_to_packed32(color));
 }
 
 /**
@@ -1004,10 +1001,9 @@ inline void rdpq_set_prim_color(color_t color)
  */
 inline void rdpq_set_detail_factor(float value)
 {
-    // NOTE: this does not require a pipe sync
+    // NOTE: like all "prim" command, this does not require a sync
     int8_t conv = (1.0 - value) * 31;
-    extern void __rdpq_fixup_write8_syncchange(uint32_t, uint32_t, uint32_t, uint32_t);
-    __rdpq_fixup_write8_syncchange(RDPQ_CMD_SET_PRIM_COLOR_COMPONENT, ((conv & 0x1F) << 8) | (2<<16), 0, 0);
+    __rdpq_fixup_write8(RDPQ_CMD_SET_PRIM_COLOR_COMPONENT, ((conv & 0x1F) << 8) | (2<<16), 0);
 }
 
 /**
@@ -1031,9 +1027,8 @@ inline void rdpq_set_detail_factor(float value)
  */
 inline void rdpq_set_prim_lod_frac(uint8_t value)
 {
-    // NOTE: this does not require a pipe sync
-    extern void __rdpq_fixup_write8_syncchange(uint32_t, uint32_t, uint32_t, uint32_t);
-    __rdpq_fixup_write8_syncchange(RDPQ_CMD_SET_PRIM_COLOR_COMPONENT, value | (1<<16), 0, 0);
+    // NOTE: like all "prim" command, this does not require a sync
+    __rdpq_fixup_write8(RDPQ_CMD_SET_PRIM_COLOR_COMPONENT, value | (1<<16), 0);
 }
 
 /**
@@ -1069,7 +1064,7 @@ inline void rdpq_set_prim_lod_frac(uint8_t value)
  */
 inline void rdpq_set_prim_register_raw(color_t color, uint8_t minlod, uint8_t primlod)
 {
-    extern void __rdpq_write8(uint32_t cmd_id, uint32_t arg0, uint32_t arg1);
+    // NOTE: like all "prim" command, this does not require a sync
     __rdpq_write8(RDPQ_CMD_SET_PRIM_COLOR, ((minlod & 0x1F) << 8) | primlod, color_to_packed32(color));
 }
 
@@ -1096,9 +1091,8 @@ inline void rdpq_set_prim_register_raw(color_t color, uint8_t minlod, uint8_t pr
  */
 inline void rdpq_set_env_color(color_t color)
 {
-    extern void __rdpq_write8_syncchange(uint32_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t autosync);
-    __rdpq_write8_syncchange(RDPQ_CMD_SET_ENV_COLOR, 0, color_to_packed32(color),
-        AUTOSYNC_PIPE);
+    __rdpq_autosync_wait_after_draw(29);
+    __rdpq_write8(RDPQ_CMD_SET_ENV_COLOR, 0, color_to_packed32(color));
 }
 
 /**
@@ -1224,11 +1218,8 @@ inline void rdpq_set_color_image_raw(uint8_t index, uint32_t offset, tex_format_
 inline void rdpq_set_z_image_raw(uint8_t index, uint32_t offset)
 {
     assertf(index <= 15, "Lookup address index out of range [0,15]: %d", index);
-    extern void __rdpq_fixup_write8_syncchange(uint32_t, uint32_t, uint32_t, uint32_t);
-    __rdpq_fixup_write8_syncchange(RDPQ_CMD_SET_Z_IMAGE,
-        0, 
-        _carg(index, 0xF, 28) | (offset & 0xFFFFFF),
-        AUTOSYNC_PIPE);
+    __rdpq_autosync_wait_after_draw(29);
+    __rdpq_fixup_write8(RDPQ_CMD_SET_Z_IMAGE, 0, _carg(index, 0xF, 28) | (offset & 0xFFFFFF));
 }
 
 /**
@@ -1258,13 +1249,12 @@ inline void rdpq_set_texture_image_raw(uint8_t index, uint32_t offset, tex_forma
     assertf(width <= 1024, "Texture width out of range [1,1024]: %d", width);
     assertf(height <= 1024, "Texture height out of range [1,1024]: %d", height);
     assertf(index <= 15, "Lookup address index out of range [0,15]: %d", index);
-    extern void __rdpq_fixup_write8_syncchange(uint32_t, uint32_t, uint32_t, uint32_t);
     // NOTE: we also encode the texture height in the command (split in two halves...)
     // to help the validator to a better job. The RDP hardware ignores those bits.
-    __rdpq_fixup_write8_syncchange(RDPQ_CMD_SET_TEXTURE_IMAGE,
+    __rdpq_autosync_wait_after_draw(29);
+    __rdpq_fixup_write8(RDPQ_CMD_SET_TEXTURE_IMAGE,
         _carg(format, 0x1F, 19) | _carg(width-1, 0x3FF, 0) | _carg(height-1, 0x1FF, 10),
-        _carg(index, 0xF, 28) | (offset & 0xFFFFFF) | _carg((height-1)>>9, 0x1, 31),
-        AUTOSYNC_PIPE);
+        _carg(index, 0xF, 28) | (offset & 0xFFFFFF) | _carg((height-1)>>9, 0x1, 31));
 }
 
 /**
@@ -1483,11 +1473,10 @@ uint64_t rdpq_get_other_modes_raw(void);
  * 
  */
 inline void rdpq_set_combiner_raw(uint64_t comb) {
-    extern void __rdpq_write8_syncchange(uint32_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t autosync);
-    __rdpq_write8_syncchange(RDPQ_CMD_SET_COMBINE_MODE_RAW,
+    __rdpq_autosync_wait_after_draw(29);
+    __rdpq_write8(RDPQ_CMD_SET_COMBINE_MODE_RAW,
         (comb >> 32) & 0x00FFFFFF,
-        comb & 0xFFFFFFFF,
-        AUTOSYNC_PIPE);   
+        comb & 0xFFFFFFFF);
 }
 
 /**
@@ -1611,6 +1600,23 @@ void rdpq_call_deferred(void (*func)(void *), void *arg);
     } \
     rspq_write(ovl_id, cmd_id, ##__VA_ARGS__); \
 })
+
+#define RDPQ_AUTOSYNC_TRI_TEX               (1<<0)
+#define RDPQ_AUTOSYNC_TRI_NOTEX             (1<<1)
+#define RDPQ_AUTOSYNC_TEX_RECT              (1<<2)
+#define RDPQ_AUTOSYNC_FILL_RECT             (1<<3)
+#define RDPQ_AUTOSYNC_SET_FILL_COLOR        (1<<4)
+#define RDPQ_AUTOSYNC_SET_OTHER_MODES_ALL   (1<<16)
+#define RDPQ_AUTOSYNC_SOM_BLENDER           (1<<17)
+
+__attribute__((always_inline))
+inline void rdpq_autosync(uint32_t cmd_bitmask)
+{
+    if (__builtin_constant_p(cmd_bitmask))
+        __rdpq_autosync_inline(cmd_bitmask);
+    else
+        __rdpq_autosync_outline(cmd_bitmask);
+}
 
 
 #ifdef __cplusplus

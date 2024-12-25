@@ -7,6 +7,7 @@
 
 #include "rdpq_rect.h"
 #include "rdpq_internal.h"
+#include "rdpq_autosync.h"
 
 // The fixup for fill rectangle and texture rectangle uses the exact same code in IMEM.
 // It needs to also adjust the command ID with the same constant (via XOR), so make
@@ -21,7 +22,7 @@ _Static_assert(
 __attribute__((noinline))
 void __rdpq_fill_rectangle(uint32_t w0, uint32_t w1)
 {
-    __rdpq_autosync_use(AUTOSYNC_PIPE);
+    __rdpq_autosync_fillrect();
     if (rdpq_tracking.cycle_type_known) {
         if (rdpq_tracking.cycle_type_known == 2) {
             w0 -= (4<<12) | 4;
@@ -43,7 +44,7 @@ void __rdpq_texture_rectangle(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3
     int tile = (w1 >> 24) & 7;
     // FIXME: this can also use tile+1 in case the combiner refers to TEX1
     // FIXME: this can also use tile+2 and +3 in case SOM activates texture detail / sharpen
-    __rdpq_autosync_use(AUTOSYNC_PIPE | AUTOSYNC_TILE(tile) | AUTOSYNC_TMEM(0));
+    __rdpq_autosync_texrect(tile, 4);
     if (rdpq_tracking.cycle_type_known) {
         if (rdpq_tracking.cycle_type_known == 2) {
             w0 -= (4<<12) | 4;

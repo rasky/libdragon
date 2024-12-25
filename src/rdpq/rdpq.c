@@ -360,6 +360,7 @@
 #include "rdpq.h"
 #include "rdpq_internal.h"
 #include "rdpq_constants.h"
+#include "rdpq_autosync.h"
 #include "rdpq_debug_internal.h"
 #include "rspq.h"
 #include "rspq/rspq_internal.h"
@@ -472,7 +473,7 @@ void rdpq_init()
     // Clear library globals
     memset(&rdpq_block_state, 0, sizeof(rdpq_block_state));
     rdpq_config = RDPQ_CFG_DEFAULT;
-    rdpq_tracking.autosync = 0;
+    memset(&rdpq_autosync, 0, sizeof(rdpq_autosync));
     rdpq_tracking.mode_freeze = false;
 
     // Register an interrupt handler for DP interrupts, and activate them.
@@ -583,28 +584,44 @@ static void rdpq_assert_handler(rsp_snapshot_t *state, uint16_t assert_code)
     }
 }
 
-/** @brief Autosync engine: mark certain resources as in use */
-extern inline void __rdpq_autosync_use(uint32_t res);
+void __rdpq_autosync_emit(int num_clk) {
+    if (num_clk <= 25)
+        rdpq_sync_load();
+    else if (num_clk <= 33)
+        rdpq_sync_tile();
+    else
+        rdpq_sync_pipe();
+}
 
-/** 
- * @brief Autosync engine: mark certain resources as being changed.
- * 
- * This is the core of the autosync engine. Whenever a resource is "changed"
- * while "in use", a SYNC command must be issued. This is a slightly conservative
- * approach, as the RDP might already have finished using that resource,
- * but we have no way to know it.
- * The SYNC command will then reset the "use" status of each respective resource.
- */
-void __rdpq_autosync_change(uint32_t res) {
-    res &= rdpq_tracking.autosync;
-    if (res) {
-        if ((res & AUTOSYNC_TILES) && (rdpq_config & RDPQ_CFG_AUTOSYNCTILE))
-            rdpq_sync_tile();
-        if ((res & AUTOSYNC_TMEMS) && (rdpq_config & RDPQ_CFG_AUTOSYNCLOAD))
-            rdpq_sync_load();
-        if ((res & AUTOSYNC_PIPE)  && (rdpq_config & RDPQ_CFG_AUTOSYNCPIPE))
-            rdpq_sync_pipe();
+void __rdpq_autosync_wait(uint32_t wait_point) {
+    if (wait_point > rdpq_autosync.gclk) {
+        __rdpq_autosync_emit(wait_point - rdpq_autosync.gclk);
+        assertf(rdpq_autosync.gclk >= wait_point, "autosync internal error");
     }
+}
+
+void __rdpq_autosync_wait_after_draw(int num_clk) {
+    __rdpq_autosync_wait(rdpq_autosync.last_draw + num_clk);
+}
+
+void __rdpq_autosync_wait_after_draw_tmem(int num_clk) {
+    __rdpq_autosync_wait(rdpq_autosync.last_draw_tex + num_clk);
+}
+
+void __rdpq_autosync_wait_after_draw_tile(int num_clk, int tile) {
+    if (!(rdpq_autosync.last_tile_usage & (1<<tile)))
+        return;
+    __rdpq_autosync_wait(rdpq_autosync.last_draw_tex + num_clk);
+}
+
+void __rdpq_autosync_wait_after_tmem_write(int num_clk)
+{
+    __rdpq_autosync_wait(rdpq_autosync.last_tmem_write + num_clk);
+}
+
+void __rdpq_autosync_outline(uint32_t cmd_bitmask)
+{
+    __rdpq_autosync_inline(cmd_bitmask);
 }
 
 /**
@@ -778,11 +795,6 @@ void __rdpq_block_run(rdpq_block_t *block)
     } else {
         // Initialize tracking state for unknown state
         rdpq_tracking = (rdpq_tracking_t){
-            // current autosync status is unknown because blocks can be
-            // played in any context. So assume the worst: all resources
-            // are being used. This will cause all SYNCs to be generated,
-            // which is the safest option.
-            .autosync = ~0,
             // we don't know whether mode changes will be frozen or not
             // when the block will play. Assume the worst (and thus
             // do not optimize out mode changes).
@@ -790,6 +802,14 @@ void __rdpq_block_run(rdpq_block_t *block)
             // we don't know the cycle type after we run the block
             .cycle_type_known = 0,
             .cycle_type_frozen = 0,
+        };
+
+        // Reset autosync to a conservative default. This will basically cause
+        // all types of syncs to be emitted, which is the safest option.
+        rdpq_autosync = (rdpq_autosync_t){
+            .gclk = 0,
+            .last_draw = 0, .last_draw_tex = 0, .last_tmem_write = 0,
+            .last_tile_usage = 0xFF,
         };
     }
 }
@@ -916,31 +936,6 @@ void __rdpq_write8(uint32_t cmd_id, uint32_t arg0, uint32_t arg1)
     rdpq_passthrough_write((cmd_id, arg0, arg1));
 }
 
-/** @brief Write a standard 8-byte RDP command, which changes some autosync resources  */
-__attribute__((noinline))
-void __rdpq_write8_syncchange(uint32_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t autosync)
-{
-    __rdpq_autosync_change(autosync);
-    __rdpq_write8(cmd_id, arg0, arg1);
-}
-
-/** @brief Write a standard 8-byte RDP command, which uses some autosync resources  */
-__attribute__((noinline))
-void __rdpq_write8_syncuse(uint32_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t autosync)
-{
-    __rdpq_autosync_use(autosync);
-    __rdpq_write8(cmd_id, arg0, arg1);
-}
-
-/** @brief Write a standard 8-byte RDP command, which changes some autosync resources and uses others. */
-__attribute__((noinline))
-void __rdpq_write8_syncchangeuse(uint32_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t autosync_c, uint32_t autosync_u)
-{
-    __rdpq_autosync_change(autosync_c);
-    __rdpq_autosync_use(autosync_u);
-    __rdpq_write8(cmd_id, arg0, arg1);
-}
-
 /** @brief Write a standard 16-byte RDP command  */
 __attribute__((noinline))
 void __rdpq_write16(uint32_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3)
@@ -948,24 +943,13 @@ void __rdpq_write16(uint32_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2
     rdpq_passthrough_write((cmd_id, arg0, arg1, arg2, arg3));
 }
 
-/** @brief Write a standard 16-byte RDP command, which uses some autosync resources  */
 __attribute__((noinline))
-void __rdpq_write16_syncuse(uint32_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t autosync)
+void __rdpq_fixup_write8(uint32_t cmd_id, uint32_t w0, uint32_t w1)
 {
-    __rdpq_autosync_use(autosync);
-    __rdpq_write16(cmd_id, arg0, arg1, arg2, arg3);
-}
-
-/** @brief Write a 8-byte RDP command fixup. */
-__attribute__((noinline))
-void __rdpq_fixup_write8_syncchange(uint32_t cmd_id, uint32_t w0, uint32_t w1, uint32_t autosync)
-{
-    __rdpq_autosync_change(autosync);
     rdpq_write(1, RDPQ_OVL_ID, cmd_id, w0, w1);
 }
 
 /** @} */
-
 
 /**
  * @name RDP fixups out-of-line implementations
@@ -980,7 +964,7 @@ void __rdpq_fixup_write8_syncchange(uint32_t cmd_id, uint32_t w0, uint32_t w1, u
 __attribute__((noinline))
 void __rdpq_set_scissor(uint32_t w0, uint32_t w1)
 {
-    // NOTE: SET_SCISSOR does not require SYNC_PIPE
+    // NOTE: SET_SCISSOR does not require any syncing
     // NOTE: We can't optimize this away into a standard SET_SCISSOR, even if
     // we track the cycle type, because the RSP must always know the current
     // scissoring rectangle. So we must always go through the fixup.
@@ -991,7 +975,7 @@ void __rdpq_set_scissor(uint32_t w0, uint32_t w1)
 __attribute__((noinline))
 void __rdpq_set_fill_color(uint32_t w1)
 {
-    __rdpq_autosync_change(AUTOSYNC_PIPE);
+    __rdpq_autosync_wait_after_draw(29);
     rdpq_write(1, RDPQ_OVL_ID, RDPQ_CMD_SET_FILL_COLOR_32, 0, w1);
 }
 
@@ -999,9 +983,9 @@ void __rdpq_set_fill_color(uint32_t w1)
 __attribute__((noinline))
 void __rdpq_set_color_image(uint32_t w0, uint32_t w1, uint32_t sw0, uint32_t sw1)
 {
-    // SET_COLOR_IMAGE on RSP always generates an additional SET_FILL_COLOR,
-    // so make sure there is space for it in case of a static buffer (in a block).
-    __rdpq_autosync_change(AUTOSYNC_PIPE);
+    __rdpq_autosync_wait_after_draw(29);
+
+    // Note: SET_COLOR_IMAGE on RSP always generates an additional SET_FILL_COLOR,
     rdpq_write(2, RDPQ_OVL_ID, RDPQ_CMD_SET_COLOR_IMAGE, w0, w1);
 
     if (rdpq_config & RDPQ_CFG_AUTOSCISSOR)
@@ -1056,7 +1040,7 @@ void rdpq_set_texture_image(const surface_t *surface)
 __attribute__((noinline))
 void __rdpq_set_other_modes(uint32_t w0, uint32_t w1)
 {
-    __rdpq_autosync_change(AUTOSYNC_PIPE);
+    __rdpq_autosync_wait_after_draw(29);
 
     // SOM might also generate a SET_SCISSOR. Make sure to reserve space for it.
     rdpq_write(2, RDPQ_OVL_ID, RDPQ_CMD_SET_OTHER_MODES, w0, w1);
@@ -1071,7 +1055,7 @@ void __rdpq_set_other_modes(uint32_t w0, uint32_t w1)
 __attribute__((noinline))
 void __rdpq_change_other_modes(uint32_t w0, uint32_t w1, uint32_t w2)
 {
-    __rdpq_autosync_change(AUTOSYNC_PIPE);
+    __rdpq_autosync_wait_after_draw(29);
 
     // SOM might also generate a SET_SCISSOR. Make sure to reserve space for it.
     rdpq_write(2, RDPQ_OVL_ID, RDPQ_CMD_MODIFY_OTHER_MODES, w0, w1, w2);
@@ -1108,26 +1092,27 @@ void rdpq_sync_full(void (*callback)(void*), void* arg)
     // and we need that to be forwarded to RSP dynamic command.
     rdpq_write(1, RDPQ_OVL_ID, RDPQ_CMD_SYNC_FULL, w0, w1);
 
-    // The RDP is fully idle after this command, so no sync is necessary.
-    rdpq_tracking.autosync = 0;
+    // Reset autosync tracking into a safe state. No syncs are required
+    // at this point, so assume gclk is far away from the last draws.
+    rdpq_autosync = (rdpq_autosync_t){ .gclk = 1024 };
 }
 
 void rdpq_sync_pipe(void)
 {
     __rdpq_write8(RDPQ_CMD_SYNC_PIPE, 0, 0);
-    rdpq_tracking.autosync &= ~AUTOSYNC_PIPE;
+    rdpq_autosync.gclk += 50-1;
 }
 
 void rdpq_sync_tile(void)
 {
     __rdpq_write8(RDPQ_CMD_SYNC_TILE, 0, 0);
-    rdpq_tracking.autosync &= ~AUTOSYNC_TILES;
+    rdpq_autosync.gclk += 33-1;
 }
 
 void rdpq_sync_load(void)
 {
     __rdpq_write8(RDPQ_CMD_SYNC_LOAD, 0, 0);
-    rdpq_tracking.autosync &= ~AUTOSYNC_TMEMS;
+    rdpq_autosync.gclk += 25-1;
 }
 
 void rdpq_call_deferred(void (*func)(void *), void *arg)
