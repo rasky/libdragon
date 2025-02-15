@@ -78,6 +78,7 @@ void usage(void) {
 	printf("   --wav-mono                Force mono output\n");
 	printf("   --wav-resample <N>        Resample to a different sample rate\n");
 	printf("   --wav-compress <0|1|3>    Enable compression: 0=none, 1=vadpcm (default), 3=opus\n");
+	printf("   --wav-compress-bitrate <N>Enable a specific bitrate if the compression alghorighm allows it\n");
 	printf("   --wav-loop <true|false>   Activate playback loop by default\n");
 	printf("   --wav-loop-offset <N>     Set looping offset (in samples; default: 0)\n");
 	printf("\n");
@@ -254,7 +255,18 @@ int main(int argc, char *argv[]) {
 					fprintf(stderr, "invalid argument for --wav-resample: %s\n", argv[i]);
 					return 1;
 				}
-			} else if (!strcmp(argv[i], "--xm-8bit")) {
+			} else if (!strcmp(argv[i], "--wav-compress-bitrate")) {
+				if (++i == argc) {
+					fprintf(stderr, "missing argument for --wav-compress-bitrate\n");
+					return 1;
+				}
+				flag_wav_bitrate = atoi(argv[i]);
+				if (flag_wav_bitrate < 1 || flag_wav_bitrate > 500000) {
+					fprintf(stderr, "invalid argument for --wav-compress-bitrate: %s\n", argv[i]);
+					return 1;
+				}
+			} 
+			else if (!strcmp(argv[i], "--xm-8bit")) {
 				flag_xm_8bit = true;
 			} else if (!strcmp(argv[i], "--ym-compress")) {
 				if (++i == argc) {

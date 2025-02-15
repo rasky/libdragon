@@ -45,6 +45,8 @@
 
 #include "libopus_internal.h"
 
+#define OPUS_SAMPLE_RATE 48000
+
 /// @brief Wav64 Opus header extension
 typedef struct {
     uint32_t frame_size;            ///< Size of an audioframe in samples
@@ -125,7 +127,7 @@ void wav64_opus_init(wav64_t *wav, int state_size) {
     wav64_opus_header_ext *ext = wav->st->ext;
 
     int err = OPUS_OK;
-    ext->mode = opus_custom_mode_create(wav->wave.frequency, ext->frame_size, &err);
+    ext->mode = opus_custom_mode_create(OPUS_SAMPLE_RATE, ext->frame_size, &err);
     assertf(err == OPUS_OK, "%i", err);
 
     assertf(state_size >= opus_custom_decoder_get_size(ext->mode, wav->wave.channels), "wav64: opus state_size=%d calc_size=%d\n", state_size, opus_custom_decoder_get_size(ext->mode, wav->wave.channels));

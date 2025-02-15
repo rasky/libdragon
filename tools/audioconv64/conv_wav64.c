@@ -36,8 +36,10 @@ bool flag_wav_looping = false;
 int flag_wav_looping_offset = 0;
 int flag_wav_compress = 1;
 int flag_wav_resample = 0;
+int flag_wav_bitrate = 0;
 bool flag_wav_mono = false;
 const int OPUS_SAMPLE_RATE = 48000;
+int wavOriginalSampleRate = 0;
 
 typedef struct {
 	int16_t *samples;			// Samples (always 16-bit signed)
@@ -134,7 +136,7 @@ bool wav64_write(const char *infn, const char *outfn, FILE *out, wav_data_t* wav
 	w8(out, format);  						// format
 	w8(out, wav->channels);					// channels
 	w8(out, nbits);							// bits
-	w32(out, wav->sampleRate);				// frequency
+	w32(out, wavOriginalSampleRate? wavOriginalSampleRate : wav->sampleRate);				// frequency
 	w32(out, wav->cnt);						// len
 	w32(out, loop_len);						// loop_len
 	w32_placeholderf(out, "samples");		// offset where samples begin
@@ -313,7 +315,8 @@ bool wav64_write(const char *infn, const char *outfn, FILE *out, wav_data_t* wav
 
 		// Automatic bitrate calculation for "good quality". This is the same
 		// algorithm libopus selects when setting OPUS_AUTO bitrate.
-		int bitrate_bps = 60*FRAMES_PER_SECOND + flag_wav_resample * wav->channels;
+		if(flag_wav_bitrate == 0) flag_wav_bitrate = wavOriginalSampleRate;
+		int bitrate_bps = 60*FRAMES_PER_SECOND + flag_wav_bitrate * wav.channels;
 		if (flag_verbose)
 			fprintf(stderr, "  opus bitrate: %d bps\n", bitrate_bps);
 
@@ -508,20 +511,6 @@ int wav_convert(const char *infn, const char *outfn) {
 
 	int wavResampleTo = flag_wav_resample;
 
-	// When compressing with opus, we need to resample to 32 Khz. Whatever value
-	// was selected by the user, we force it to 32 Khz.
-	if (flag_wav_compress == 3) {
-		if (flag_verbose)
-			fprintf(stderr, "  opus only supports %d kHz, forcing resample\n", OPUS_SAMPLE_RATE/1000);
-
-		// For Opus, input files must always be 48 Khz (OPUS_SAMPLE_RATE).
-		// We will check the real flag_wav_resample later as a way to tune the
-		// bitrate.
-		wavResampleTo = OPUS_SAMPLE_RATE;
-		if (!flag_wav_resample)
-			flag_wav_resample = wav.sampleRate;
-	}
-
 	// Do sample rate conversion if requested
 	if (wavResampleTo && wav.sampleRate != wavResampleTo) {
 		if (flag_verbose)
@@ -566,6 +555,17 @@ int wav_convert(const char *infn, const char *outfn) {
 
 		// Update also the loop offset to the new sample rate
 		wav.loopOffset = wav.loopOffset * wavResampleTo / wav.sampleRate;
+	}
+
+	// When compressing with opus, its specification suggests 48 Khz only. Whatever value
+	// was selected by the user, we reinterpret it to 48 Khz without it actually being 48 KHz. Then at playback we limit the mixer to the original sample rate
+	// this will make Opus work with audio of any sample rate other than 48 KHz
+	if (flag_wav_compress == 3) {
+		if (flag_verbose)
+			fprintf(stderr, "  opus only supports %d kHz, reinterpreting\n", OPUS_SAMPLE_RATE/1000);
+
+		wavOriginalSampleRate = wav.sampleRate;
+		wav.sampleRate = OPUS_SAMPLE_RATE;
 	}
 
 	// Keep 8 bits file if original is 8 bit, otherwise expand to 16 bit.
