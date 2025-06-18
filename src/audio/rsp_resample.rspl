@@ -1,0 +1,194 @@
+
+#define RESAMPLE_PRINT         1
+
+@Align(8)
+#ifdef RESAMPLE_8_MONO
+function Resample_8_Mono()
+#endif
+#ifdef RESAMPLE_16_MONO
+function Resample_16_Mono()
+#endif
+{
+    u16<$a1> nsamples; u16<$s2> outptr; u32<$t8> finish_bitmask; u32<$t7> prev_bitmask;
+    u32<$k0> SCRATCH_ADDR; u32<$a2> CUR_TVOLUME_ADDR;
+    vec32<$v01> vec_pos; vec32<$v03> vec_step8; vec16<$v05> finish_mask;
+    vec16<$v16> ym1, y0, y1, y2, x;
+
+    loop {
+      vec16<$v08> b0, b1, b2, b3, b4, b5, b6, b7;
+
+      // Load the 8 DMEM addresses into 8 scalar registers.
+      u32 a0,a1,a2,a3,a4,a5,a6,a7,a8;
+      @Barrier("vpos") a0:u16 = load(SCRATCH_ADDR, 0x00);
+      @Barrier("vpos") a1:u16 = load(SCRATCH_ADDR, 0x02);
+      @Barrier("vpos") a2:u16 = load(SCRATCH_ADDR, 0x04);
+      @Barrier("vpos") a3:u16 = load(SCRATCH_ADDR, 0x06);
+      @Barrier("vpos") a4:u16 = load(SCRATCH_ADDR, 0x08);
+      @Barrier("vpos") a5:u16 = load(SCRATCH_ADDR, 0x0a);
+      @Barrier("vpos") a6:u16 = load(SCRATCH_ADDR, 0x0c);
+      @Barrier("vpos") a7:u16 = load(SCRATCH_ADDR, 0x0e);
+
+      // Load the 4 taps for each of the 8 samples to interpolate.
+      // Notice that we subtracted 2 by the DMEM addresses, so
+      // the samples in .e0 will actually be the tap N-1.
+      #ifdef RESAMPLE_16_MONO
+      b0 = load(a0, 0).0123;
+      b1 = load(a1, 0).0123;
+      b2 = load(a2, 0).0123;
+      b3 = load(a3, 0).0123;
+      b4 = load(a4, 0).0123;
+      b5 = load(a5, 0).0123;
+      b6 = load(a6, 0).0123;
+      b7 = load(a7, 0).0123;
+      #endif
+      #ifdef RESAMPLE_8_MONO
+      b0 = load_vec_s8(a0, 0);
+      b1 = load_vec_s8(a1, 0);
+      b2 = load_vec_s8(a2, 0);
+      b3 = load_vec_s8(a3, 0);
+      b4 = load_vec_s8(a4, 0);
+      b5 = load_vec_s8(a5, 0);
+      b6 = load_vec_s8(a6, 0);
+      b7 = load_vec_s8(a7, 0);
+      #endif
+
+      // Now transpose the vector registers. This way, we end up
+      // with vectors b0-b3 containing the 4 taps, and the 8 lanes
+      // now represent the 8 different samples
+      b0 = transpose(b0, SCRATCH_ADDR, 4, 8);
+
+      // Now perform the Hermite interpolation
+      // NOTE: we are using previous loop's samples here.
+      hermite_interpolate(x, ym1, y0, y1, y2);
+
+      // Load volumes
+      vec16 volume, tvolume;
+      tvolume = load(CUR_TVOLUME_ADDR, 0x00);
+      @Barrier("volume") volume = load(CUR_TVOLUME_ADDR, 0x10);
+
+      // Load 16 stereo samples from the output buffer
+      vec16 final_lr_1, final_lr_2;
+      vec16 final_auxa_1, final_auxa_2;
+      vec16 final_auxb_1, final_auxb_2;
+      final_lr_1   = load(outptr,  0);
+      final_lr_2   = load(outptr, 16);
+      final_auxa_1 = load(outptr,  0);
+      final_auxa_2 = load(outptr, 16);
+      final_auxb_1 = load(outptr,  0);
+      final_auxb_2 = load(outptr, 16);
+
+      x = vec_pos:ufract << (16 - WAVEFORM_POS_FRAC_BITS - 1);
+      // vec16 pos_fract = vec_pos:ufract << (16 - WAVEFORM_POS_FRAC_BITS - 1);
+      // @Barrier("tapx") store(pos_fract, SCRATCH_ADDR, 0x70);
+      // @Barrier("tapx") x = load(SCRATCH_ADDR, 0x70);
+
+      // Update volume for next loop (into tvolume) by applying the 1-tap 1-pole filter
+      tvolume = tvolume:sfract  * vec_step8:ufract.3;
+      tvolume = volume:sfract  +* vec_step8:ufract.2;
+
+      // Mask out samples that we don't want to write (because we reached end of sample buffer)
+      // Setting samples to 0 nullifies them during the final mixing step.
+      VTEMP &= finish_mask;
+      prev_bitmask = finish_bitmask;
+      #ifdef RESAMPLE_PRINT
+      print(finish_bitmask);
+      print(finish_mask);
+      print(vec_pos:sint);
+      print(vec_pos:ufract);
+      print(y0);
+      print(VTEMP);
+      #endif
+
+      // Check if we reached the end of the DMEM buffer. Otherwise,
+      // compute finish_mask and finish_bitmask for the next loop.
+      //FIXME: 32-bit selection not implemented yet
+      //finish_mask = vec_pos >= vec_step8.0 ? finish_mask : VZERO;
+      vec16 scratch, posmask;
+      asm_op("vsubc", scratch, vec_pos:ufract, vec_step8:ufract.0);
+      asm_op("vge", scratch, vec_pos:sint, vec_step8:sint.0);
+      finish_bitmask = get_vcc();
+      finish_mask = ~VZERO; // discard only the first iteration
+
+      // Compute final mask (put here to help the optimizer)
+    //   finish_mask = select(0, scratch);
+    //   finish_mask &= finish_mask.11335577;
+    //   finish_mask &= finish_mask.33337777;
+    //   finish_mask &= finish_mask.77777777;
+
+      #ifdef RESAMPLE_16_MONO
+      scratch = ~VZERO;
+      posmask = scratch << 1;     // posmask is 0xFFFE
+      #endif
+
+      // Assign taps for next loop
+      // FIXME: we need to manual test the VU vs SU implementations to find
+      // the best performance.
+      // ym1 = b0;
+      @Barrier("tap0") store(b0, SCRATCH_ADDR, 0x60);
+      @Barrier("tap0") ym1 = load(SCRATCH_ADDR, 0x60);
+    //   y0  = b1;
+      @Barrier("tap1") store(b1, SCRATCH_ADDR, 0x50);
+      @Barrier("tap1") y0 = load(SCRATCH_ADDR, 0x50);
+      // y1  = b2;
+      @Barrier("tap2") store(b2, SCRATCH_ADDR, 0x40);
+      @Barrier("tap2") y1 = load(SCRATCH_ADDR, 0x40);
+      // y2  = b3;
+      @Barrier("tap3") store(b3, SCRATCH_ADDR, 0x30);
+      @Barrier("tap3") y2 = load(SCRATCH_ADDR, 0x30);
+
+      undef b0;
+      undef b1;
+      undef b2;
+      undef b3;
+
+      // Increment position for next loop
+      vec_pos += vec_step8.7;
+
+      // Extract integer part of the position, after converting it to 16.16
+      vec32 vec_pos_int = vec_pos << 4;
+
+      // Compute left and right samples
+      final_lr_1 = final_lr_1:sint    * 1;
+      final_lr_1 = volume:sfract     +* VTEMP:sint.00224466;
+      final_lr_2 = final_lr_2:sint    * 1;
+      final_lr_2 = volume:sfract     +* VTEMP:sint.11335577;
+
+      final_auxa_1 = final_auxa_1:sint    * 1;
+      final_auxa_1 = volume:sfract     +* VTEMP:sint.00224466;
+      final_auxa_2 = final_auxa_2:sint    * 1;
+      final_auxa_2 = volume:sfract     +* VTEMP:sint.11335577;
+
+      final_auxb_1 = final_auxb_1:sint    * 1;
+      final_auxb_1 = volume:sfract     +* VTEMP:sint.00224466;
+      final_auxb_2 = final_auxb_2:sint    * 1;
+      final_auxb_2 = volume:sfract     +* VTEMP:sint.11335577;
+
+      #ifdef RESAMPLE_16_MONO
+      vec_pos_int:sint &= posmask; // mask out the LSB
+      #endif
+      @Barrier("vpos") store(vec_pos_int:sint, SCRATCH_ADDR, 0x00);
+
+      // Update volume
+      @Barrier("volume") store(tvolume, CUR_TVOLUME_ADDR, 0x10);
+
+      // Store the new samples (allow for unaligned store)
+      store(final_lr_1,   outptr,  0);
+      store(final_lr_2,   outptr, 16);
+      store(final_auxa_1, outptr,  0);
+      store(final_auxa_2, outptr, 16);
+      store(final_auxb_1, outptr,  0);
+      store(final_auxb_2, outptr, 16);
+      #ifdef RESAMPLE_PRINT
+      print(final_lr_1);
+      print(final_lr_2);
+      #endif
+
+      nsamples -= 8;
+      outptr += 32;
+
+      if (prev_bitmask != 0)
+        break;
+      
+    } while (nsamples > 0)
+}
+

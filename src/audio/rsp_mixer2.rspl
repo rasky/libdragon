@@ -1,0 +1,472 @@
+include "rsp_queue.inc"
+
+#define SAMPLE_CACHE_SIZE            192
+#define MIX_BUFFER                   512     // stereo samples
+
+#define WAVEFORM_POS_FRAC_BITS       12
+#define WAVEFORM_POS_FRAC_BITS_16    13
+#define POS_FRAC_MASK                0xfff
+
+state {
+  u32 RDRAM_BUFFER;
+  u16 DMEM_BUFFER;     // Starting address of the DMEM buffer (normally either BUFFER or BUFFER+4)
+  u16 NSAMPLES;
+  u16 GVOLUME;         // Global volume (0..1)
+  u32 TICKS;
+
+  alignas(16) u16 PREBUFFER[16];   // prebuffer to allow for dephased interpolation loop
+  alignas(16) u16 BUFFER[1032];    // 512 stereo samples (interleaved) + 16 bytes misalignment buffer
+  alignas(16) u16 POSTBUFFER[16];  // postbuffer to allow for extra writes at the end
+}
+
+data {
+  vec16 STEP8 = {
+    1, 5, 2, 6, 3, 7, 4, 8
+  };
+  u16 VOLUME_FILTER_TAPS[2] = {
+    0xe076,   //   (0.9837**8) fixed 0.16
+    0x1f8a    // 1-(0.9837**8) fixed 0.16
+  };
+}
+
+bss {
+  u32 SETTINGS[8];
+  vec16 SCRATCH[8];
+  vec32 CUR_STEP8;      // current step multiplied by 1,2,3...8
+  vec16 CUR_TVOLUME[2]; // current left/right target/current volume (repeated on all lanes)
+  alignas(8) u8 SAMPLE_CACHE[SAMPLE_CACHE_SIZE];
+}
+
+/**
+ * Mixer_Start
+ *
+ * Starts a mixing sequence. rdram_buffer is the address of the
+ * RDRAM buffer where the output will be written.
+ *
+ * @param rdram_buffer  Address of the RDRAM buffer to use for mixing.
+ *                      The current contents of the buffer will be discarded.
+ * @param nsamples      Bit 0..15: number of stereo samples to mix (max: 512)
+ *                      Bit 16..31: global volume (0..1)
+ */
+command<0> Mixer_Begin(u32 rdram_buffer, u32 nsamples)
+{
+  // FIXME: the code here handles 4-byte misalignment, but we are testing
+  // avoiding load_unaligned() in the Resample() function.
+  u32 misalign = rdram_buffer & 3;
+  if (misalign) assert(0x7002);
+  store(rdram_buffer, RDRAM_BUFFER);
+
+  misalign = rdram_buffer & 7;
+  u16<$s4> dmem_buffer = BUFFER;
+  dmem_buffer += misalign;
+  store(dmem_buffer, DMEM_BUFFER);
+  // print(rdram_buffer, misalign, dmem_buffer);
+
+  u16 gvolume = nsamples >> 16;
+  store(gvolume, GVOLUME);
+
+  u16 ns = nsamples & 0xffff;
+  if (ns > 512) assert(0x7001);
+  store(ns, NSAMPLES);
+
+  // Clear the DMEM buffer+prebuffer
+  u32 ptr = BUFFER;
+  u32 size = (512*2*2)/64;
+  loop {
+    store(VZERO, ptr, 0x00);
+    store(VZERO, ptr, 0x10);
+    store(VZERO, ptr, 0x20);
+    store(VZERO, ptr, 0x30);
+    ptr += 0x40;
+    size -= 1;
+  } while (size > 0)
+  store(VZERO, ptr, 0x00); // extra 16 bytes for misalignment
+}
+
+command<1> Mixer_End()
+{
+  u32<$s0> rdram_buffer = load(RDRAM_BUFFER);
+
+  u32 misalign = rdram_buffer & 7;
+  if (misalign != 0) {
+    // Note: misalignment (if exists) is always 4 bytes
+    u16 dmem_buffer = BUFFER;
+    u32 data = load(dmem_buffer, 4);
+    dma_in(BUFFER, rdram_buffer, 8);
+    store(data, dmem_buffer, 4);
+  }
+
+  u16<$t0> nsamples = load(NSAMPLES);
+  nsamples *= 4; // convert to byte
+  nsamples += misalign; 
+  dma_out_async(BUFFER, rdram_buffer, nsamples);
+}
+
+
+/**
+  * Hermite interpolation
+  *
+  * Performs Hermite interpolation on the given 4 samples.
+  *
+  * @param x     The fractional part of the sample position (0..1)
+  * @param ym1   Sample N-1
+  * @param y0    Sample N
+  * @param y1    Sample N+1
+  * @param y2    Sample N+2
+  *
+  * @return     The interpolated sample in VTEMP
+  */
+macro hermite_interpolate(vec16 x, vec16 ym1, vec16 y0, vec16 y1, vec16 y2)
+{
+  vec16 x2, x3;
+  // FIXME: RSPL generates wrong code for this
+  // x2 = x:ufract * x:ufract;
+  // x3 = x2:ufract * x:ufract;
+  asm_op("vmudl", x2, x:ufract, x:ufract);
+  asm_op("vmudl", x3, x2:ufract, x:ufract);
+
+  vec16 y0_05, y2_05, y2_05n, y2n, ym1_05n, y1_05, y1_n, y0_n;
+  VTEMP   = ym1 >> 1;
+  y1_05   = y1  >> 1;
+  y2_05   = y2  >> 1;
+  ym1_05n = VZERO - VTEMP;
+  y0_n    = VZERO - y0;
+  y1_n    = VZERO - y1;
+  y2_05n  = VZERO - y2_05;
+  y0_05   = y0  >> 1;
+
+  VTEMP = y0:sint  * 1;
+  VTEMP = y1_05   +* x:ufract;   // y[1]  *  0.5 * x^1
+  VTEMP = ym1_05n +* x:ufract;   // y[-1] * -0.5 * x^1
+  VTEMP = ym1     +* x2:ufract;  // y[-1] *  1.0 * x^2
+  VTEMP = y0_n    +* x2:ufract;  // y[0]  * -2.5 * x^2 
+  VTEMP = y0_n    +* x2:ufract;
+  VTEMP = y0_n    +* x2:ufract;
+  VTEMP = y0_05   +* x2:ufract;
+  VTEMP = y1      +* x2:ufract;  // y[1]  *  2.0 * x^2
+  VTEMP = y1      +* x2:ufract;
+  VTEMP = y2_05n  +* x2:ufract;  // y[2]  * -0.5 * x^2
+  VTEMP = y2_05   +* x3:ufract;  // y[2]  *  0.5 * x^3
+  VTEMP = ym1_05n +* x3:ufract;  // y[-1] * -0.5 * x^3
+  VTEMP = y0      +* x3:ufract;  // y[0]  *  1.5 * x^3
+  VTEMP = y0_05   +* x3:ufract;
+  VTEMP = y1_n    +* x3:ufract;  // y[1]  * -1.5 * x^3
+  VTEMP = y1_n    +* x3:ufract;
+  VTEMP = y1_05   +* x3:ufract;
+}
+
+#define RESAMPLE_8_MONO 1
+#include "rsp_resample.rspl"
+#undef RESAMPLE_8_MONO
+
+#define RESAMPLE_16_MONO 1
+#include "rsp_resample.rspl"
+#undef RESAMPLE_16_MONO
+
+
+/**
+ * Mixer_Resample
+ *
+ * Resamples the waveform at the given address. The waveform is
+ * expected to be in RDRAM, and the output will be written to the
+ * DMEM buffer.
+ * 
+ * Waveform structure:
+ *   0x00:  Current position (fractional 22.12)
+ *   0x04:  Resampling step (fractional 22.12)
+ *   0x08:  Length of the waveform (in samples)
+ *   0x0c:  Loop length (in samples)
+ *   0x10:  Address of the waveform in RDRAM
+ *   0x14:  Volume target (left/right) (0..1)
+ *   0x18:  Actual current volume (left/right) (0..1)
+ *
+ * @param waveform_ptr  Address of the waveform to resample.
+ */
+command<2> Mixer_Resample(u32 waveform_ptr)
+{
+  {
+    u32 ticks = get_ticks();
+    store(ticks, TICKS);    
+  }
+
+  u16<$a1> nsamples = load(NSAMPLES);
+
+  dma_in(SETTINGS, waveform_ptr);
+  if (nsamples <= 0) assert(0x7003);
+  if (nsamples > 512) assert(0x7004);
+
+  u32<$s0> rdram_addr;
+  u32<$s4> sample_cache_addr = SAMPLE_CACHE;
+  u32<$k0> SCRATCH_ADDR = SCRATCH;
+  u32<$a2> CUR_TVOLUME_ADDR = CUR_TVOLUME;
+  u32 SETTINGS_ADDR = SETTINGS;
+  
+  u16<$s2> outptr = load(DMEM_BUFFER);
+  
+  // Read waveform settings from the waveform_ptr
+  u32 wv_addr, wv_pos, wv_step, wv_len, wv_loop_len;
+  wv_addr      = load(SETTINGS_ADDR, 0x10);
+  wv_pos       = load(SETTINGS_ADDR, 0x00);
+  wv_step      = load(SETTINGS_ADDR, 0x04);
+  wv_len       = load(SETTINGS_ADDR, 0x08);
+  wv_loop_len  = load(SETTINGS_ADDR, 0x0c);
+
+  u16 ResampleFunc;
+  {
+    u32 fmt = wv_addr & 3;
+    if (fmt == 0) {
+      ResampleFunc = Resample_16_Mono;
+    } else if (fmt == 1) {
+      ResampleFunc = Resample_8_Mono;
+    } else {
+      assert(0x7005); // unsupported waveform format
+    }
+  }
+
+  // Create vec_step8 vector, which contains the step multiplied by 1,2,3...8
+  vec32 vec_step8;
+  vec16 step8;
+  step8 = load(STEP8);
+  vec_step8.0 = wv_step;
+  vec_step8 = step8:sint * vec_step8.0;
+  store(vec_step8, CUR_STEP8);
+
+  // Prepare target volume vector (with L/R volume repeated in all lanes)
+  // Use VUs to do this broadcast as this optimizes better with the reset of
+  // SU code in this prologue.
+  vec16 tvolume, volume;
+  vec16 tmp1, tmp2;
+  set_vcc(0x5555);
+  tvolume.01 = load(SETTINGS_ADDR, 0x14).01;  // target LR
+  volume.01 = load(SETTINGS_ADDR, 0x18).01;   // actual LR
+  tmp1 = tvolume.0;
+  tmp2 = volume.0;
+  tvolume = select(tmp1, tvolume.1);
+  volume = select(tmp2, volume.1);
+  store(tvolume, CUR_TVOLUME_ADDR, 0x00);
+  store(volume,  CUR_TVOLUME_ADDR, 0x10);
+
+  undef vec_step8;
+  undef step8;
+  undef tvolume;
+  undef volume;
+  undef tmp1;
+  undef tmp2;
+
+  loop {
+    print("begin loop\n");
+    print(wv_pos, wv_len, nsamples);
+
+    // Wrap wv_pos within wv_len (if it's looping, otherwise we're done)
+    while (wv_pos >= wv_len) {
+      // print("WV END\n");
+      // print(wv_loop_len);
+      if (wv_loop_len == 0) {
+        wv_pos = wv_len; // no loop, so we are done
+        goto Mixer_Resample_Epilog;
+      }
+      wv_pos -= wv_loop_len;
+    }
+
+    u32 wv_pos_to_dmem;
+    wv_pos_to_dmem = wv_pos >> WAVEFORM_POS_FRAC_BITS;
+    rdram_addr = wv_pos_to_dmem + wv_addr;
+    rdram_addr -= 2; // adjust to read sample N-1 for the 4-tap interpolation
+
+    print("toread: ");
+    u32 toread = wv_len - wv_pos;
+    toread >>= WAVEFORM_POS_FRAC_BITS;
+    // print(toread);
+    if (toread > SAMPLE_CACHE_SIZE) {
+      toread = SAMPLE_CACHE_SIZE; // we need the 3 following samples to be available for interpolation
+    }
+    print(toread);
+
+    // We need to fetch more data because:
+    // 1) Interpolation requires 3 extra samples, one before and two after (that could be either 0, or a loop).
+    //    On the C side, mixer_exec()/waveform_read() make sure these really exist.
+    // 2) DMA always reads multiple of 8 starting from aligned addresses. If rdram_addr is
+    //    misaligned, we need to read 8 bytes more to make sure we read at least the
+    //    number of samples we need.
+    u32<$t0> dmaread = toread + 16 + 8;
+    print(dmaread);
+    sample_cache_addr = SAMPLE_CACHE;
+    dma_in_async(sample_cache_addr, rdram_addr, dmaread);
+    wv_pos_to_dmem -= sample_cache_addr;  // sample_cache_addr was updated to match misalignment
+    wv_pos_to_dmem <<= WAVEFORM_POS_FRAC_BITS;
+    undef dmaread;
+    
+    vec32<$v01> vec_pos;
+    vec32<$v03> vec_step8;
+
+    // Compute begin/end position in DMEM
+    u32 begin_pos = wv_pos - wv_pos_to_dmem;
+    u32 end_pos = wv_pos >> WAVEFORM_POS_FRAC_BITS;
+    end_pos += toread; // end_pos is the number of samples to read
+    end_pos <<= WAVEFORM_POS_FRAC_BITS; // convert to fractional position
+    end_pos -= wv_pos_to_dmem; // convert to DMEM position
+    print(end_pos);
+    
+    // Calculate vector position (containing positions for the first 8 samples)
+    vec_step8 = load(CUR_STEP8);
+    vec_pos.0 = begin_pos;
+    vec_pos = vec_step8 + vec_pos.0;
+    vec_pos -= vec_step8.0;
+
+    // Now we need vec_step8 only for .7 to do the 8x increment on each loop.
+    // Reuse the rest. In .0, store SAMPLE_CACHE_END, which is useful to
+    // check when the loop is done.
+    vec_step8.0 = end_pos;
+
+    undef begin_pos;
+    undef end_pos;
+    undef toread;
+
+    // Load volume target and filter constants into empty lanes of vec_step8
+    vec_step8:ufract.23 = load(VOLUME_FILTER_TAPS, 0x00).01;
+    vec_step8:ufract.45 = load(CUR_TVOLUME).01;
+  
+    // This loops is dephased: it loads taps for one iteration, while doing
+    // the interpolation (using the taps) for the previous iteration. This allows
+    // for much faster code because of the SU/VU interleaving without dependencies.
+    vec16<$v05> finish_mask; finish_mask = 0;
+    u32<$t8> finish_bitmask = 0; u32<$t7> prev_bitmask = 0;
+
+    {
+      vec16 vec_pos_int = vec_pos << 3;
+      vec_pos_int <<= 1;
+      @Barrier("vpos") store(vec_pos_int, SCRATCH_ADDR, 0x00);
+      // print(vec_pos_int);
+    }
+    outptr -= 32;
+    nsamples += 8;
+
+    {
+      u32 align = outptr & 15;
+      if (align != 0) assert(0x7006);
+    }
+
+    // *********************************
+    ResampleFunc();
+    // *********************************
+
+    // Read back the current position. We need to decrease by 8 steps because
+    // vec_pos was already updated for next loop. 
+    //wv_pos = vec_pos.0
+    @Barrier("vpos") store(vec_pos:sint.0, SCRATCH_ADDR, 0x00);
+    @Barrier("vpos") store(vec_pos:ufract.0, SCRATCH_ADDR, 0x02);
+    @Barrier("vpos") wv_pos = load(SCRATCH_ADDR, 0x00);
+    wv_pos -= wv_step * 8;
+
+    // Convert the DMEM position to sample position.
+    wv_pos += wv_pos_to_dmem;
+
+    // // The last loop may have written less than 8 samples, so we need to
+    // // check how many samples we actually wrote. Each set bit in prev_bitmask
+    // // is a skipped sample.
+    // while (prev_bitmask != 0) {
+    //   u32 bit = prev_bitmask & 1;
+    //   if (bit != 0) {
+    //     nsamples += 1;
+    //     outptr -= 4;
+    //     wv_pos -= wv_step;
+    //   }
+    //   prev_bitmask = prev_bitmask >> 1;
+    // }
+
+    // // Force realignment. This is only needed if we want to keep the output
+    // // pointer aligned to 16 bytes so that the inner loop doesn't need to 
+    // // handle misalignment. FIXME: optimize this without a loop
+    // if (nsamples > 0) {
+    //   u32 misalign = outptr & 15;
+    //   print("misalign: ");
+    //   print(misalign);
+    //   //if (misalign != 0) assert(0x7006);
+    //   // outptr -= misalign;
+    //   // misalign >>= 2;
+    //   // nsamples += misalign;
+    //   // while (misalign > 0) {
+    //   //   wv_pos -= wv_step;
+    //   //   misalign -= 1;
+    //   // }
+
+    //   while (misalign > 0) {
+    //     outptr -= 4;
+    //     wv_pos -= wv_step;
+    //     nsamples += 1;
+    //     misalign -= 4;
+    //   }
+    // }
+
+  } while (nsamples > 0)
+
+Mixer_Resample_Epilog:
+  u32 volume = load(CUR_TVOLUME, 0x10).01;
+  // Update the position in the waveform
+  store(wv_pos, SETTINGS, 0x00);
+  store(volume, SETTINGS, 0x18);
+  dma_out_async(SETTINGS, waveform_ptr);
+
+  {
+    u32 ticks2 = get_ticks();
+    u32 ticks1 = load(TICKS);
+    ticks2 -= ticks1;
+    print("Mixer_Resample ticks: ");
+    print(ticks2);
+  }
+}
+
+
+command<3> Mixer_Interleave(u16 nsamples, u32 in1, u32 in2, u32 out)
+{
+  vec16 s1, s2;
+  vec16 n1, n2;
+
+  nsamples += 8;
+  out -= 32;
+  u32 old_out = out;
+  vec16 old1 = load(out, 0x00);
+  vec16 old2 = load(out, 0x10);
+
+  set_vcc(0x5555);
+  loop {
+    vec16 merged;
+    merged.0 = s1.4;
+    merged.1 = s2.4;
+    merged.2 = s1.5;
+    merged.3 = s2.5;
+    merged.4 = s1.6;
+    merged.5 = s2.6;
+    merged.6 = s1.7;
+    merged.7 = s2.7;
+
+    store(s1.01, out, 0x00);
+    store(s2.01, out, 0x04);
+    store(s1.23, out, 0x08);
+    store(s2.23, out, 0x0C);
+    store(merged, out, 0x10);
+
+    n1 = load(in1);
+    n2 = load(in2);
+
+    vec16 tmp1 = n1.11335577;
+    n1 = select(n1, n2.00224466);
+    n2 = select(tmp1, n2.11335577);
+
+    nsamples -= 8;
+
+    s1 = n1;
+    s2 = n2;
+
+    out += 32;
+    in1 += 16;
+    in2 += 16;
+
+  } while (nsamples > 0)
+
+  store(old1, old_out, 0x00);
+  store(old2, old_out, 0x10);
+}
+
+
+
