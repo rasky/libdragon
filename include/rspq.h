@@ -406,32 +406,27 @@ extern volatile uint32_t *rspq_cur_pointer, *rspq_cur_sentinel;
 extern void rspq_next_buffer(void);
 
 // Helpers used to implement rspq_write
-#define _rspq_write_prolog() \
+#define _rspq_write_prolog(size) \
+    if (__builtin_expect(rspq_cur_pointer+(size) > rspq_cur_sentinel, 0)) \
+        rspq_next_buffer(); \
     volatile uint32_t *ptr = rspq_cur_pointer+1; \
     (void)ptr;
-
-#define _rspq_write_epilog() ({ \
-    if (__builtin_expect(rspq_cur_pointer > rspq_cur_sentinel, 0)) \
-        rspq_next_buffer(); \
-})
 
 #define _rspq_write_arg(arg) \
     *ptr++ = (arg);
 
 #define _rspq_write0(ovl_id, cmd_id) ({ \
-    _rspq_write_prolog(); \
+    _rspq_write_prolog(1); \
     rspq_cur_pointer[0] = (ovl_id) + ((cmd_id)<<24); \
     rspq_cur_pointer += 1; \
-    _rspq_write_epilog(); \
 })
 
 #define _rspq_write1(ovl_id, cmd_id, arg0, ...) ({ \
     _Static_assert(__COUNT_VARARGS(__VA_ARGS__) <= RSPQ_MAX_SHORT_COMMAND_SIZE, "too many arguments to rspq_write, please use rspq_write_begin/arg/end instead"); \
-    _rspq_write_prolog(); \
+    _rspq_write_prolog(1 + __COUNT_VARARGS(__VA_ARGS__)); \
     __CALL_FOREACH(_rspq_write_arg, ##__VA_ARGS__); \
     rspq_cur_pointer[0] = ((ovl_id) + ((cmd_id)<<24)) | (arg0); \
     rspq_cur_pointer += 1 + __COUNT_VARARGS(__VA_ARGS__); \
-    _rspq_write_epilog(); \
 })
 
 /// @endcond

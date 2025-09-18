@@ -31,6 +31,8 @@
 #define RSPQ_OVERLAY_HEADER_SIZE     16
 #endif
 
+#define RSPQ_BUFFER_EPILOGUE_SIZE      4        ///< Size of the epilogue written by rspq_next_buffer/rspq_highpri_end (in 32-bit words)
+
 #define RSPQ_BLOCK_MIN_SIZE            64       ///< Minimum / maximum size of a block's chunk (contiguous memory buffer)
 #define RSPQ_BLOCK_MAX_SIZE            8192     ///< Maximum block size
 

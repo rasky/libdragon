@@ -206,7 +206,6 @@
 #include <string.h>
 #include <malloc.h>
 
-
 /// @cond
 // Make sure that RSPQ_CMD_WRITE_STATUS and RSPQ_CMD_TEST_WRITE_STATUS have
 // an even ID number. This is a small trick used to save one opcode in
@@ -515,12 +514,9 @@ static volatile uint32_t* rspq_switch_buffer(uint32_t *new, int size, bool clear
     assert(size >= RSPQ_MAX_COMMAND_SIZE+2);
     if (clear) memset(new, 0, size * sizeof(uint32_t));
 
-    // Switch to the new buffer, and calculate the new sentinel. The sentinel
-    // must allow for a maximum size command (RSPQ_MAX_SHORT_COMMAND_SIZE) to
-    // be written, plus the special block terminator written by rspq_next_buffer
-    // which is 2 words.
+    // Switch to the new buffer, and calculate the new sentinel
     rspq_cur_pointer = new;
-    rspq_cur_sentinel = new + size - (RSPQ_MAX_SHORT_COMMAND_SIZE + 2);
+    rspq_cur_sentinel = new + size - RSPQ_BUFFER_EPILOGUE_SIZE;
 
     // Return a pointer to the previous buffer
     return prev;
@@ -583,7 +579,7 @@ static void rspq_init_context(rspq_ctx_t *ctx, int buf_size)
     ctx->buf_idx = 0;
     ctx->buf_size = buf_size;
     ctx->cur = ctx->buffers[0];
-    ctx->sentinel = ctx->cur + buf_size - RSPQ_MAX_COMMAND_SIZE;
+    ctx->sentinel = ctx->cur + buf_size - RSPQ_BUFFER_EPILOGUE_SIZE;
 }
 
 static void rspq_close_context(rspq_ctx_t *ctx)
