@@ -5,7 +5,7 @@ N64_GCCPREFIX_TRIPLET = $(N64_GCCPREFIX)/bin/$(addsuffix -,$(N64_TARGET))
 TARGET := $(shell $(CC) -dumpmachine)
 
 C_CXX_FLAGS += -O2 -pthread -Wall -Werror
-C_CXX_FLAGS += -I../include -MMD
+C_CXX_FLAGS += -I../include -I./n64sym -MMD
 C_CXX_FLAGS += -fdiagnostics-color=always
 C_CXX_FLAGS += -Wno-unused-result -Wno-error=unknown-pragmas -Wno-sign-compare
 
@@ -101,7 +101,7 @@ mkdfs_OBJS = mkdfs/mkdfs.o
 dumpdfs_OBJS = dumpdfs/dumpdfs.o
 cpaktool_OBJS = cpaktool/cpaktool.o cpaktool/cpakcmds.o cpaktool/cpaklib.o cpaktool/cpakwrapper.o
 n64tool_OBJS = n64tool.o
-n64sym_OBJS = n64sym/n64sym.o n64sym/n64sym_huffman.o
+n64sym_OBJS = n64sym/n64sym.o n64sym/n64sym_huffman.o n64sym/n64sym_compact.o
 n64symdump_OBJS = n64sym/n64symdump.o n64sym/n64sym_huffman.o
 n64metadata_OBJS = n64metadata.o
 ed64romconfig_OBJS = ed64romconfig.o

@@ -15,8 +15,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdarg.h>
+#include <string.h>
 
-#include <math.h>
 #include <stdlib.h>
 #include "../common/subprocess.h"
 
@@ -24,6 +24,7 @@
 #include "../common/utils.h"
 #include "../common/binout.h"
 #include "n64sym_huffman.h"
+#include "./n64sym_compact.h"
 
 #include "../common/binout.c"
 
@@ -34,6 +35,7 @@
 #define MAX_BUFFER_SIZE  512
 
 bool flag_verbose = false;
+int flag_verbose_level = 0;
 int flag_max_sym_len = 64;
 bool flag_inlines = true;
 const char *gccprefix_triplet = NULL;
@@ -55,7 +57,7 @@ void usage(const char *progname)
     fprintf(stderr, "Usage: %s [flags] <program.elf> [<program.sym>]\n", progname);
     fprintf(stderr, "\n");
     fprintf(stderr, "Command-line flags:\n");
-    fprintf(stderr, "   -v/--verbose          Verbose output\n");
+    fprintf(stderr, "   -v/--verbose          Verbose output (repeat for more)\n");
     fprintf(stderr, "   -m/--max-len <N>      Maximum symbol length (default: 64)\n");
     fprintf(stderr, "   --no-inlines          Do not export inlined symbols\n");
     fprintf(stderr, "\n");
@@ -200,15 +202,28 @@ void symbol_add(const char *elf, uint32_t addr, bool is_func)
         int n = getline(&line_buf, &line_buf_size, addr2line_r);
         if (strncmp(line_buf, "0xffffffff", 10) == 0) break;
         n--;
-        if (line_buf[n-1] == '\r') n--; // Remove trailing \r (Windows)
+        if (n > 0 && line_buf[n-1] == '\r') n--; // Remove trailing \r (Windows)
 
-        // If the function of name is longer than 64 bytes, truncate it. This also
-        // avoid paradoxically long function names like in C++ that can even be
-        // several thousands of characters long.
-        // Also ensure it fits in the runtime buffer.
+        line_buf[n] = 0;
+        // If the function name is longer than N, try to compact it with
+        // heuristics to keep it readable and within the runtime buffer.
         int max_len = MIN(flag_max_sym_len, MAX_BUFFER_SIZE - 8);
-        char *func = strndup(line_buf, MIN(n, max_len));
-        if (n > max_len) strcpy(&func[max_len-3], "...");
+        bool was_long = n > max_len;
+        char *simple = was_long ? simple_truncate(line_buf, max_len) : NULL;
+        char *func = compact_symbol(line_buf, max_len);
+        if (!func) {
+            fprintf(stderr, "Error: cannot allocate memory for symbol name\n");
+            exit(1);
+        }
+        if ((int)strlen(func) > max_len)
+            head_tail_ellipsis(func, max_len);
+        if (flag_verbose_level >= 2 && was_long) {
+            verbose("Symbol compaction (> %d chars):\n", max_len);
+            verbose("  original: %s\n", line_buf);
+            verbose("  simple  : %s\n", simple ? simple : "(none)");
+            verbose("  compact : %s\n", func);
+        }
+        free(simple);
 
         // Second line is the file name and line number
         int ret = getline(&line_buf, &line_buf_size, addr2line_r);
@@ -793,6 +808,7 @@ int main(int argc, char *argv[])
             usage(argv[0]);
             return 0;
         } else if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) {
+            flag_verbose_level++;
             flag_verbose = true;
         } else if (!strcmp(argv[i], "--no-inlines")) {
             flag_inlines = false;
