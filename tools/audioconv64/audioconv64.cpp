@@ -83,6 +83,7 @@ void usage(void) {
 	printf("   --wav-compress <0|1|3>    	Enable compression: 0=none, 1=vadpcm (default), 3=opus\n");
 	printf("   --wav-loop <true|false>   	Activate playback loop by default\n");
 	printf("   --wav-loop-offset <N>     	Set looping offset (in samples; default: 0)\n");
+	printf("   --wav-headroom <N>        	Apply headroom for mixing N channels (default: 8, 0=off)\n");
 	printf("   --wav-seek <SEC|FILE>     	Enable seeking support:\n");
 	printf("                             	- if SEC is a float, add a seekpoint every SEC seconds\n");
 	printf("                             	- if FILE, read a list of seekpoints (one per line):\n");
@@ -267,6 +268,16 @@ int main(int argc, char *argv[]) {
 					return 1;
 				}
 				flag_wav_looping = true;
+			} else if (!strcmp(argv[i], "--wav-headroom")) {
+				if (++i == argc) {
+					fprintf(stderr, "missing argument for --wav-headroom\n");
+					return 1;
+				}
+				char extra;
+				if (sscanf(argv[i], "%d%c", &flag_wav_headroom, &extra) != 1 || flag_wav_headroom < 0) {
+					fprintf(stderr, "invalid integer argument for --wav-headroom: %s\n", argv[i]);
+					return 1;
+				}
 			} else if (!strcmp(argv[i], "--wav-mono")) {
 				flag_wav_mono = true;
 			} else if (!strcmp(argv[i], "--wav-compress") || !strcmp(argv[i], "--xm-compress")) {

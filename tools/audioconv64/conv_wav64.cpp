@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <time.h>
 #include <unordered_set>
+#include <cmath>
 #include "../../src/audio/wav64_internal.h"
 #include "../common/binout.h"
 
@@ -40,6 +41,7 @@ int flag_wav_compress = 1;
 int flag_wav_compress_vadpcm_huffman = -1;
 int flag_wav_compress_vadpcm_bits = 4;
 int flag_wav_resample = 0;
+int flag_wav_headroom = 8;
 double flag_wav_seek_interval_sec = 0.0;
 const char *flag_wav_seek_file = NULL;
 bool flag_wav_mono = false;
@@ -156,6 +158,76 @@ static int64_t now_ms(void) {
 	struct timespec ts;
 	clock_gettime(CLOCK_MONOTONIC, &ts);
 	return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+static float compute_wav_headroom_gain(const wav_data_t *wav, int mix_channels, float *out_peak, float *out_rms50) {
+	if (!wav || !wav->samples || wav->cnt <= 0 || wav->channels <= 0 || mix_channels <= 0) {
+		if (out_peak) *out_peak = 0.0f;
+		if (out_rms50) *out_rms50 = 0.0f;
+		return 1.0f;
+	}
+
+	int window_len = (int)std::llround(0.05 * (double)wav->sampleRate);
+	if (window_len < 1) window_len = 1;
+	if (window_len > wav->cnt) window_len = wav->cnt;
+
+	float max_peak = 0.0f;
+	float max_rms = 0.0f;
+	const int channels = wav->channels;
+
+	for (int ch = 0; ch < channels; ch++) {
+		int32_t peak = 0;
+		for (int i = 0; i < wav->cnt; i++) {
+			int16_t s = wav->samples[i * channels + ch];
+			int32_t a = (int32_t)s;
+			if (a < 0) a = -a;
+			if (a > peak) peak = a;
+		}
+
+		int64_t sumsq = 0;
+		for (int i = 0; i < window_len; i++) {
+			int32_t s = wav->samples[i * channels + ch];
+			sumsq += (int64_t)s * (int64_t)s;
+		}
+		int64_t max_sumsq = sumsq;
+		for (int i = window_len; i < wav->cnt; i++) {
+			int32_t s_add = wav->samples[i * channels + ch];
+			int32_t s_sub = wav->samples[(i - window_len) * channels + ch];
+			sumsq += (int64_t)s_add * (int64_t)s_add;
+			sumsq -= (int64_t)s_sub * (int64_t)s_sub;
+			if (sumsq > max_sumsq) max_sumsq = sumsq;
+		}
+
+		float peak_norm = (float)peak / 32768.0f;
+		float rms_norm = (float)std::sqrt((double)max_sumsq / (double)window_len) / 32768.0f;
+		if (peak_norm > max_peak) max_peak = peak_norm;
+		if (rms_norm > max_rms) max_rms = rms_norm;
+	}
+
+	if (out_peak) *out_peak = max_peak;
+	if (out_rms50) *out_rms50 = max_rms;
+
+	float gain_rms = 1.0f;
+	if (max_rms > 0.0f) {
+		gain_rms = (1.0f / (float)std::sqrt((double)mix_channels)) / max_rms;
+	}
+
+	// Use RMS-only headroom for stability; peak is tracked for statistics only.
+	float gain = gain_rms;
+	if (gain > 1.0f) gain = 1.0f;
+	return gain;
+}
+
+static void apply_wav_gain(wav_data_t *wav, float gain) {
+	if (!wav || !wav->samples || gain >= 1.0f) return;
+	const int total = wav->cnt * wav->channels;
+	for (int i = 0; i < total; i++) {
+		float v = (float)wav->samples[i] * gain;
+		int32_t out = (int32_t)std::lrint(v);
+		if (out > 32767) out = 32767;
+		if (out < -32768) out = -32768;
+		wav->samples[i] = (int16_t)out;
+	}
 }
 
 static void resample_progress_print(int64_t bytes_done, int64_t bytes_total, int64_t *last_print_ms, double *last_pct) {
@@ -906,6 +978,20 @@ int wav_convert(const char *infn, const char *outfn) {
 	// Normalize seek points array
 	std::sort(wav.skipPoints.begin(), wav.skipPoints.end());
 	wav.skipPoints.erase(std::unique(wav.skipPoints.begin(), wav.skipPoints.end()), wav.skipPoints.end());
+
+	if (flag_wav_headroom > 0) {
+		float peak = 0.0f;
+		float rms50 = 0.0f;
+		float gain = compute_wav_headroom_gain(&wav, flag_wav_headroom, &peak, &rms50);
+		if (flag_verbose) {
+			float peak_db = peak > 0.0f ? 20.0f * (float)std::log10((double)peak) : -1000.0f;
+			float rms_db = rms50 > 0.0f ? 20.0f * (float)std::log10((double)rms50) : -1000.0f;
+			float gain_db = gain > 0.0f ? 20.0f * (float)std::log10((double)gain) : -1000.0f;
+			fprintf(stderr, "  headroom: N=%d peak=%.1f dBFS rms50=%.1f dBFS gain=%.1f dB (volume: %.3f)\n",
+				flag_wav_headroom, peak_db, rms_db, gain_db, gain);
+		}
+		apply_wav_gain(&wav, gain);
+	}
 
 	FILE *out = fopen(outfn, "wb");
 	if (!out) {
