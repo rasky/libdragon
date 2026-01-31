@@ -395,6 +395,7 @@ RSPQ_DefineCommand RSPQCmd_SwapBuffers,     12    # 0x07
 RSPQ_DefineCommand RSPQCmd_TestWriteStatus, 8     # 0x08 -- must be even (bit 24 must be 0)
 RSPQ_DefineCommand RSPQCmd_RdpSetBuffer,    12    # 0x09
 RSPQ_DefineCommand RSPQCmd_RdpAppendBuffer, 4     # 0x0A
+RSPQ_DefineCommand RSPQCmd_RdpResetMode,    36    # 0x0B
 
 # Overlay data will be loaded at this address. We force 8-byte alignment
 # here so that the overlay header can layout 2/4 bytes field in a way
@@ -888,6 +889,18 @@ RSPQCmd_RdpAppendBuffer:
     sw a0, %lo(RDPQ_CURRENT)
     jr ra
     mtc0 a0, COP0_DP_END
+    .endfunc
+
+    .func RSPQCmd_RdpResetMode
+RSPQCmd_RdpResetMode:
+    lqv $v01,0, -0x20+160,rspq_dmem_buf_ptr  # FIXME: hardcoded offset
+    lrv $v01,0, -0x10+160,rspq_dmem_buf_ptr
+    lqv $v02,0, -0x10+160,rspq_dmem_buf_ptr
+    lrv $v02,0, -0x00+160,rspq_dmem_buf_ptr
+    li t0, %lo(RDPQ_MODE)  # 416
+    sqv $v01,0, 0x00,t0
+    jr ra
+    sqv $v02,0, 0x10,t0
     .endfunc
 
 

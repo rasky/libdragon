@@ -11,6 +11,7 @@
 #include "rdpq_rect.h"
 #include "surface.h"
 #include "sprite.h"
+#include "rdpq_debug.h"
 #include "rdpq_mode.h"
 #include "rdpq_tex.h"
 #include "rdpq_sprite.h"
@@ -45,6 +46,7 @@ static void setup_render_mode(int font_type, tex_format_t fmt)
         // Atlases are simple I4 textures, so we just need to colorize
         // them using the PRIM color. We also use PRIM alpha to control
         // additional transparency of the text.
+        debugf("setup_render_mode: FONT_TYPE_ALIASED\n");
         rdpq_mode_begin();
             rdpq_set_mode_standard();
             rdpq_mode_combiner(RDPQ_COMBINER1((0,0,0,PRIM), (TEX0,0,PRIM,0)));
@@ -83,6 +85,7 @@ static void setup_render_mode(int font_type, tex_format_t fmt)
         break;
     case FONT_TYPE_ALIASED_OUTLINE:
         // Atlases are IA8, where I modulates between the fill color and the outline color.
+        debugf("setup_render_mode: FONT_TYPE_ALIASED_OUTLINE\n");
         rdpq_mode_begin();
             rdpq_set_mode_standard();
             rdpq_mode_combiner(RDPQ_COMBINER1((PRIM,ENV,TEX0,ENV), (TEX0,0,PRIM,0)));
@@ -95,6 +98,7 @@ static void setup_render_mode(int font_type, tex_format_t fmt)
         case FMT_CI4:
         case FMT_CI8:
             rdpq_mode_begin();
+                rdpq_set_mode_standard();
                 rdpq_mode_alphacompare(1);
                 rdpq_mode_combiner(RDPQ_COMBINER1((TEX0,0,PRIM,0), (TEX0,0,PRIM,0)));
                 if (fmt == FMT_CI4 || fmt == FMT_CI8)
@@ -188,9 +192,11 @@ rdpq_font_t* rdpq_font_load_buf(void *buf, int sz)
         sprite_t *spr = fnt->atlases[i].sprite;
         rspq_block_begin();
             // Setup the render mode for this font type
+            rdpq_debug_log_msg("setup_render_mode");
             int font_type = fnt->flags & FONT_FLAG_TYPE_MASK;
             setup_render_mode(font_type, sprite_get_format(spr));
 
+            rdpq_debug_log_msg("load_atlas");
             // Get the atlas surface and check if it fits into TMEM or not,
             // as we will need different rendering strategies.
             surface_t surf = sprite_get_pixels(spr);

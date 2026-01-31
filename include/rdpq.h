@@ -194,6 +194,7 @@ enum {
     RDPQ_CMD_TRIANGLE                   = 0x1E,
     RDPQ_CMD_TRIANGLE_DATA              = 0x1F,
 
+    RDPQ_CMD_SET_OTHER_MODES            = 0x23,
     RDPQ_CMD_TEXTURE_RECTANGLE          = 0x24,
     RDPQ_CMD_TEXTURE_RECTANGLE_FLIP     = 0x25,
     RDPQ_CMD_SYNC_LOAD                  = 0x26,
@@ -205,7 +206,7 @@ enum {
     RDPQ_CMD_SET_CONVERT                = 0x2C,
     RDPQ_CMD_SET_SCISSOR                = 0x2D,
     RDPQ_CMD_SET_PRIM_DEPTH             = 0x2E,
-    RDPQ_CMD_SET_OTHER_MODES            = 0x2F,
+    RDPQ_CMD_SET_OTHER_MODES_RAW        = 0x2F,
 
     RDPQ_CMD_LOAD_TLUT                  = 0x30,
     RDPQ_CMD_DEBUG                      = 0x31,

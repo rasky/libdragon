@@ -50,7 +50,7 @@
         RSPQ_DefineCommand RSPQCmd_Noop,                    8   # 0xE0
         RSPQ_DefineCommand RSPQCmd_Noop,                    8   # 0xE1
         RSPQ_DefineCommand RSPQCmd_Noop,                    8   # 0xE2
-        RSPQ_DefineCommand RSPQCmd_Noop,                    8   # 0xE3
+        RSPQ_DefineCommand RDPQCmd_SetOtherModes,           8   # 0xE3 SET_OTHER_MODES (fixup)
         RSPQ_DefineCommand RDPQCmd_Passthrough16,           16  # 0xE4 TEXTURE_RECTANGLE
         RSPQ_DefineCommand RDPQCmd_Passthrough16,           16  # 0xE5 TEXTURE_RECTANGLE_FLIP
         RSPQ_DefineCommand RDPQCmd_Passthrough8,            8   # 0xE6 SYNC_LOAD
@@ -62,7 +62,8 @@
         RSPQ_DefineCommand RDPQCmd_Passthrough8,            8   # 0xEC SET_CONVERT
         RSPQ_DefineCommand RDPQCmd_Passthrough8,            8   # 0xED SET_SCISSOR
         RSPQ_DefineCommand RDPQCmd_Passthrough8,            8   # 0xEE SET_PRIM_DEPTH
-        RSPQ_DefineCommand RDPQCmd_SetOtherModes,           8   # 0xEF SET_OTHER_MODES
+        RSPQ_DefineCommand RDPQCmd_Passthrough8,            8   # 0xEF SET_OTHER_MODES (raw)
+        
         RSPQ_DefineCommand RDPQCmd_Passthrough8,            8   # 0xF0 LOAD_TLUT
         RSPQ_DefineCommand RDPQCmd_Passthrough8,            8   # 0xF1 RDPQ_DEBUG (debugging command)
         RSPQ_DefineCommand RDPQCmd_Passthrough8,            8   # 0xF2 SET_TILE_SIZE

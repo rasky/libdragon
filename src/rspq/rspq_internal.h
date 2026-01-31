@@ -130,6 +130,9 @@ enum {
      * commands appended in the current buffer to be sent to RDP.
      */
     RSPQ_CMD_RDP_APPEND_BUFFER = 0x0A,
+
+
+    RSPQ_CMD_RDP_RESET_MODE      = 0x0B,
 };
 
 /** @brief Write an internal command to the RSP queue */

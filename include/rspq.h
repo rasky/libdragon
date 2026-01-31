@@ -197,7 +197,7 @@ extern "C" {
 #endif
 
 /** @brief Maximum size of a command (in 32-bit words). */
-#define RSPQ_MAX_COMMAND_SIZE          62
+#define RSPQ_MAX_COMMAND_SIZE          58
 
 /** @brief Maximum size of a command that it is writable with #rspq_write
  *         (in 32-bit words).
