@@ -44,7 +44,7 @@ RDPQ_CMD_PTR:           .word RDPQ_CMD_STAGING - 0xA4000000
     # Enough for a full triangle command
 RDPQ_CMD_STAGING:       .ds.b 0xB0
 
-    .section .text.rdpq_send
+    RSP_TEXT_SUBSECTION .text.rdpq_send
 
     #############################################################
     # RDPQ_Send
@@ -144,7 +144,7 @@ do_dma:
     #undef buf_idx 
     #undef next_func
 
-    .section .text.rdpq_send_helpers
+    RSP_TEXT_SUBSECTION .text.rdpq_send_helpers
 
     #############################################################
     # RDPQ_Finalize
@@ -246,7 +246,7 @@ RDPQ_MODE_COMBINER_1CYC:     .quad  0
 RDPQ_MODE_COMBINER_2CYC:     .quad  0
 
 
-    .section .text.rdpq_mode_api
+    RSP_TEXT_SUBSECTION .text.rdpq_mode_api
 
     .func RDPQ_SetBlendingMode
 RDPQ_SetBlendingMode:
@@ -706,7 +706,7 @@ rdpq_update_fillcopy:
     #undef cycle_type
 
 
-    .section .text.rdpq_scissor
+    RSP_TEXT_SUBSECTION .text.rdpq_scissor
 
     #############################################################
     # RDPQ_WriteSetScissor
@@ -737,7 +737,7 @@ RDPQ_WriteSetScissor:
     .endfunc
 
 
-    .section .text.rdpq_fillcolor
+    RSP_TEXT_SUBSECTION .text.rdpq_fillcolor
 
     #############################################################
     # RDPQ_WriteSetFillColor
@@ -788,7 +788,7 @@ RDPQ_WriteSetFillColor:
 TRICONST1: .half 0xFFFF,0,0,0,0x200,0x200,0x200,0x200
 
 
-    .section .text.rdpq_triangle
+    RSP_TEXT_SUBSECTION .text.rdpq_triangle
 
     #####################################################################
     # RDPQ_Triangle

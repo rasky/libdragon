@@ -4,7 +4,7 @@
 # Authors: Dennis Heinze <dennisjp.heinze@gmail.com>
 ############################################################
 
-    .section .text.gl_lighting
+    RSP_TEXT_SUBSECTION .text.gl_lighting
 
     ################################################################
     # GL_VtxLighting

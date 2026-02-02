@@ -25,6 +25,9 @@ MEMORY
     */
     ram_data : ORIGIN = 0xA4000000, LENGTH = 0x1000
     ram_text : ORIGIN = 0xA4001000, LENGTH = 0x1000
+
+    /* ROM-only area for relocation metadata (not loaded to DMEM/IMEM). */
+    rom_rspreloc : ORIGIN = 0x00005000, LENGTH = 0x00010000
 }
 
 SECTIONS
@@ -67,6 +70,11 @@ SECTIONS
         KEEP(*(.meta))
         *(.meta.*)
     }
+
+    .rspreloc : {
+        KEEP(*(.rspreloc.base))
+        *(.rspreloc*)
+    } > rom_rspreloc
 
     /DISCARD/ : { *(.MIPS.abiflags) }
 }

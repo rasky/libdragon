@@ -968,56 +968,71 @@ makeVrndpOp vrndp16, 0b000010, 1
 .endm
 
 
-/** @brief Syntactic sugar for lwc2 instuctions */
+/***********************************************************
+ * RSP Load / store opcodes
+/***********************************************************
+ *
+ * These opcodes require a special relocation (when used with a symbolic
+ * address), because they use a signed 7-bit field for the offset, scaled
+ * by the instruction size (1/2/4/8/16). The assembler/linker cannot express
+ * this operation, so we need to use a special relocation entry in a custom
+ * format, and later apply it using a custom tool (n64rspreloc). See the
+ * comments there for a decription of the relocation binary format.
+ * 
+ ***********************************************************/
+
+.set __rsp_group_sig_enabled, 0
+.set __rsp_group_sig, 0
+
+/* Macro to define a text subsection with COMDAT group signature.
+   This allows symbolic references not to keep the section alive. */
+.macro RSP_TEXT_SUBSECTION name
+    .section \name,"axG",@progbits,.Lrsp_group_sig_\@,comdat
+.Lrsp_group_sig_\@:
+    .set __rsp_group_sig_enabled, 1
+    .set __rsp_group_sig, .Lrsp_group_sig_\@
+.endm
+
+/* Macro to emit a relocation entry for a vector load/store instruction. */
+.macro RSP_RELOC_VAL scale, value, patch_label
+    .if __rsp_group_sig_enabled
+        .section .rspreloc,"aG",@progbits,__rsp_group_sig,comdat
+    .else
+        .section .rspreloc.base,"a",@progbits
+    .endif
+    .word \patch_label          # Patch address
+    .half \scale                # Scale factor
+    .half 0
+    addiu zero, zero, (\value)  # Resolved symbol (store as imm16)
+    .word 0
+    .previous
+.endm
+
 .macro loadVector, opcode, vt, element, offset, base
     renameRegisters
     lwc2 \vt, (\opcode << 11 | \element << 7 | \offset) (\base)
 .endm
-
-/** @brief Syntactic sugar for swc2 instuctions */
 .macro storeVector opcode, vt, element, offset, base
     renameRegisters
     swc2 \vt, (\opcode << 11 | \element << 7 | \offset) (\base)
 .endm
 
-.macro lsInstruction mode, opcode, vt, element, offset, base, size, rangemin, rangemax
-    .ifgt (\element >> 4)
-        .error "Invalid element"
-        .exitm
-    .endif
-
-    .ifne ((\offset) % \size)
-        .error "Invalid offset - must be multiple of \size"
-        .exitm
-    .endif
-
-    .ifge (\offset)
-        .ifgt ((\offset) - \rangemax)
-            .error "Invalid offset - valid range: [\rangemin, \rangemax]"
-            .exitm
-        .endif
-
-        \mode\()Vector \opcode, \vt, \element, ((\offset) / \size), \base
-    .else
-        .iflt ((\offset) - \rangemin)
-            .error "Invalid offset - valid range: [\rangemin, \rangemax]"
-            .exitm
-        .endif
-
-        \mode\()Vector \opcode, \vt, \element, (128 + ((\offset) / \size)), \base
-    .endif
+.macro lsInstruction mode, opcode, vt, element, offset, base, size
+    .Lrsp_reloc_\@:
+    \mode\()Vector \opcode, \vt, \element, 0, \base
+    RSP_RELOC_VAL \size, \offset, .Lrsp_reloc_\@
 .endm
 
-.macro makeLsInstruction mode, elMode, name, opcode, size, rangemin, rangemax
+.macro makeLsInstruction mode, elMode, name, opcode, size
     # Overloads:
     #   op vt, element, offset, base
-    #   op vt, offset, base
-    #   op vt.e, offset, base
+    #   op vt[.e], offset, base
+    #   op vt[.e], address
     .macro \name vt, elementOrOffset, offsetOrBase, baseOrEmpty
         \elMode\()VectorElements
 
         .ifnb \baseOrEmpty
-            lsInstruction \mode, \opcode, \vt, \elementOrOffset, \offsetOrBase, \baseOrEmpty, \size, \rangemin, \rangemax
+            lsInstruction \mode, \opcode, \vt, \elementOrOffset, \offsetOrBase, \baseOrEmpty, \size
             .exitm
         .endif
 
@@ -1029,34 +1044,39 @@ makeVrndpOp vrndp16, 0b000010, 1
             .exitm
         .endif
 
+        .ifb \offsetOrBase
+            .set __rsp_ls_base, zero
+        .else
+            .set __rsp_ls_base, \offsetOrBase
+        .endif
         # Dot-style syntax is encoded as numbers >= 0x200
         .if (\vt >= 0x200)
             regVectorAccessors
-            lsInstruction \mode, \opcode, reg.\vt, (\vt & 0xF), \elementOrOffset, \offsetOrBase, \size, \rangemin, \rangemax
+            lsInstruction \mode, \opcode, reg.\vt, (\vt & 0xF), \elementOrOffset, __rsp_ls_base, \size
         .else
-            lsInstruction \mode, \opcode, \vt, 0, \elementOrOffset, \offsetOrBase, \size, \rangemin, \rangemax
+            lsInstruction \mode, \opcode, \vt, 0, \elementOrOffset, __rsp_ls_base, \size
         .endif
     .endm
 .endm
 
 .macro makeLsInstructionQuad mode, elMode, name, opcode
-    makeLsInstruction \mode, \elMode, \name, \opcode, 16, -1024, 1008
+    makeLsInstruction \mode, \elMode, \name, \opcode, 16
 .endm
 
 .macro makeLsInstructionDouble mode, elMode, name, opcode
-    makeLsInstruction \mode, \elMode, \name, \opcode, 8, -512, 504
+    makeLsInstruction \mode, \elMode, \name, \opcode, 8
 .endm
 
 .macro makeLsInstructionLong mode, elMode, name, opcode
-    makeLsInstruction \mode, \elMode, \name, \opcode, 4, -256, 252
+    makeLsInstruction \mode, \elMode, \name, \opcode, 4
 .endm
 
 .macro makeLsInstructionShort mode, elMode, name, opcode
-    makeLsInstruction \mode, \elMode, \name, \opcode, 2, -128, 126
+    makeLsInstruction \mode, \elMode, \name, \opcode, 2
 .endm
 
 .macro makeLsInstructionByte mode, elMode, name, opcode
-    makeLsInstruction \mode, \elMode, \name, \opcode, 1, -64, 63
+    makeLsInstruction \mode, \elMode, \name, \opcode, 1
 .endm
 
 /** @brief Load Byte into Vector Register */

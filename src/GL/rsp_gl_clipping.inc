@@ -25,7 +25,7 @@ CLIP_LISTS:
     CLIP_LIST1: .dcb.w  CLIPPING_CACHE_SIZE
 
 
-    .section .text.gl_clipping
+    RSP_TEXT_SUBSECTION .text.gl_clipping
 
     ################################################################
     # GL_ClipTriangle

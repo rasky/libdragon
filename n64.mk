@@ -63,6 +63,7 @@ N64_METADATA = $(N64_BINDIR)/n64metadata
 N64_DSO = $(N64_BINDIR)/n64dso
 N64_DSOEXTERN = $(N64_BINDIR)/n64dso-extern
 N64_DSOMSYM = $(N64_BINDIR)/n64dso-msym
+N64_RSPRELOC = $(N64_BINDIR)/n64rspreloc
 
 N64_C_AND_CXX_FLAGS =  -march=vr4300 -mtune=vr4300 -mabi=o64 -I$(N64_INCLUDEDIR)/newlib_overrides -I$(N64_INCLUDEDIR) -include ktls.h
 N64_C_AND_CXX_FLAGS += -falign-functions=32   # NOTE: if you change this, also change backtrace() in backtrace.c
@@ -105,7 +106,6 @@ ifeq ($(D),1)
 CFLAGS+=-g3
 CXXFLAGS+=-g3
 ASFLAGS+=-g
-RSPASFLAGS+=-g
 LDFLAGS+=-g
 endif
 
@@ -114,6 +114,9 @@ CFLAGS+=-MMD
 CXXFLAGS+=-MMD
 ASFLAGS+=-MMD
 RSPASFLAGS+=-MMD
+
+# Always keep debug info for RSP ELFs so addr2line works
+RSPASFLAGS+=-g -ffile-prefix-map="$(CURDIR)"=$(N64_BACKTRACE_FILE_PREFIX)
 
 # Change all the dependency chain of z64 ROMs to use the N64 toolchain.
 %.z64: CC=$(N64_CC)
@@ -170,8 +173,14 @@ $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.S
 		METASECTION="$(basename $@).meta"; \
 		BINARY="$(basename $@).elf"; \
 		echo "    [RSP] $<"; \
-		$(N64_CC) $(RSPASFLAGS) -L$(N64_LIBDIR) -nostartfiles -Wl,-Trsp.ld -Wl,--gc-sections  -Wl,-Map=$(BUILD_DIR)/$(notdir $(basename $@)).map,--cref -o $@ $<; \
+		$(N64_CC) $(RSPASFLAGS) -L$(N64_LIBDIR) \
+			 -nostdlib -nostartfiles \
+			 -Wl,-T"$(N64_LDSCRIPTDIR)/rsp.ld" \
+			 -Wl,--gc-sections \
+			 -Wl,-Map=$(BUILD_DIR)/$(notdir $(basename $<)).map,--cref \
+			 -o $@ $<; \
 		mv "$@" $$BINARY; \
+		$(N64_RSPRELOC) $$BINARY; \
 		$(N64_OBJCOPY) -O binary -j .text $$BINARY $$TEXTSECTION.bin; \
 		$(N64_OBJCOPY) -O binary -j .data $$BINARY $$DATASECTION.bin; \
 		$(N64_OBJCOPY) -O binary -j .meta $$BINARY $$METASECTION.bin --set-section-flags .meta=alloc,load; \

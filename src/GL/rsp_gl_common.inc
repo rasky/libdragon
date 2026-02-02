@@ -6,7 +6,7 @@
 #ifndef RSP_GL_COMMON_INC
 #define RSP_GL_COMMON_INC
 
-    .section .text.mtxmult
+    RSP_TEXT_SUBSECTION .text.mtxmult
 
 .func GL_MtxMult
 GL_MtxMult:
@@ -102,7 +102,7 @@ GL_MtxMultSave:
 
     .endfunc
 
-    .section .text.mtxtransform
+    RSP_TEXT_SUBSECTION .text.mtxtransform
 
     .func GL_MtxTransformDouble
 GL_MtxTransformDouble:

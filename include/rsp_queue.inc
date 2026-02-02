@@ -298,6 +298,7 @@ _RSPQ_SAVED_STATE_END:
 _data_start:
 
 # Data for vector shift registers.
+RSPQ_SHIFT_CONSTS:
     .byte 0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01
 
 # Overlay table. Contains packed pointer to overlay data segment in RDRAM 
@@ -519,7 +520,7 @@ rspq_overlay_check:
     lhu t0, %lo(_ovl_data_start) + RSPQ_OH_CMDBASE
 
     # <stall cycle> Initial vshift in preparation to running the command
-    lpv vshift8,  0x00,zero
+    lpv vshift8,  %lo(RSPQ_SHIFT_CONSTS)
 
     # Check if the requested overlay is already in memory
     bne ovl_index, t1, rspq_load_overlay
@@ -893,14 +894,13 @@ RSPQCmd_RdpAppendBuffer:
 
     .func RSPQCmd_RdpResetMode
 RSPQCmd_RdpResetMode:
-    lqv $v01,0, -0x20+160,rspq_dmem_buf_ptr  # FIXME: hardcoded offset
-    lrv $v01,0, -0x10+160,rspq_dmem_buf_ptr
-    lqv $v02,0, -0x10+160,rspq_dmem_buf_ptr
-    lrv $v02,0, -0x00+160,rspq_dmem_buf_ptr
-    li t0, %lo(RDPQ_MODE)  # 416
-    sqv $v01,0, 0x00,t0
+    lqv $v01, %lo(RSPQ_DMEM_BUFFER - 0x20),rspq_dmem_buf_ptr
+    lrv $v01, %lo(RSPQ_DMEM_BUFFER - 0x10),rspq_dmem_buf_ptr
+    lqv $v02, %lo(RSPQ_DMEM_BUFFER - 0x10),rspq_dmem_buf_ptr
+    lrv $v02, %lo(RSPQ_DMEM_BUFFER - 0x00),rspq_dmem_buf_ptr
+    sqv $v01, %lo(RDPQ_MODE + 0x00)
     jr ra
-    sqv $v02,0, 0x10,t0
+    sqv $v02, %lo(RDPQ_MODE + 0x10)
     .endfunc
 
 
