@@ -111,8 +111,9 @@ n64symdump_OBJS = n64sym/n64symdump.o n64sym/n64sym_huffman.o
 n64metadata_OBJS = n64metadata.o
 ed64romconfig_OBJS = ed64romconfig.o
 n64elfcompress_OBJS = n64elfcompress/n64elfcompress.o common/assetcomp.a
+n64rspreloc_OBJS = n64rspreloc/n64rspreloc.o
 n64elfcompress/n64elfcompress.o: n64elfcompress/n64elfcompress.c $(DECOMP_STUBS)
-TOOLS = n64tool n64metadata n64sym n64symdump n64elfcompress ed64romconfig audioconv64 videoconv64 mkdfs dumpdfs mkasset mksprite mkfont mkmodel mkmaterial n64dso n64dso-msym n64dso-extern rdpvalidate combexpr cpaktool
+TOOLS = n64tool n64metadata n64sym n64symdump n64elfcompress n64rspreloc ed64romconfig audioconv64 videoconv64 mkdfs dumpdfs mkasset mksprite mkfont mkmodel mkmaterial n64dso n64dso-msym n64dso-extern rdpvalidate combexpr cpaktool
 
 # Define a variable that has value ".exe" when building on Windows
 # Alo
