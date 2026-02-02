@@ -127,13 +127,19 @@ tools-install:
 tools-clean:
 	$(MAKE) -C tools clean
 
-install-mk: $(INSTALLDIR)/include/n64.mk
+# install-mk is a special target that ensures that prerequisites are installed
+# before building libdragon itself. It is a separate target because it allows
+# to be run under "sudo" if required for installation.
+install-mk: $(INSTALLDIR)/include/n64.mk $(INSTALLDIR)/bin/n64rspreloc
 
 $(INSTALLDIR)/include/n64.mk: n64.mk
 # Always update timestamp of n64.mk. This make sure that further targets
 # depending on install-mk won't always try to re-install it.
 	mkdir -p $(INSTALLDIR)/include
 	install -cv -m 0644 n64.mk $(INSTALLDIR)/include/n64.mk
+
+$(INSTALLDIR)/bin/n64rspreloc:
+	$(MAKE) -C tools n64rspreloc-install
 
 gen-version:
 # Generate a version file for libdragon. We go through git archive so that
