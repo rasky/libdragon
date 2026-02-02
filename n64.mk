@@ -33,6 +33,7 @@ N64_ROOTDIR = $(N64_INST)
 N64_BINDIR = $(N64_ROOTDIR)/bin
 N64_INCLUDEDIR = $(N64_ROOTDIR)/$(N64_TARGET)/include
 N64_LIBDIR = $(N64_ROOTDIR)/$(N64_TARGET)/lib
+N64_LDSCRIPTDIR = $(N64_ROOTDIR)/$(N64_TARGET)/lib
 N64_GCCPREFIX_TRIPLET = $(N64_GCCPREFIX)/bin/$(addsuffix -,$(N64_TARGET))
 
 COMMA:=,
@@ -74,8 +75,8 @@ N64_CFLAGS = $(N64_C_AND_CXX_FLAGS) -std=gnu17
 N64_CXXFLAGS = $(N64_C_AND_CXX_FLAGS) -std=gnu++17
 N64_ASFLAGS = -mtune=vr4300 -march=vr4300 -mabi=o64 -Wa,--fatal-warnings -I$(N64_INCLUDEDIR)
 N64_RSPASFLAGS = -march=mips1 -mabi=32 -Wa,--fatal-warnings -I$(N64_INCLUDEDIR)
-N64_LDFLAGS = -g -L$(N64_LIBDIR) -ldragon -lm -ldragonsys -Tn64.ld --gc-sections --wrap __do_global_ctors
-N64_DSOLDFLAGS = --emit-relocs --unresolved-symbols=ignore-all --nmagic -T$(N64_LIBDIR)/dso.ld
+N64_LDFLAGS = -g -L$(N64_LIBDIR) -ldragon -lm -ldragonsys -T"$(N64_LDSCRIPTDIR)/n64.ld" --gc-sections --wrap __do_global_ctors
+N64_DSOLDFLAGS = --emit-relocs --unresolved-symbols=ignore-all --nmagic -T"$(N64_LDSCRIPTDIR)/dso.ld"
 
 N64_TOOLFLAGS = --toc
 N64_TOOLFLAGS += --title $(N64_ROM_TITLE)
@@ -211,7 +212,7 @@ $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.cpp
 	@echo "    [CXX] $<"
 	$(CXX) -c $(CXXFLAGS) -o $@ $<
 
-%.elf: $(N64_LIBDIR)/libdragon.a $(N64_LIBDIR)/libdragonsys.a $(N64_LIBDIR)/n64.ld
+%.elf: $(N64_LIBDIR)/libdragon.a $(N64_LIBDIR)/libdragonsys.a $(N64_LDSCRIPTDIR)/n64.ld
 	@mkdir -p $(dir $@)
 	@echo "    [LD] $@"
 # We always use g++ to link except for ucode and DSO files because of the inconsistencies
@@ -237,7 +238,7 @@ $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.cpp
 %.dso: ASFLAGS+=$(N64_ASFLAGS)
 %.dso: RSPASFLAGS+=$(N64_RSPASFLAGS)
 
-%.dso: $(N64_LIBDIR)/dso.ld
+%.dso: $(N64_LDSCRIPTDIR)/dso.ld
 	$(eval DSO_ELF=$(basename $(BUILD_DIR)/dso_elf/$@).elf)
 	@mkdir -p $(dir $@)
 	@mkdir -p $(dir $(DSO_ELF))
