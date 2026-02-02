@@ -582,12 +582,11 @@ static void process_rspreloc_section(elf_t *elf, const char *elf_path, Elf32_Hal
             sym_value % scale != 0 || sym_value < min_off || sym_value > max_off;
 
         /* Do symbol lookup if needed. */
-        char off_str[32];
-        bool zero_base = false;
+        char off_str[32]; bool zero_base = false;
         const char *err_sym = NULL;
-        const char *sym_name = NULL;
         if (must_lookup_sym) {
-            const sym_t *match = find_sym_by_value(elf, (Elf32_Addr)sym_value);
+            const char *sym_name = NULL;
+            const sym_t *match = find_sym_by_value(elf, (Elf32_Addr)sym_value + 0xA4000000);
             if (match)
                 sym_name = match->name;
 
