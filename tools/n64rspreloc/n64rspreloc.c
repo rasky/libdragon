@@ -111,38 +111,6 @@ static void fatal(const char *fmt, ...)
     exit(1);
 }
 
-static size_t checked_mul(size_t a, size_t b)
-{
-    if (a != 0 && b > SIZE_MAX / a)
-        fatal("Invalid ELF size (overflow)");
-    return a * b;
-}
-
-static void *xmalloc(size_t size)
-{
-    void *ptr = malloc(size);
-    if (!ptr)
-        fatal("Out of memory allocating %zu bytes", size);
-    return ptr;
-}
-
-static void *xcalloc(size_t count, size_t size)
-{
-    size_t total = checked_mul(count, size);
-    void *ptr = calloc(1, total);
-    if (!ptr)
-        fatal("Out of memory allocating %zu bytes", total);
-    return ptr;
-}
-
-static char *xstrdup(const char *s)
-{
-    size_t len = strlen(s) + 1;
-    char *ptr = xmalloc(len);
-    memcpy(ptr, s, len);
-    return ptr;
-}
-
 /* Swap a 16-bit value to host endianness. */
 static uint16_t bswap16(uint16_t v)
 {
@@ -229,8 +197,8 @@ static void load_elf_header(elf_t *elf)
 /* Load and byte-swap section headers. */
 static void load_section_headers(elf_t *elf)
 {
-    size_t shdrs_size = checked_mul(elf->ehdr.e_shnum, sizeof(Elf32_Shdr));
-    elf->shdrs = xcalloc(elf->ehdr.e_shnum, sizeof(Elf32_Shdr));
+    size_t shdrs_size = elf->ehdr.e_shnum * sizeof(Elf32_Shdr);
+    elf->shdrs = calloc(elf->ehdr.e_shnum, sizeof(Elf32_Shdr));
     read_checked(elf, elf->ehdr.e_shoff, elf->shdrs, shdrs_size);
     for (Elf32_Half i = 0; i < elf->ehdr.e_shnum; i++) {
         elf->shdrs[i].sh_name      = bswap32(elf->shdrs[i].sh_name);
@@ -254,7 +222,7 @@ static void load_shstrtab(elf_t *elf)
     Elf32_Shdr *shstr = &elf->shdrs[elf->ehdr.e_shstrndx];
     if (shstr->sh_type != SHT_STRTAB)
         fatal("Invalid shstrtab section");
-    elf->shstrtab = xmalloc(shstr->sh_size);
+    elf->shstrtab = malloc(shstr->sh_size);
     read_checked(elf, shstr->sh_offset, elf->shstrtab, shstr->sh_size);
 }
 
@@ -282,13 +250,13 @@ static void load_symtab(elf_t *elf)
     Elf32_Shdr *strtab = &elf->shdrs[symtab->sh_link];
     if (strtab->sh_type != SHT_STRTAB)
         fatal("Invalid .symtab string table");
-    elf->strtab = xmalloc(strtab->sh_size);
+    elf->strtab = malloc(strtab->sh_size);
     read_checked(elf, strtab->sh_offset, elf->strtab, strtab->sh_size);
 
     if (symtab->sh_size % sizeof(Elf32_Sym))
         fatal("Invalid .symtab size");
     elf->sym_count = symtab->sh_size / sizeof(Elf32_Sym);
-    elf->syms = xcalloc(elf->sym_count, sizeof(sym_t));
+    elf->syms = calloc(elf->sym_count, sizeof(sym_t));
 
     for (size_t i = 0; i < elf->sym_count; i++) {
         Elf32_Sym sym;
@@ -301,7 +269,7 @@ static void load_symtab(elf_t *elf)
 
         if (sym.st_name >= strtab->sh_size)
             fatal("Invalid symbol name offset");
-        elf->syms[i].name = xstrdup(elf->strtab + sym.st_name);
+        elf->syms[i].name = strdup(elf->strtab + sym.st_name);
         elf->syms[i].value = sym.st_value;
         elf->syms[i].shndx = sym.st_shndx;
         elf->syms[i].info = sym.st_info;
@@ -360,8 +328,8 @@ static const sym_t *find_sym_by_value(const elf_t *elf, Elf32_Addr value)
 static elf_t *load_elf(const char *path, bool writeable)
 {
     g_elf_path = path;
-    elf_t *elf = xcalloc(1, sizeof(*elf));
-    elf->path = xstrdup(path);
+    elf_t *elf = calloc(1, sizeof(*elf));
+    elf->path = strdup(path);
     elf->file = fopen(path, writeable ? "r+b" : "rb");
     if (!elf->file) {
         free_elf(elf);
@@ -389,10 +357,10 @@ static const char *addr2line_bin(const char *elf_path)
     const char *n64inst = getenv("N64_INST");
     if (n64inst) {
         size_t len = (size_t)snprintf(NULL, 0, "%s/bin/mips64-elf-addr2line", n64inst) + 1;
-        addrbin = xmalloc(len);
+        addrbin = malloc(len);
         snprintf(addrbin, len, "%s/bin/mips64-elf-addr2line", n64inst);
     } else {
-        addrbin = xstrdup("mips64-elf-addr2line");
+        addrbin = strdup("mips64-elf-addr2line");
     }
     return addrbin;
 }
@@ -552,7 +520,7 @@ static void process_rspreloc_section(elf_t *elf, const char *elf_path, Elf32_Hal
         return;
 
     /* Load and byte-swap relocation entries. */
-    rsp_reloc_t *entries = xcalloc(entry_count, sizeof(rsp_reloc_t));
+    rsp_reloc_t *entries = calloc(entry_count, sizeof(rsp_reloc_t));
     read_checked(elf, rspreloc->sh_offset, entries, rspreloc->sh_size);
     for (size_t i = 0; i < entry_count; i++) {
         entries[i].patch_addr = bswap32(entries[i].patch_addr);
