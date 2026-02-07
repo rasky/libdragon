@@ -982,7 +982,8 @@ makeVrndpOp vrndp16, 0b000010, 1
  ***********************************************************/
 
 .set __rsp_group_sig_enabled, 0
-.set __rsp_group_sig, 0
+.macro __rsp_emit_rspreloc_section
+.endm
 
 /* Macro to define a text subsection with COMDAT group signature.
    This allows symbolic references not to keep the section alive. */
@@ -990,13 +991,16 @@ makeVrndpOp vrndp16, 0b000010, 1
     .section \name,"axG",@progbits,.Lrsp_group_sig_\@,comdat
 .Lrsp_group_sig_\@:
     .set __rsp_group_sig_enabled, 1
-    .set __rsp_group_sig, .Lrsp_group_sig_\@
+    .purgem __rsp_emit_rspreloc_section
+    .macro __rsp_emit_rspreloc_section
+        .section .rspreloc,"aG",@progbits,.Lrsp_group_sig_\@,comdat
+    .endm
 .endm
 
 /* Macro to emit a relocation entry for a vector load/store instruction. */
 .macro RSP_RELOC_VAL scale, value, patch_label
     .if __rsp_group_sig_enabled
-        .section .rspreloc,"aG",@progbits,__rsp_group_sig,comdat
+        __rsp_emit_rspreloc_section
     .else
         .section .rspreloc.base,"a",@progbits
     .endif
