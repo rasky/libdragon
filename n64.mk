@@ -178,9 +178,9 @@ $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.S
 			 -Wl,-T"$(N64_LDSCRIPTDIR)/rsp.ld" \
 			 -Wl,--gc-sections \
 			 -Wl,-Map=$(BUILD_DIR)/$(notdir $(basename $<)).map,--cref \
-			 -o $@ $<; \
-		mv "$@" $$BINARY; \
-		$(N64_RSPRELOC) $$BINARY; \
+			 -o "$$BINARY.tmp" $<; \
+		$(N64_RSPRELOC) -v "$$BINARY.tmp"; \
+		mv "$$BINARY.tmp" $$BINARY; \
 		$(N64_OBJCOPY) -O binary -j .text $$BINARY $$TEXTSECTION.bin; \
 		$(N64_OBJCOPY) -O binary -j .data $$BINARY $$DATASECTION.bin; \
 		$(N64_OBJCOPY) -O binary -j .meta $$BINARY $$METASECTION.bin --set-section-flags .meta=alloc,load; \
