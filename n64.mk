@@ -179,7 +179,7 @@ $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.S
 			 -Wl,--gc-sections \
 			 -Wl,-Map=$(BUILD_DIR)/$(notdir $(basename $<)).map,--cref \
 			 -o "$$BINARY.tmp" $<; \
-		$(N64_RSPRELOC) -v "$$BINARY.tmp"; \
+		$(N64_RSPRELOC) "$$BINARY.tmp"; \
 		mv "$$BINARY.tmp" $$BINARY; \
 		$(N64_OBJCOPY) -O binary -j .text $$BINARY $$TEXTSECTION.bin; \
 		$(N64_OBJCOPY) -O binary -j .data $$BINARY $$DATASECTION.bin; \
