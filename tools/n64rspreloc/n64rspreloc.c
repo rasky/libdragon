@@ -99,6 +99,7 @@ typedef struct {
 static bool starts_with(const char *s, const char *prefix);
 
 static const char *g_elf_path = NULL;
+static int num_errors = 0;
 
 static void fatal(const char *fmt, ...)
 {
@@ -431,8 +432,11 @@ static void print_msg_at(const char *elf_path, uint32_t addr, const char *level,
     va_end(args);
 }
 
-#define print_error_at(elf_path, addr, sym_name, fmt, ...) print_msg_at(elf_path, addr, "error", sym_name, fmt, ##__VA_ARGS__)
 #define print_info_at(elf_path, addr, sym_name, fmt, ...)  print_msg_at(elf_path, addr, "info", sym_name, fmt, ##__VA_ARGS__)
+#define print_error_at(elf_path, addr, sym_name, fmt, ...) ({ \
+    print_msg_at(elf_path, addr, "error", sym_name, fmt, ##__VA_ARGS__); \
+    num_errors++; \
+})
 
 /* Compute file offset for a VMA inside .text. */
 static uint32_t locate_instr_at(const elf_t *elf, uint32_t patch_addr)
@@ -534,7 +538,8 @@ static void process_rspreloc_section(elf_t *elf, const char *elf_path, Elf32_Hal
     for (size_t i = 0; i < entry_count; i++) {
         uint16_t scale = entries[i].scale;
         if (!(scale == 1 || scale == 2 || scale == 4 || scale == 8 || scale == 16)) {
-            fprintf(stderr, "error: invalid scale %u in rspreloc\n", scale);
+            print_error_at(elf_path, entries[i].patch_addr, NULL,
+                "Invalid scale %u in rspreloc", scale);
             continue;
         }
 
@@ -649,9 +654,11 @@ int main(int argc, char **argv)
             process_rspreloc_section(elf, elf_path, i, verbose);
         }
     }
-    if (processed == 0 && verbose)
+    if (processed == 0 && verbose) {
         fprintf(stderr, "n64rspreloc: no .rspreloc in %s\n", elf_path);
+        num_errors++;
+    }
 
     free_elf(elf);
-    return 0;
+    return num_errors > 0 ? 1 : 0;
 }
