@@ -4,7 +4,7 @@
 # Authors: Giovanni Bajo <giovannibajo@gmail.com>
 ##########################################################################
 
-    .section .text.rdpq_triangle_send_async
+    RSP_TEXT_SUBSECTION .text.rdpq_triangle_send_async
 
 #ifndef RDPQ_TRIANGLE_PROFILE
 #define RDPQ_TRIANGLE_PROFILE     0
