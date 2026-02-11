@@ -70,7 +70,21 @@
  *       whenever it is necessary. If you come from a RDP low-level programming
  *       background, it might be confusing at first because everything "just works"
  *       without needing to adjust settings any time you need to change a render state.
- * 
+ *
+ * ## Batching and blocks: frozen vs non-frozen
+ *
+ * A rdpq_mode_begin()/rdpq_mode_end() batch can be recorded inside a rspq block.
+ * The behavior depends on #RDPQ_CFG_FROZEN_BLOCKS:
+ *
+ *   * Frozen blocks enabled (#RDPQ_CFG_FROZEN_BLOCKS set): the batch is flattened
+ *     on the CPU into final SET_COMBINE_MODE / SET_OTHER_MODES commands, and those
+ *     commands are recorded into the block. When the block is later run, the render
+ *     mode is fully defined by the block and cannot be affected externally.
+ *
+ *   * Frozen blocks disabled (default): The block records the mode commands as usual,
+ *     and when the block is executed, the final render mode is resolved by the RSP
+ *     using the current external state. This allows the global render state to
+ *     influence the batch output, at the cost of running the RSP update logic.
  * 
  * ## Mode setting stack
  * 
