@@ -216,6 +216,7 @@ int assert_equal_mem(TestContext *ctx, const char *file, int line, const uint8_t
 #include "test_backtrace.c"
 #include "test_rspq.c"
 #include "test_rdpq.c"
+#include "test_rdpq_batch.c"
 #include "test_rdpq_tri.c"
 #include "test_rdpq_tex.c"
 #include "test_rdpq_attach.c"
@@ -338,12 +339,25 @@ static const struct Testsuite
 	TEST_FUNC(test_rdpq_mode_alphacompare,     0, TEST_FLAGS_NO_BENCHMARK),
 	TEST_FUNC(test_rdpq_mode_zmode,            0, TEST_FLAGS_NO_BENCHMARK),
 	TEST_FUNC(test_rdpq_mode_freeze,           0, TEST_FLAGS_NO_BENCHMARK),
-	TEST_FUNC(test_rdpq_mode_freeze_stack,     0, TEST_FLAGS_NO_BENCHMARK),
 	TEST_FUNC(test_rdpq_mipmap,                0, TEST_FLAGS_NO_BENCHMARK),
 	TEST_FUNC(test_rdpq_mipmap_interpolate,    0, TEST_FLAGS_NO_BENCHMARK),
 	TEST_FUNC(test_rdpq_autotmem,              0, TEST_FLAGS_NO_BENCHMARK),
 	TEST_FUNC(test_rdpq_autotmem_reuse,        0, TEST_FLAGS_NO_BENCHMARK),
 	TEST_FUNC(test_rdpq_texrect_passthrough,   0, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_rdpq_batch_tex_shade_full,  0, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_rdpq_batch_tex_shade,       0, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_rdpq_batch_combiner_2pass,  0, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_rdpq_batch_fog_tex_shade,   0, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_rdpq_batch_fog_shade,       0, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_rdpq_batch_blender_2pass,   0, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_rdpq_batch_aa_default,      0, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_rdpq_batch_aa_reduced,      0, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_rdpq_batch_aa_alphacompare, 0, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_rdpq_batch_aa_bkg_blend,    0, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_rdpq_batch_mipmap_interpolate_shq, 0, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_rdpq_batch_mipmap_nearest,  0, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_rdpq_batch_fog_tex_flat,    0, TEST_FLAGS_NO_BENCHMARK),
+	TEST_FUNC(test_rdpq_batch_bkg_blend_no_aa, 0, TEST_FLAGS_NO_BENCHMARK),
 	TEST_FUNC(test_rdpq_triangle,              0, TEST_FLAGS_NO_BENCHMARK),
 	TEST_FUNC(test_rdpq_triangle_w1,           0, TEST_FLAGS_NO_BENCHMARK),
 	TEST_FUNC(test_rdpq_attach_clear,             0, TEST_FLAGS_NO_BENCHMARK),
@@ -437,6 +451,11 @@ int main() {
 		// Compute the test duration
 		uint32_t test_stop = TICKS_READ();
 		uint32_t test_stop_mem = MEMORY_USED();
+
+		if (ctx.result == TEST_FAILED) {
+			// Ignore memory leaks on failures
+			test_stop_mem = test_start_mem;
+		}
 
 		if (test_stop_mem > test_start_mem) {
 			// If the test didn't release the memory, run it again to make sure

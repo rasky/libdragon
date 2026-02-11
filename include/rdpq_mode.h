@@ -896,15 +896,25 @@ inline void rdpq_mode_persp(bool perspective)
  *          rdpq_mode_blender(RDPQ_BLENDING_MULTIPLY);
  *      rdpq_mode_end();
  * @endcode
- * 
- * The only effect of using #rdpq_mode_begin is more efficient RSP
- * and RDP usage, there is no semantic change in the way RDP is
- * programmed when #rdpq_mode_end is called.
+ *
+ * By default, batched commands will be resolved by the RSP into a final
+ * RDP state (given also the previous RDP state). This means that, just like
+ * normal rdpq mode commands, they can be recorded into a block, and then
+ * part of the global RDP state can still be changed externally (eg: think
+ * switching the fog state externally, and then calling a recorded block
+ * setting the render state for a material in mesh).
+ *
+ * This can be affected by #RDPQ_CFG_FROZEN_BLOCKS configuration flag. If this
+ * flag is set, the RDP state will be frozen in the recorded block, meaning
+ * that it will not be possible anymore to affect it externally. The main
+ * advantage is that this will not require anymore RSP code to be executed
+ * to execute the batch, which can be a significant performance gain.
  * 
  * @note The functions affected by #rdpq_mode_begin / #rdpq_mode_end
  *       are just those that are part of the mode API (that is,
  *       `rdpq_set_mode_*` and `rdpq_mode_*`). Any other function
  *       is not batched and will be issued immediately.
+ * @note A begin/end block must be fully inside or fully outside a rspq block.
  */
 void rdpq_mode_begin(void);
 

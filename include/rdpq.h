@@ -231,7 +231,8 @@ enum {
 #define RDPQ_CFG_AUTOSYNCLOAD   (1 << 1)     ///< Configuration flag: enable automatic generation of SYNC_LOAD commands
 #define RDPQ_CFG_AUTOSYNCTILE   (1 << 2)     ///< Configuration flag: enable automatic generation of SYNC_TILE commands
 #define RDPQ_CFG_AUTOSCISSOR    (1 << 3)     ///< Configuration flag: enable automatic generation of SET_SCISSOR commands on render target change
-#define RDPQ_CFG_DEFAULT        (0xFFFF)     ///< Configuration flag: default configuration
+#define RDPQ_CFG_FROZEN_BLOCKS  (1 << 4)     ///< Configuration flag: freeze the RDP state in the recorded block
+#define RDPQ_CFG_DEFAULT        (RDPQ_CFG_AUTOSYNCPIPE | RDPQ_CFG_AUTOSYNCLOAD | RDPQ_CFG_AUTOSYNCTILE | RDPQ_CFG_AUTOSCISSOR)     ///< Configuration flag: default configuration
 
 ///@cond
 // Used in inline functions as part of the autosync engine. Not part of public API.

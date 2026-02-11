@@ -402,7 +402,7 @@ static rdpq_state_t *rdpq_state;
 bool __rdpq_inited = false;             ///< True if #rdpq_init was called
 
 /** @brief Current configuration of the rdpq library. */ 
-static uint32_t rdpq_config;
+uint32_t __rdpq_config;
 
 /** @brief RDP block management state */
 rdpq_block_state_t rdpq_block_state;
@@ -475,9 +475,12 @@ void rdpq_init()
 
     // Clear library globals
     memset(&rdpq_block_state, 0, sizeof(rdpq_block_state));
-    rdpq_config = RDPQ_CFG_DEFAULT;
+    __rdpq_config = RDPQ_CFG_DEFAULT;
     rdpq_tracking.autosync = 0;
-    rdpq_tracking.mode_freeze = false;
+    rdpq_mode_state_global = (rdpq_mode_state_t){0};
+    rdpq_mode_state_block_diff = (rdpq_mode_state_t){0};
+    rdpq_mode_state_batch_diff = (rdpq_mode_state_t){0};
+    rdpq_mode_state_cur = &rdpq_mode_state_global;
 
     // Register an interrupt handler for DP interrupts, and activate them.
     register_DP_handler(__rdpq_interrupt);
@@ -511,19 +514,19 @@ void rdpq_close()
 
 uint32_t rdpq_config_set(uint32_t cfg)
 {
-    uint32_t prev = rdpq_config;
-    rdpq_config = cfg;
+    uint32_t prev = __rdpq_config;
+    __rdpq_config = cfg;
     return prev;
 }
 
 uint32_t rdpq_config_enable(uint32_t cfg)
 {
-    return rdpq_config_set(rdpq_config | cfg);
+    return rdpq_config_set(__rdpq_config | cfg);
 }
 
 uint32_t rdpq_config_disable(uint32_t cfg)
 {
-    return rdpq_config_set(rdpq_config & ~cfg);
+    return rdpq_config_set(__rdpq_config & ~cfg);
 }
 
 void rdpq_fence(void)
@@ -604,11 +607,11 @@ extern inline void __rdpq_autosync_use(uint32_t res);
 void __rdpq_autosync_change(uint32_t res) {
     res &= rdpq_tracking.autosync;
     if (res) {
-        if ((res & AUTOSYNC_TILES) && (rdpq_config & RDPQ_CFG_AUTOSYNCTILE))
+        if ((res & AUTOSYNC_TILES) && (__rdpq_config & RDPQ_CFG_AUTOSYNCTILE))
             rdpq_sync_tile();
-        if ((res & AUTOSYNC_TMEMS) && (rdpq_config & RDPQ_CFG_AUTOSYNCLOAD))
+        if ((res & AUTOSYNC_TMEMS) && (__rdpq_config & RDPQ_CFG_AUTOSYNCLOAD))
             rdpq_sync_load();
-        if ((res & AUTOSYNC_PIPE)  && (rdpq_config & RDPQ_CFG_AUTOSYNCPIPE))
+        if ((res & AUTOSYNC_PIPE)  && (__rdpq_config & RDPQ_CFG_AUTOSYNCPIPE))
             rdpq_sync_pipe();
     }
 }
@@ -624,7 +627,7 @@ void __rdpq_autosync_change(uint32_t res) {
  */
 
 /** 
- * @brief Initialize RDP block mangament
+ * @brief Initialize RDP block management
  * 
  * This is called by #rspq_block_begin. It resets all the block management
  * state to default.
@@ -640,9 +643,13 @@ void __rdpq_autosync_change(uint32_t res) {
  */
 void __rdpq_block_begin()
 {
+    assertf(rdpq_mode_batch_state == RDPQ_BATCH_NONE,
+        "cannot record a block within rdpq_mode_begin()/end()");
     memset(&rdpq_block_state, 0, sizeof(rdpq_block_state));
+    rdpq_mode_state_block_diff = (rdpq_mode_state_t){0};
+    rdpq_mode_state_cur = &rdpq_mode_state_block_diff;
 
-    // Save the tracking state (to be recovered when the block is done)
+    // Save the autosync tracking state (to be recovered when the block is done)
     rdpq_block_state.previous_tracking = rdpq_tracking;
 
     // Set for unknown state (like if we just run another unknown block: we lost track of the RDP state)
@@ -732,16 +739,21 @@ void __rdpq_block_next_buffer(void)
  */
 rdpq_block_t* __rdpq_block_end()
 {
+    assertf(rdpq_mode_batch_state == RDPQ_BATCH_NONE,
+        "cannot finish a block with rdpq_mode_begin()/end() pending");
     struct rdpq_block_state_s *st = &rdpq_block_state;
     rdpq_block_t *ret = st->first_node;
 
     // Save the current autosync state in the first node of the RDP block.
     // This makes it easy to recover it when the block is run
-    if (st->first_node)
+    if (st->first_node) {
         st->first_node->tracking = rdpq_tracking;
+        st->first_node->mode_state_diff = rdpq_mode_state_block_diff;
+    }
 
-    // Recover tracking state before the block creation started
+    // Recover autosync tracking state before the block creation started
     rdpq_tracking = st->previous_tracking;
+    rdpq_mode_state_cur = &rdpq_mode_state_global;
 
     // NOTE: no rspq command is enqueued at the end of block. Specifically,
     // there is no RSPQ_CMD_RDP_SET_BUFFER to switch back to the dynamic RDP buffers. 
@@ -757,22 +769,20 @@ rdpq_block_t* __rdpq_block_end()
 /** @brief Notify that a rspq block was run (called by #rspq_block_run). */
 void __rdpq_block_run(rdpq_block_t *block)
 {
+    assertf(rdpq_mode_batch_state == RDPQ_BATCH_NONE,
+        "cannot run a block within a rdpq_mode_begin()/end() pair");
     if (block) {
         // We have run a block that contains rdpq commands.
         // During creation, we tracked some state for the block 
         // and saved it into the block structure; set it as current,
         // because from now on we can assume the block would and the
         // state of the engine must match the state at the end of the block.
-        rdpq_tracking_t prev = rdpq_tracking;
         rdpq_tracking = block->tracking;
 
-        // If the data coming out of the block is "unknown", we can
-        // restore the previous value, because it means that the block didn't
-        // change it.
-        if (rdpq_tracking.cycle_type_known == 0)
-            rdpq_tracking.cycle_type_known = prev.cycle_type_known;
-        if (rdpq_tracking.cycle_type_frozen == 0)
-            rdpq_tracking.cycle_type_frozen = prev.cycle_type_frozen;
+        // Merge the block state with the current one (could be the global one,
+        // or another block's one in case of nested block call).
+        assert(rdpq_mode_state_cur != &block->mode_state_diff);
+        __rdpq_mode_state_merge(rdpq_mode_state_cur, &block->mode_state_diff);
 
         // The called block has switched static buffer. Adjust our state to set
         // our buffer as pending; if a new RDP command is issued, we will switch
@@ -783,21 +793,16 @@ void __rdpq_block_run(rdpq_block_t *block)
         st->wptr = NULL;
         st->wend = NULL;
     } else {
-        // Initialize tracking state for unknown state
+        // Initialize autosync tracking state for unknown state
         rdpq_tracking = (rdpq_tracking_t){
             // current autosync status is unknown because blocks can be
             // played in any context. So assume the worst: all resources
             // are being used. This will cause all SYNCs to be generated,
             // which is the safest option.
             .autosync = ~0,
-            // we don't know whether mode changes will be frozen or not
-            // when the block will play. Assume the worst (and thus
-            // do not optimize out mode changes).
-            .mode_freeze = false,
-            // we don't know the cycle type after we run the block
-            .cycle_type_known = 0,
-            .cycle_type_frozen = 0,
         };
+        // Unknown mode state
+        *rdpq_mode_state_cur = (rdpq_mode_state_t){0};
     }
 }
 
@@ -1011,7 +1016,7 @@ void __rdpq_set_color_image(uint32_t w0, uint32_t w1, uint32_t sw0, uint32_t sw1
     __rdpq_autosync_change(AUTOSYNC_PIPE);
     rdpq_write(2, RDPQ_OVL_ID, RDPQ_CMD_SET_COLOR_IMAGE, w0, w1);
 
-    if (rdpq_config & RDPQ_CFG_AUTOSCISSOR)
+    if (__rdpq_config & RDPQ_CFG_AUTOSCISSOR)
         __rdpq_set_scissor(sw0, sw1);
 }
 
@@ -1029,7 +1034,7 @@ void rdpq_set_color_image(const surface_t *surface)
     }
     assertf((PhysicalAddr(surface->buffer) & 63) == 0,
         "buffer pointer is not aligned to 64 bytes, so it cannot be used as RDP color image");
-    if (rdpq_config & RDPQ_CFG_AUTOSCISSOR) {
+    if (__rdpq_config & RDPQ_CFG_AUTOSCISSOR) {
         // Max horizontal scissor value is 1023, and that allows for a 1023-pixel
         // surface in standard mode, and 1024-pixel surface in copy/fill mode.
         // Here, for simplicity, we just allow only up to 1023.
@@ -1075,11 +1080,7 @@ void __rdpq_set_other_modes(uint32_t w0, uint32_t w1)
 
     // SOM might also generate a SET_SCISSOR. Make sure to reserve space for it.
     rdpq_write(2, RDPQ_OVL_ID, RDPQ_CMD_SET_OTHER_MODES, w0, w1);
-
-    if (w0 & (1 << (SOM_CYCLE_SHIFT-32+1)))
-        rdpq_tracking.cycle_type_known = 2;
-    else
-        rdpq_tracking.cycle_type_known = 1;
+    __rdpq_mode_state_apply_som(rdpq_mode_state_cur, UINT64_MAX, ((uint64_t)w0 << 32) | w1);
 }
 
 /** @brief Out-of-line implementation of #rdpq_change_other_modes_raw */
@@ -1090,13 +1091,16 @@ void __rdpq_change_other_modes(uint32_t w0, uint32_t w1, uint32_t w2)
 
     // SOM might also generate a SET_SCISSOR. Make sure to reserve space for it.
     rdpq_write(2, RDPQ_OVL_ID, RDPQ_CMD_MODIFY_OTHER_MODES, w0, w1, w2);
-
-    if ((w0 == 0) && (w1 & (1 << (SOM_CYCLE_SHIFT-32+1))))  {
-        if (w2 & (1 << (SOM_CYCLE_SHIFT-32+1)))
-            rdpq_tracking.cycle_type_known = 2;
-        else
-            rdpq_tracking.cycle_type_known = 1;
+    uint64_t mask = 0;
+    uint64_t val = 0;
+    if ((w0 & 0xF) == 0) {
+        mask = ((uint64_t)(~w1) << 32);
+        val = ((uint64_t)w2 << 32);
+    } else {
+        mask = (uint64_t)(~w1) & 0xFFFFFFFFu;
+        val = (uint64_t)w2 & 0xFFFFFFFFu;
     }
+    __rdpq_mode_state_apply_som(rdpq_mode_state_cur, mask, val);
 }
 
 uint64_t rdpq_get_other_modes_raw(void)

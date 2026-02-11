@@ -9,10 +9,22 @@
 #include "rspq.h"
 #include "rdpq_internal.h"
 #include "yuv.h"
+#include <stdint.h>
 #include <string.h>
 
-static rspq_rdp_mode_t rdpq_mode_shadow;
-static bool rdpq_mode_cpu_track = false;
+#define RDPQ_SOM_TRACK_MASK ( \
+    SOMX_FOG | SOMX_LOD_INTERP_MASK | SOM_TEXTURE_LOD | \
+    SOM_AA_ENABLE | SOMX_AA_REDUCED | SOM_ALPHACOMPARE_MASK | \
+    SOM_ZMODE_MASK | SOM_SAMPLE_MASK | SOM_TF_MASK | \
+    SOM_BLENDING | SOMX_BLEND_2PASS | SOM_CYCLE_MASK \
+)
+
+rdpq_mode_state_t rdpq_mode_state_global;
+rdpq_mode_state_t rdpq_mode_state_block_diff;
+rdpq_mode_state_t rdpq_mode_state_batch_diff;
+rdpq_mode_state_t *rdpq_mode_state_cur = &rdpq_mode_state_global;
+
+rdpq_mode_batch_state_t rdpq_mode_batch_state = RDPQ_BATCH_NONE;
 
 #define RDPQ_COMB_LOD_INTERP    RDPQ_COMBINER2((TEX1, TEX0, LOD_FRAC, TEX0), (TEX1, TEX0, LOD_FRAC, TEX0), (0,0,0,0), (0,0,0,0))
 #define RDPQ_COMB_LOD_SHQ       RDPQ_COMBINER2((TEX0, TEX1, K5,       0   ), (0,    0,    0,        TEX1), (0,0,0,0), (0,0,0,0))
@@ -39,52 +51,70 @@ static const uint64_t rdpq_combiner_mipmaps[2] = {
     (RDPQ_COMB_LOD_SHQ    & RDPQ_COMB0_MASK) | RDPQ_COMBINER_2PASS,
 };
 
-static uint64_t rdpq_shadow_encode_combiner(uint32_t w0, uint32_t w1)
+void __rdpq_mode_state_merge(rdpq_mode_state_t *dst, const rdpq_mode_state_t *diff)
 {
-    //uint32_t hi = (w0 | 0x7F000000) ^ 0x03000000;
-    return ((uint64_t)w0 << 32) | w1;
+    dst->som_known_mask |= diff->som_known_mask;
+    dst->som_value_mask = (dst->som_value_mask & ~diff->som_known_mask) |
+                          (diff->som_value_mask & diff->som_known_mask);
+
+    if (diff->known_mask & RDPQ_STATE_KNOWN_COMBINER)
+        dst->combiner = diff->combiner;
+
+    if (diff->known_mask & RDPQ_STATE_KNOWN_BLEND_STEP0)
+        dst->blend_step0 = diff->blend_step0;
+    if (diff->known_mask & RDPQ_STATE_KNOWN_BLEND_STEP1)
+        dst->blend_step1 = diff->blend_step1;
+    dst->known_mask |= diff->known_mask;
 }
 
-static void rdpq_shadow_reset(uint64_t som)
+void __rdpq_mode_state_apply_som(rdpq_mode_state_t *state, uint64_t mask, uint64_t val)
 {
-    memset(&rdpq_mode_shadow, 0, sizeof(rdpq_mode_shadow));
-    rdpq_mode_shadow.other_modes = som & 0x00FFFFFFFFFFFFFFull;
+    state->som_known_mask |= mask;
+    state->som_value_mask = (state->som_value_mask & ~mask) | (val & mask);
 }
 
-static void rdpq_shadow_apply_cmd(uint32_t cmd_id, uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3)
+static void rdpq_mode_state_apply_cmd(uint32_t cmd_id, uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3)
 {
+    rdpq_mode_state_t *state = rdpq_mode_state_cur;
+
     switch (cmd_id) {
     case RDPQ_CMD_SET_BLENDING_MODE: {
-        uint32_t step0 = rdpq_mode_shadow.blend_step0;
+        uint32_t step0 = state->blend_step0;
         if (w1 != 0) {
-            rdpq_mode_shadow.blend_step1 = w1;
+            state->blend_step1 = w1;
+            state->known_mask |= RDPQ_STATE_KNOWN_BLEND_STEP1;
             step0 = w1;
         }
-        if (step0 & SOMX_BLEND_2PASS)
-            rdpq_mode_shadow.blend_step0 = w1;
+        if (step0 & SOMX_BLEND_2PASS) {
+            state->blend_step0 = w1;
+            state->known_mask |= RDPQ_STATE_KNOWN_BLEND_STEP0;
+        }
         break;
     }
     case RDPQ_CMD_SET_FOG_MODE:
-        rdpq_mode_shadow.blend_step0 = w1;
+        state->blend_step0 = w1;
+        state->known_mask |= RDPQ_STATE_KNOWN_BLEND_STEP0;
         break;
     case RDPQ_CMD_SET_COMBINE_MODE_1PASS:
-        rdpq_mode_shadow.combiner_mipmapmask = ((uint64_t)w2 << 32) | w3;
-        rdpq_mode_shadow.combiner = ((uint64_t)w0 << 32) | w1;
+        state->combiner = ((uint64_t)w0 << 32) | w1;
+        state->known_mask |= RDPQ_STATE_KNOWN_COMBINER;
         break;
     case RDPQ_CMD_SET_COMBINE_MODE_2PASS:
-        rdpq_mode_shadow.combiner = ((uint64_t)w0 << 32) | w1 | RDPQ_COMBINER_2PASS;
+        state->combiner = ((uint64_t)w0 << 32) | w1 | RDPQ_COMBINER_2PASS;
+        state->known_mask |= RDPQ_STATE_KNOWN_COMBINER;
         break;
     case RDPQ_CMD_MODIFY_OTHER_MODES: {
-        debugf("[rdpq_shadow_apply_cmd] ModifyOtherModes: offset=%lx mask=%08lx value=%08lx\n", w0, w1, w2);
         uint32_t offset = w0 & 0xF;
-        uint32_t som_hi = (uint32_t)(rdpq_mode_shadow.other_modes >> 32);
-        uint32_t som_lo = (uint32_t)rdpq_mode_shadow.other_modes;
+        uint64_t mask = 0;
+        uint64_t val = 0;
         if (offset == 0) {
-            som_hi = (som_hi & w1) | w2;
+            mask = ((uint64_t)(~w1) << 32);
+            val = ((uint64_t)w2 << 32);
         } else {
-            som_lo = (som_lo & w1) | w2;
+            mask = (uint64_t)(~w1) & 0xFFFFFFFFu;
+            val = (uint64_t)w2 & 0xFFFFFFFFu;
         }
-        rdpq_mode_shadow.other_modes = ((uint64_t)som_hi << 32) | som_lo;
+        __rdpq_mode_state_apply_som(state, mask, val);
         break;
     }
     default:
@@ -93,12 +123,27 @@ static void rdpq_shadow_apply_cmd(uint32_t cmd_id, uint32_t w0, uint32_t w1, uin
     }
 }
 
-static void rdpq_update_render_mode_cpu(uint64_t *comb_rdp_out, uint64_t *som_rdp_out)
+static uint64_t rdpq_shadow_combiner_mask(uint64_t combiner)
+{
+    uint64_t comb1_mask = RDPQ_COMB1_MASK;
+    if (((combiner >> 0 ) &  7) == 1) comb1_mask ^= 1ull << 0;
+    if (((combiner >> 3 ) &  7) == 1) comb1_mask ^= 1ull << 3;
+    if (((combiner >> 6 ) &  7) == 1) comb1_mask ^= 1ull << 6;
+    if (((combiner >> 18) &  7) == 1) comb1_mask ^= 1ull << 18;
+    if (((combiner >> 21) &  7) == 1) comb1_mask ^= 1ull << 21;
+    if (((combiner >> 24) &  7) == 1) comb1_mask ^= 1ull << 24;
+    if (((combiner >> 32) & 31) == 1) comb1_mask ^= 1ull << 32;
+    if (((combiner >> 37) & 15) == 1) comb1_mask ^= 1ull << 37;
+    return comb1_mask;
+}
+
+static void rdpq_update_render_mode_cpu(const rdpq_mode_state_t *state,
+                                        uint64_t *comb_rdp_out, uint64_t *som_rdp_out)
 {
     uint64_t comb_1cyc = 0;
     uint64_t comb_2cyc = 0;
-    uint32_t som_hi = (uint32_t)(rdpq_mode_shadow.other_modes >> 32);
-    uint32_t som_lo = (uint32_t)rdpq_mode_shadow.other_modes;
+    uint32_t som_hi = (uint32_t)(state->som_value_mask >> 32);
+    uint32_t som_lo = (uint32_t)state->som_value_mask;
 
 #if 0
     // copy/fill mode: for now we don't handle this case
@@ -109,16 +154,13 @@ static void rdpq_update_render_mode_cpu(uint64_t *comb_rdp_out, uint64_t *som_rd
     }
 #endif
 
-    uint32_t comb_hi = (uint32_t)(rdpq_mode_shadow.combiner >> 32);
-    uint32_t comb_lo = (uint32_t)rdpq_mode_shadow.combiner;
-
-    debugf("rdpq_update_render_mode_cpu: som_hi=%08lx som_lo=%08lx\n", som_hi, som_lo);
-    debugf("rdpq_update_render_mode_cpu: comb_hi=%08lx comb_lo=%08lx\n", comb_hi, comb_lo);
+    uint32_t comb_hi = (uint32_t)(state->combiner >> 32);
+    uint32_t comb_lo = (uint32_t)state->combiner;
 
     if (comb_hi & 0x80000000) {
         if (som_hi & (uint32_t)(SOMX_LOD_INTERPOLATE >> 32))
             assertf(false, "RDPQ: interpolated mipmaps require 1-pass combiner");
-        comb_2cyc = rdpq_mode_shadow.combiner;
+        comb_2cyc = state->combiner;
         comb_1cyc = comb_2cyc;
     } else {
         if (som_hi & (uint32_t)(SOMX_FOG >> 32)) {
@@ -136,7 +178,7 @@ static void rdpq_update_render_mode_cpu(uint64_t *comb_rdp_out, uint64_t *som_rd
 
         uint32_t interp = (som_hi & (uint32_t)(SOMX_LOD_INTERP_MASK >> 32)) >> (SOMX_LOD_INTERP_SHIFT - 32);
         if (interp) {
-            uint64_t mask = rdpq_mode_shadow.combiner_mipmapmask;
+            uint64_t mask = rdpq_shadow_combiner_mask(state->combiner);
             uint64_t comb_masked = ((uint64_t)(comb_hi & (uint32_t)(mask >> 32)) << 32) |
                                    (uint32_t)(comb_lo & (uint32_t)mask);
             uint64_t comb_mipmap = rdpq_combiner_mipmaps[interp - 1];
@@ -151,8 +193,8 @@ static void rdpq_update_render_mode_cpu(uint64_t *comb_rdp_out, uint64_t *som_rd
         }
     }
 
-    uint32_t blend0 = rdpq_mode_shadow.blend_step0;
-    uint32_t blend1 = rdpq_mode_shadow.blend_step1;
+    uint32_t blend0 = state->blend_step0;
+    uint32_t blend1 = state->blend_step1;
     bool bkg_blending = blend1 != 0;
 
     if (!blend1 && (som_lo & SOM_AA_ENABLE)) {
@@ -185,10 +227,6 @@ static void rdpq_update_render_mode_cpu(uint64_t *comb_rdp_out, uint64_t *som_rd
     uint64_t comb_final = need_2cyc ? comb_2cyc : comb_1cyc;
     uint32_t blend_final = need_2cyc ? blend_2cyc : blend_1cyc;
 
-    // uint32_t cycle_type = need_2cyc ?
-    //     ((uint32_t)((SOM_CYCLE_MASK ^ SOM_CYCLE_2) >> 32) | 0x10000000) :
-    //     ((uint32_t)((SOM_CYCLE_MASK ^ SOM_CYCLE_1) >> 32) | 0x10000000);
-    // som_hi = (som_hi | (uint32_t)(SOM_CYCLE_MASK >> 32) | 0xFF000000) ^ cycle_type;
     som_hi = (som_hi & ~((SOM_CYCLE_MASK >> 32) | 0xFF000000));
     if (need_2cyc)
         som_hi |= (SOM_CYCLE_2 >> 32);
@@ -212,27 +250,22 @@ static void rdpq_update_render_mode_cpu(uint64_t *comb_rdp_out, uint64_t *som_rd
         som_lo ^= 2u << 10;
     }
 
-    // uint32_t comb_final_hi = (uint32_t)(comb_final >> 32);
-    // comb_final_hi = (comb_final_hi | 0xFF000000) ^ 0x03000000;
-    // comb_final = ((uint64_t)comb_final_hi << 32) | (uint32_t)comb_final;
-
     *comb_rdp_out = comb_final & 0x00FFFFFFFFFFFFFFull;
     *som_rdp_out = ((uint64_t)som_hi << 32) | som_lo;
-
-    // Keep MSB of other modes for the RDPQ_OTHER_MODES register
-    som_hi |= rdpq_mode_shadow.other_modes & 0xFF000000;
-    rdpq_mode_shadow.other_modes = ((uint64_t)som_hi << 32) | som_lo;
 }
 
 /** 
  * @brief Like #rdpq_write, but for mode commands.
  * 
- * During freeze (#rdpq_mode_begin), mode commands don't emit RDP commands
- * as they are batched instead, so we can avoid reserving space in the
- * RDP static buffer in blocks.
+ * During CPU-side batching (#rdpq_mode_begin), mode commands are handled
+ * separately and not emitted via RSP, so we can avoid reserving space in
+ * the RDP static buffer in blocks.
  */
-#define rdpq_mode_write(num_rdp_commands, num_frozen_rdp_commands, ...) ({ \
-    rdpq_write(rdpq_tracking.mode_freeze ? num_frozen_rdp_commands : num_rdp_commands, ##__VA_ARGS__); \
+#define rdpq_mode_write(num_rdp_commands, num_batched_rdp_commands, ...) ({ \
+    rdpq_write(\
+        rdpq_mode_batch_state != RDPQ_BATCH_NONE ? \
+            num_batched_rdp_commands : num_rdp_commands, \
+        ##__VA_ARGS__); \
 })
 
 /** 
@@ -245,10 +278,10 @@ __attribute__((noinline))
 void __rdpq_fixup_mode(uint32_t cmd_id, uint32_t w0, uint32_t w1)
 {
     __rdpq_autosync_change(AUTOSYNC_PIPE);
-    if (rdpq_mode_cpu_track)
-        rdpq_shadow_apply_cmd(cmd_id, w0, w1, 0, 0);
-    else
-        rdpq_mode_write(2, 0, RDPQ_OVL_ID, cmd_id, w0, w1);  // COMBINE+SOM
+    rdpq_mode_state_apply_cmd(cmd_id, w0, w1, 0, 0);
+    if (rdpq_mode_batch_state == RDPQ_BATCH_DEFERRED)
+        return;
+    rdpq_mode_write(2, 0, RDPQ_OVL_ID, cmd_id, w0, w1);  // COMBINE+SOM
 }
 
 /** @brief Write a fixup that changes the current render mode (12-byte command) */
@@ -256,10 +289,10 @@ __attribute__((noinline))
 void __rdpq_fixup_mode3(uint32_t cmd_id, uint32_t w0, uint32_t w1, uint32_t w2)
 {
     __rdpq_autosync_change(AUTOSYNC_PIPE);
-    if (rdpq_mode_cpu_track)
-        rdpq_shadow_apply_cmd(cmd_id, w0, w1, w2, 0);
-    else
-        rdpq_mode_write(2, 0, RDPQ_OVL_ID, cmd_id, w0, w1, w2);  // COMBINE+SOM
+    rdpq_mode_state_apply_cmd(cmd_id, w0, w1, w2, 0);
+    if (rdpq_mode_batch_state == RDPQ_BATCH_DEFERRED)
+        return;
+    rdpq_mode_write(2, 0, RDPQ_OVL_ID, cmd_id, w0, w1, w2);  // COMBINE+SOM
 }
 
 /** @brief Write a fixup that changes the current render mode (16-byte command) */
@@ -267,10 +300,10 @@ __attribute__((noinline))
 void __rdpq_fixup_mode4(uint32_t cmd_id, uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3)
 {
     __rdpq_autosync_change(AUTOSYNC_PIPE);
-    if (rdpq_mode_cpu_track)
-        rdpq_shadow_apply_cmd(cmd_id, w0, w1, w2, w3);
-    else
-        rdpq_mode_write(2, 0, RDPQ_OVL_ID, cmd_id, w0, w1, w2, w3);  // COMBINE+SOM
+    rdpq_mode_state_apply_cmd(cmd_id, w0, w1, w2, w3);
+    if (rdpq_mode_batch_state == RDPQ_BATCH_DEFERRED)
+        return;
+    rdpq_mode_write(2, 0, RDPQ_OVL_ID, cmd_id, w0, w1, w2, w3);  // COMBINE+SOM
 }
 
 /** @brief Write a fixup to reset the render mode */
@@ -278,6 +311,8 @@ __attribute__((noinline))
 void __rdpq_reset_render_mode(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3)
 {
     __rdpq_autosync_change(AUTOSYNC_PIPE);
+    assertf(rdpq_mode_batch_state != RDPQ_BATCH_DEFERRED,
+        "reset render mode while in deferred batch");
     // ResetRenderMode can generate: SCISSOR+COMBINE+SOM when not frozen,
     // or just SCISSOR when frozen.
     rdpq_mode_write(3, 1, RDPQ_OVL_ID, RDPQ_CMD_RESET_RENDER_MODE, w0, w1, w2, w3);
@@ -285,6 +320,8 @@ void __rdpq_reset_render_mode(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3
 
 void rdpq_mode_push(void)
 {
+    assertf(rdpq_mode_batch_state == RDPQ_BATCH_NONE,
+        "rdpq_mode_push not allowed inside rdpq_mode_begin/end");
     // Push is not a RDP passthrough/fixup command, it's just a standard
     // RSP command. Use rspq_write.
     rspq_write(RDPQ_OVL_ID, RDPQ_CMD_PUSH_RENDER_MODE);
@@ -292,34 +329,38 @@ void rdpq_mode_push(void)
 
 void rdpq_mode_pop(void)
 {
+    assertf(rdpq_mode_batch_state == RDPQ_BATCH_NONE,
+        "rdpq_mode_pop not allowed inside rdpq_mode_begin/end");
     __rdpq_autosync_change(AUTOSYNC_PIPE);
     // ModePop can generate: SCISSOR+COMBINE+SOM when not frozen,
     // or just SCISSOR when frozen.
     rdpq_mode_write(3, 1, RDPQ_OVL_ID, RDPQ_CMD_POP_RENDER_MODE);
-    rdpq_tracking.cycle_type_known = 0;
+    // When recording a block, the popped state is unknown: force fixups.
+    if (rspq_block_is_recording())
+        *rdpq_mode_state_cur = (rdpq_mode_state_t){0};
 }
 
 /** @brief Like #rdpq_set_mode_fill, but without fill color configuration */
 void __rdpq_set_mode_fill(void) {
-    if (rdpq_mode_cpu_track)
-        rdpq_mode_cpu_track = false;
     uint64_t som = (0xEFull << 56) | SOM_CYCLE_FILL;
-    __rdpq_reset_render_mode(0, 0, som >> 32, som & 0xFFFFFFFF);
-    if (!rdpq_tracking.mode_freeze)
-        rdpq_tracking.cycle_type_known = 2;
-    else
-        rdpq_tracking.cycle_type_frozen = 2;
+    *rdpq_mode_state_cur = (rdpq_mode_state_t){
+        .som_known_mask = UINT64_MAX,
+        .som_value_mask = som,
+        .known_mask = RDPQ_STATE_KNOWN_ALL,
+    };
+    if (rdpq_mode_batch_state != RDPQ_BATCH_DEFERRED)
+        __rdpq_reset_render_mode(0, 0, som >> 32, som & 0xFFFFFFFF);
 }
 
 void rdpq_set_mode_copy(bool transparency) {
-    if (rdpq_mode_cpu_track)
-        rdpq_mode_cpu_track = false;
     uint64_t som = (0xEFull << 56) | SOM_CYCLE_COPY | (transparency ? SOM_ALPHACOMPARE_THRESHOLD : 0);
-    __rdpq_reset_render_mode(0, 0, som >> 32, som & 0xFFFFFFFF);
-    if (!rdpq_tracking.mode_freeze)
-        rdpq_tracking.cycle_type_known = 2;
-    else
-        rdpq_tracking.cycle_type_frozen = 2;
+    *rdpq_mode_state_cur = (rdpq_mode_state_t){
+        .som_known_mask = UINT64_MAX,
+        .som_value_mask = som,
+        .known_mask = RDPQ_STATE_KNOWN_ALL,
+    };
+    if (rdpq_mode_batch_state != RDPQ_BATCH_DEFERRED)
+        __rdpq_reset_render_mode(0, 0, som >> 32, som & 0xFFFFFFFF);
 }
 
 void rdpq_set_mode_standard(void) {
@@ -331,43 +372,42 @@ void rdpq_set_mode_standard(void) {
         SOM_RGBDITHER_NONE | SOM_ALPHADITHER_NONE |
         SOM_COVERAGE_DEST_ZAP;
 
-    if (rdpq_tracking.mode_freeze) {
-        rdpq_mode_cpu_track = true;
-        rdpq_shadow_reset(som);
-        rdpq_mode_shadow.combiner = cc;
-    } else {
+    *rdpq_mode_state_cur = (rdpq_mode_state_t){
+        .som_known_mask = UINT64_MAX,
+        .som_value_mask = som,
+        .combiner = cc,
+        .known_mask = RDPQ_STATE_KNOWN_ALL,
+    };
+    if (rdpq_mode_batch_state != RDPQ_BATCH_DEFERRED) {
         __rdpq_reset_render_mode(
             cc >> 32,   cc & 0xFFFFFFFF,
             som >> 32, som & 0xFFFFFFFF);
     }
-    rdpq_mode_combiner(cc); // FIXME: this should not be required, but we need it for the mipmap mask
-    if (!rdpq_tracking.mode_freeze)
-        rdpq_tracking.cycle_type_known = 1;
-    else
-        rdpq_tracking.cycle_type_frozen = 1;
+    rdpq_mode_combiner(cc);
 }
 
 void rdpq_set_mode_yuv(bool bilinear) {
     uint64_t cc, som;
 
-    if (rdpq_mode_cpu_track)
-        rdpq_mode_cpu_track = false;
     som = SOM_RGBDITHER_NONE | SOM_ALPHADITHER_NONE | SOM_TF0_YUV | SOM_TF1_YUV;
     cc = RDPQ_COMBINER1((TEX0, K4, K5, TEX0), (0, 0, 0, 1));
 
-    __rdpq_reset_render_mode(
-        cc >> 32,   cc & 0xFFFFFFFF,
-        som >> 32, som & 0xFFFFFFFF);
+    *rdpq_mode_state_cur = (rdpq_mode_state_t){
+        .som_known_mask = UINT64_MAX,
+        .som_value_mask = som,
+        .combiner = cc,
+        .known_mask = RDPQ_STATE_KNOWN_ALL,
+    };
+    if (rdpq_mode_batch_state != RDPQ_BATCH_DEFERRED) {
+        __rdpq_reset_render_mode(
+            cc >> 32,   cc & 0xFFFFFFFF,
+            som >> 32, som & 0xFFFFFFFF);
+    }
     if (bilinear) {
         rdpq_mode_filter(FILTER_BILINEAR);
         cc = RDPQ_COMBINER1((TEX1, K4, K5, TEX1), (0, 0, 0, 1));
     }
-    rdpq_mode_combiner(cc); // FIXME: this should not be required, but we need it for the mipmap mask
-
-    if (!rdpq_tracking.mode_freeze)
-        rdpq_tracking.cycle_type_known = 1;
-    else
-        rdpq_tracking.cycle_type_frozen = 1;
+    rdpq_mode_combiner(cc);
 
     // Set the YUV coefficients (FIXME: make this configurable)
     const yuv_colorspace_t *cs = &YUV_BT601_TV;
@@ -376,44 +416,58 @@ void rdpq_set_mode_yuv(bool bilinear) {
 
 void rdpq_mode_begin(void)
 {
-    assertf(!rdpq_tracking.mode_freeze, "rdpq_mode_begin nested calls not supported");
-    // Freeze render mode updates. We call rdpq_change_other_modes_raw here
-    // (instead of __rdpq_mode_change_som) because there will be no RDP
-    // commands emitted from this call.
-    rdpq_tracking.mode_freeze = true;
-    rdpq_tracking.cycle_type_frozen = 0;
-    rdpq_mode_cpu_track = false;
-    __rdpq_mode_change_som(SOMX_UPDATE_FREEZE, SOMX_UPDATE_FREEZE);
+    assertf(rdpq_mode_batch_state == RDPQ_BATCH_NONE, "rdpq_mode_begin nested calls not supported");
+    if (__rdpq_config & RDPQ_CFG_FROZEN_BLOCKS) {
+        rdpq_mode_batch_state = RDPQ_BATCH_DEFERRED;
+        rdpq_mode_state_batch_diff = (rdpq_mode_state_t){0};
+        rdpq_mode_state_cur = &rdpq_mode_state_batch_diff;
+    } else {
+        rdpq_mode_batch_state = RDPQ_BATCH_PENDING;
+        __rdpq_mode_change_som(SOMX_UPDATE_FREEZE, SOMX_UPDATE_FREEZE);
+    }
 }
 
 void rdpq_mode_end(void)
 {
-    if (rdpq_mode_cpu_track) {
-        uint64_t comb_final = 0;
-        uint64_t som_final = 0;
-        rdpq_update_render_mode_cpu(&comb_final, &som_final);
-        debugf("[rdpq_mode_end] comb_final=%08lx%08lx som_final=%08lx%08lx\n", 
-            (unsigned long)(comb_final >> 32), (unsigned long)(comb_final & 0xFFFFFFFF), 
-            (unsigned long)(som_final >> 32), (unsigned long)(som_final & 0xFFFFFFFF));
-
-        rdpq_passthrough_write((RDPQ_CMD_SET_OTHER_MODES_RAW, som_final >> 32, som_final & 0xFFFFFFFF));
-        rdpq_passthrough_write((RDPQ_CMD_SET_COMBINE_MODE_RAW, comb_final >> 32, comb_final & 0xFFFFFFFF));
-        rspq_int_write(RSPQ_CMD_RDP_RESET_MODE, 0, 
-            rdpq_mode_shadow.combiner >> 32, rdpq_mode_shadow.combiner & 0xFFFFFFFF,
-            rdpq_mode_shadow.combiner_mipmapmask >> 32, rdpq_mode_shadow.combiner_mipmapmask & 0xFFFFFFFF,
-            rdpq_mode_shadow.blend_step0, rdpq_mode_shadow.blend_step1,
-            rdpq_mode_shadow.other_modes >> 32, rdpq_mode_shadow.other_modes & 0xFFFFFFFF);
-
-        rdpq_tracking.mode_freeze = false;
-        rdpq_tracking.cycle_type_known = rdpq_tracking.cycle_type_frozen;
-        rdpq_mode_cpu_track = false;
+    assertf(rdpq_mode_batch_state != RDPQ_BATCH_NONE, "rdpq_mode_end called without begin");
+    if (rdpq_mode_batch_state == RDPQ_BATCH_PENDING) {
+        __rdpq_mode_change_som(SOMX_UPDATE_FREEZE, 0);
+        rdpq_mode_batch_state = RDPQ_BATCH_NONE;
         return;
     }
+    rdpq_mode_state_t merged = rdpq_mode_state_global;
+    if (rspq_block_is_recording())
+        __rdpq_mode_state_merge(&merged, &rdpq_mode_state_block_diff);
+    __rdpq_mode_state_merge(&merged, &rdpq_mode_state_batch_diff);
 
-    // Unfreeze render mode updates and recalculate new render mode.
-    rdpq_tracking.mode_freeze = false;
-    rdpq_tracking.cycle_type_known = rdpq_tracking.cycle_type_frozen;
-    __rdpq_mode_change_som(SOMX_UPDATE_FREEZE, 0);
+    assertf((merged.som_known_mask & RDPQ_SOM_TRACK_MASK) == RDPQ_SOM_TRACK_MASK,
+        "rdpq_mode_end: unknown SOM bits in tracked mask");
+    assertf((merged.known_mask & RDPQ_STATE_KNOWN_COMBINER), "rdpq_mode_end: combiner unknown");
+    assertf((merged.known_mask & RDPQ_STATE_KNOWN_BLEND_MASK) == RDPQ_STATE_KNOWN_BLEND_MASK,
+        "rdpq_mode_end: blender steps unknown");
+
+    uint64_t comb_final = 0;
+    uint64_t som_final = 0;
+    rdpq_update_render_mode_cpu(&merged, &comb_final, &som_final);
+
+    rdpq_passthrough_write((RDPQ_CMD_SET_OTHER_MODES_RAW, som_final >> 32, som_final & 0xFFFFFFFF));
+    rdpq_passthrough_write((RDPQ_CMD_SET_COMBINE_MODE_RAW, comb_final >> 32, comb_final & 0xFFFFFFFF));
+    uint64_t comb_mask = rdpq_shadow_combiner_mask(merged.combiner);
+    uint64_t som_sync = (som_final & 0x00FFFFFFFFFFFFFFull) |
+                        (merged.som_value_mask & 0xFF00000000000000ull);
+    rspq_int_write(RSPQ_CMD_RDP_RESET_MODE, 0,
+        merged.combiner >> 32, merged.combiner & 0xFFFFFFFF,
+        comb_mask >> 32, comb_mask & 0xFFFFFFFF,
+        merged.blend_step0, merged.blend_step1,
+        som_sync >> 32, som_sync & 0xFFFFFFFF);
+
+    if (rspq_block_is_recording())
+        __rdpq_mode_state_merge(&rdpq_mode_state_block_diff, &rdpq_mode_state_batch_diff);
+    else
+        __rdpq_mode_state_merge(&rdpq_mode_state_global, &rdpq_mode_state_batch_diff);
+
+    rdpq_mode_batch_state = RDPQ_BATCH_NONE;
+    rdpq_mode_state_cur = rspq_block_is_recording() ? &rdpq_mode_state_block_diff : &rdpq_mode_state_global;
 }
 
 

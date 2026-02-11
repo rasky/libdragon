@@ -23,8 +23,10 @@ __attribute__((noinline))
 void __rdpq_fill_rectangle(uint32_t w0, uint32_t w1)
 {
     __rdpq_autosync_use(AUTOSYNC_PIPE);
-    if (rdpq_tracking.cycle_type_known) {
-        if (rdpq_tracking.cycle_type_known == 2) {
+    rdpq_mode_state_t *state = rdpq_mode_state_cur;
+    if ((state->som_known_mask & SOM_CYCLE_MASK) == SOM_CYCLE_MASK) {
+        uint64_t cycle = state->som_value_mask & SOM_CYCLE_MASK;
+        if (cycle == SOM_CYCLE_COPY || cycle == SOM_CYCLE_FILL) {
             w0 -= (4<<12) | 4;
         }
         rdpq_passthrough_write((RDPQ_CMD_FILL_RECTANGLE, w0, w1));
@@ -46,8 +48,10 @@ void __rdpq_texture_rectangle(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3
     // FIXME: this can also use tile+1 in case the combiner refers to TEX1
     // FIXME: this can also use tile+2 and +3 in case SOM activates texture detail / sharpen
     __rdpq_autosync_use(AUTOSYNC_PIPE | AUTOSYNC_TILE(tile) | AUTOSYNC_TMEM(0));
-    if (rdpq_tracking.cycle_type_known) {
-        if (rdpq_tracking.cycle_type_known == 2) {
+    rdpq_mode_state_t *state = rdpq_mode_state_cur;
+    if ((state->som_known_mask & SOM_CYCLE_MASK) == SOM_CYCLE_MASK) {
+        uint64_t cycle = state->som_value_mask & SOM_CYCLE_MASK;
+        if (cycle == SOM_CYCLE_COPY || cycle == SOM_CYCLE_FILL) {
             w0 -= (4<<12) | 4;
             w3 = ((w3 & 0xFFFF0000) << 2) | (w3 & 0x0000FFFF);
         }

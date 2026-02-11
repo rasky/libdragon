@@ -11,6 +11,7 @@
 #include "pputils.h"
 #include "rspq.h"
 #include "fgeom2d.h"
+#include "rdpq_macros.h"
 #include "../rspq/rspq_internal.h"
 
 /** @brief True if the rdpq module was inited */
@@ -25,10 +26,10 @@ typedef struct rdpq_trifmt_s rdpq_trifmt_t;
 ///@endcond
 
 /**
- * @brief RDP tracking state
+ * @brief RDP autosync tracking state
  * 
- * This structure contains information that refer to the state of the RDP,
- * tracked by the CPU as it enqueues RDP instructions.ì
+ * This structure contains the autosync-related state tracked by the CPU
+ * as it enqueues RDP instructions.
  * 
  * Tracking the RDP state on the CPU is in general possible (as all 
  * RDP commands are supposed to go through rdpq, when it is used), but it
@@ -53,14 +54,42 @@ typedef struct {
      * a tile and the pipe (which contains most of the mode registers).
      */ 
     uint32_t autosync : 17;
-    /** @brief True if the mode changes are currently frozen. */
-    bool mode_freeze : 1;
-    /** @brief 0=unknown, 1=standard, 2=copy/fill  */
-    uint8_t cycle_type_known : 2;
-    uint8_t cycle_type_frozen : 2;
 } rdpq_tracking_t;
 
 extern rdpq_tracking_t rdpq_tracking;
+extern uint32_t __rdpq_config;
+
+typedef enum {
+    RDPQ_BATCH_NONE = 0,
+    RDPQ_BATCH_PENDING,
+    RDPQ_BATCH_DEFERRED,
+} rdpq_mode_batch_state_t;
+
+extern rdpq_mode_batch_state_t rdpq_mode_batch_state;
+
+typedef struct {
+    uint64_t som_known_mask;
+    uint64_t som_value_mask;
+    uint64_t combiner;
+    uint32_t blend_step0;
+    uint32_t blend_step1;
+    uint8_t known_mask;   // bit0=blend step0, bit1=blend step1, bit2=combiner
+} rdpq_mode_state_t;
+
+#define RDPQ_STATE_KNOWN_BLEND_STEP0  (1u << 0)
+#define RDPQ_STATE_KNOWN_BLEND_STEP1  (1u << 1)
+#define RDPQ_STATE_KNOWN_COMBINER     (1u << 2)
+
+#define RDPQ_STATE_KNOWN_BLEND_MASK   (RDPQ_STATE_KNOWN_BLEND_STEP0 | RDPQ_STATE_KNOWN_BLEND_STEP1)
+#define RDPQ_STATE_KNOWN_ALL          (RDPQ_STATE_KNOWN_BLEND_MASK | RDPQ_STATE_KNOWN_COMBINER)
+
+extern rdpq_mode_state_t rdpq_mode_state_global;
+extern rdpq_mode_state_t rdpq_mode_state_block_diff;
+extern rdpq_mode_state_t rdpq_mode_state_batch_diff;
+extern rdpq_mode_state_t *rdpq_mode_state_cur;
+
+void __rdpq_mode_state_merge(rdpq_mode_state_t *dst, const rdpq_mode_state_t *diff);
+void __rdpq_mode_state_apply_som(rdpq_mode_state_t *state, uint64_t mask, uint64_t val);
 
 /**
  * @brief A buffer that piggybacks onto rspq_block_t to store RDP commands
@@ -75,6 +104,7 @@ extern rdpq_tracking_t rdpq_tracking;
 typedef struct rdpq_block_s {
     rdpq_block_t *next;                           ///< Link to next buffer (or NULL if this is the last one for this block)
     rdpq_tracking_t tracking;                     ///< Tracking state at the end of a block (this is populated only on the first link)
+    rdpq_mode_state_t mode_state_diff;            ///< Render mode diff recorded in this block (first link only)
     uint32_t cmds[] __attribute__((aligned(8)));  ///< RDP commands
 } rdpq_block_t;
 
