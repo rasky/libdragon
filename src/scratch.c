@@ -127,7 +127,7 @@ void *scratch_malloc(size_t size) {
         uint8_t *p = sbrk_top((ptrdiff_t)need);
         if (p == (void *)-1) return NULL;
         assertf(!sh_low || p + need == sh_low, "non-contiguous scratch heap");
-        assert((uint32_t)p & (SCRATCH_ALIGN - 1)) == 0);
+        assert((((uintptr_t)p) & (SCRATCH_ALIGN - 1)) == 0);
 
         b = (block_t *)p;
         b->size_flags = need;
