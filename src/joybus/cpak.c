@@ -6,9 +6,9 @@
  */
 
 #include "cpak.h"
+#include "scratch.h"
 #include "joypad_accessory.h"
 #include <string.h>
-#include <stdlib.h>
 #include <errno.h>
 #ifdef N64
 #include "../rand_internal.h"
@@ -67,8 +67,8 @@ int cpak_probe_banks(joypad_port_t port)
     }
 
     int retcode = -1;
-    int nsave_banks = 16;
-    uint8_t* save_label = malloc(nsave_banks * BLOCK_SIZE);
+    const int max_probe_banks = 256;
+    uint8_t* save_label = scratch_malloc(max_probe_banks * BLOCK_SIZE);
     assert(save_label);
 
     // Create a random probe label that we will use to mark banks that we have already probed.
@@ -76,13 +76,7 @@ int cpak_probe_banks(joypad_port_t port)
     __rand(probe_label, BLOCK_SIZE);
 
     int bnk;
-    for (bnk = 0; bnk < 256; bnk++) {
-        // Resize the save area if we need more banks
-        if (bnk >= nsave_banks) {
-            nsave_banks *= 2;
-            save_label = realloc(save_label, nsave_banks * BLOCK_SIZE);
-            assert(save_label);
-        }
+    for (bnk = 0; bnk < max_probe_banks; bnk++) {
 
         // Read the current label into the save area
         if (cpak_read(port, bnk, 0, save_label + bnk * BLOCK_SIZE, BLOCK_SIZE) < 0) {
@@ -113,6 +107,6 @@ exit:
         cpak_write(port, i, 0, save_label + i * BLOCK_SIZE, BLOCK_SIZE);
     }
 
-    free(save_label);
+    scratch_free(save_label);
     return retcode;
 }
