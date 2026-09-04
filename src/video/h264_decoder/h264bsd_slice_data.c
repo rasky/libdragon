@@ -34,6 +34,7 @@
 ------------------------------------------------------------------------------*/
 
 #include "h264bsd_slice_data.h"
+#include "h264bsd_inter_prediction.h"
 #include "h264bsd_util.h"
 #include "h264bsd_vlc.h"
 
@@ -109,6 +110,10 @@ u32 h264bsdDecodeSliceData(strmData_t *pStrmData, storage_t *pStorage,
     currMbAddr = pSliceHeader->firstMbInSlice;
     skipRun = 0;
     prevSkipped = HANTRO_FALSE;
+
+#ifdef H264BSD_N64
+    h264bsdPrepareWeights(pSliceHeader);
+#endif
 
     /* increment slice index, will be one for decoding of the first slice of
      * the picture */

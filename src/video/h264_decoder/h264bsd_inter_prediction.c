@@ -281,31 +281,58 @@ static const neighbour_t N_D_SUB_PART[4][4][4] = {
 #ifdef H264BSD_N64
 #include "../rsph264_internal.h"
 
+/* Packing the coefficients of one reference index reads six arrays scattered
+ * over the ~400 bytes of predWeightTable_t, which costs a handful of cache
+ * misses. The result only depends on the slice, so it is packed once per slice
+ * into this table, where one entry is 12 bytes: the reference index used by
+ * most partitions then costs a single miss. Zero entries means no weighting,
+ * either because the slice does not use it or because the index is out of the
+ * range coded in the slice header. */
+static u32 n64PackedWeights[MAX_NUM_REF_PICS][3];
+static u32 n64NumPackedWeights;
+
+void h264bsdPrepareWeights(const sliceHeader_t *pSliceHeader) {
+
+  const predWeightTable_t *pWeights;
+  u32 i, num, lumaDenom, chromaDenom;
+
+  n64NumPackedWeights = 0;
+  if (pSliceHeader == NULL || !pSliceHeader->weightedPredFlag)
+    return;
+
+  pWeights = &pSliceHeader->predWeightTable;
+  lumaDenom = pWeights->lumaLog2WeightDenom;
+  chromaDenom = pWeights->chromaLog2WeightDenom;
+
+  num = pSliceHeader->numRefIdxL0Active;
+  if (num > MAX_NUM_REF_PICS) num = MAX_NUM_REF_PICS;
+
+  for (i = 0; i < num; i++) {
+    n64PackedWeights[i][0] = rsph264_weight_pack(pWeights->lumaWeightL0[i],
+        pWeights->lumaOffsetL0[i], lumaDenom);
+    n64PackedWeights[i][1] = rsph264_weight_pack(pWeights->chromaWeightL0[i][0],
+        pWeights->chromaOffsetL0[i][0], chromaDenom);
+    n64PackedWeights[i][2] = rsph264_weight_pack(pWeights->chromaWeightL0[i][1],
+        pWeights->chromaOffsetL0[i][1], chromaDenom);
+  }
+  n64NumPackedWeights = num;
+}
+
 static inline void n64SetWeights(
   const sliceHeader_t *pSliceHeader,
   u32 refIdx) {
 
-  const predWeightTable_t *pWeights;
-  u32 lumaDenom, chromaDenom;
+  const u32 *w;
+  (void)pSliceHeader;
 
-  if (pSliceHeader == NULL || !pSliceHeader->weightedPredFlag) {
+  if (refIdx >= n64NumPackedWeights) {
     rsph264_queue_set_weights_if_changed(RSPH264_WEIGHT_IDENTITY,
         RSPH264_WEIGHT_IDENTITY, RSPH264_WEIGHT_IDENTITY);
     return;
   }
 
-  assertf(refIdx < MAX_NUM_REF_PICS, "invalid reference index %u", (unsigned)refIdx);
-  pWeights = &pSliceHeader->predWeightTable;
-  lumaDenom = pWeights->lumaLog2WeightDenom;
-  chromaDenom = pWeights->chromaLog2WeightDenom;
-
-  rsph264_queue_set_weights_if_changed(
-      rsph264_weight_pack(pWeights->lumaWeightL0[refIdx],
-          pWeights->lumaOffsetL0[refIdx], lumaDenom),
-      rsph264_weight_pack(pWeights->chromaWeightL0[refIdx][0],
-          pWeights->chromaOffsetL0[refIdx][0], chromaDenom),
-      rsph264_weight_pack(pWeights->chromaWeightL0[refIdx][1],
-          pWeights->chromaOffsetL0[refIdx][1], chromaDenom));
+  w = n64PackedWeights[refIdx];
+  rsph264_queue_set_weights_if_changed(w[0], w[1], w[2]);
 }
 
 static inline void n64PredictSamples(
