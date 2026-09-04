@@ -8,7 +8,6 @@
 
 #include "preview.h"
 #include "n64sys.h"
-#include "emux.h"
 #include <stdint.h>
 
 /** 
@@ -26,9 +25,6 @@
 #undef LIBDRAGON_PROFILE
 #define LIBDRAGON_PROFILE 0
 #endif
-
-#include "n64sys.h"
-#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -183,6 +179,7 @@ inline void __profile_record(int slot, int32_t len) {
 ///@endcond
 
 #if LIBDRAGON_PROFILE
+	#include "emux.h"
 	#include "pputils.h"
 
 	// Internal helpers to make the ordinal parameter optional in PROFILE_START/STOP.
