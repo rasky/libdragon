@@ -7,13 +7,14 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "profile.h"
 
 /** @brief RSPQ overlay ID assigned to the mixer ucode */
 extern uint32_t __mixer_overlay_id;
 
 /** @brief Profile slots for mixer / xm64 / mid64 / vadpcm (see #__mixer_profile_init). */
 enum {
-	PS_MIXER = 0,       ///< mixer_try_play
+	PS_MIXER = PROFILE_SLOT_AUDIO,  ///< mixer_try_play
 	PS_XM_TICK,         ///< xm64 tick callback (sequencing + channel sync)
 	PS_XM_GETPOS,       ///< xm64: sync sample_position from mixer
 	PS_XM_LIBXM,        ///< xm64: xm_tick (libxm sequencer)

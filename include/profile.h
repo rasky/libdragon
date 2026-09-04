@@ -91,6 +91,22 @@ LIBDRAGON_PREVIEW_API
 void profile_reset(void);
 
 /**
+ * @brief First profile slot reserved to each subsystem.
+ *
+ * All subsystems share a single global array of profile slots, indexed by the
+ * slot number passed to the PROFILE_* macros. Several of them can be active at
+ * the same time (eg: video playback drives both a video decoder and the mixer),
+ * so each one reserves a distinct range: overlapping slot numbers would
+ * silently sum unrelated measurements into the same counter.
+ *
+ * Applications defining their own slots must start at #PROFILE_SLOT_USER.
+ */
+#define PROFILE_SLOT_AUDIO      0    ///< Mixer, xm64, mid64, VADPCM (32 slots)
+#define PROFILE_SLOT_MPEG1      32   ///< MPEG-1 video decoder (16 slots)
+#define PROFILE_SLOT_H264       48   ///< H.264 video decoder (16 slots)
+#define PROFILE_SLOT_USER       64   ///< First slot available to applications
+
+/**
  * @brief Register a new profile slot
  * @preview
  * 

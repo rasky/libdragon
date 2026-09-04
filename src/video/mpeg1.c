@@ -26,7 +26,7 @@ typedef struct mpeg1_s {
 } mpeg1_t;
 
 typedef enum {
-	PS_MPEG,
+	PS_MPEG = PROFILE_SLOT_MPEG1,
 	PS_MPEG_FINDSTART,
 	PS_MPEG_HASSTART,
 	PS_MPEG_DECODESLICE,

@@ -26,11 +26,12 @@
 // about 192KB of RAM.
 #define NUM_PARALLEL_MACROBLOCKS 128
 
+#include "profile.h"
 #include "h264_decoder/h264bsd_decoder.h"
 #include "h264_decoder/h264bsd_storage.h"
 
 typedef enum {
-	PS_H264,
+	PS_H264 = PROFILE_SLOT_H264,
 	PS_H264_NAL,
 	PS_H264_MACROB,
 	PS_H264_LAYER,
