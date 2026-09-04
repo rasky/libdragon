@@ -454,19 +454,20 @@ static void h264_seekfast(video_t *v, int frame_idx, uint32_t file_off)
 void __h264_profile_init(void) {
 	profile_register(PS_H264, "H264", 0);
 	profile_register(PS_H264_NAL, "NAL", 1);
-	profile_register(PS_H264_MACROB, "MacroB", 1);
 	profile_register(PS_H264_LAYER, "Layer", 1);
+	// Clear is also entered from within Predict, so its time partly overlaps it
 	profile_register(PS_H264_LAYER_CLEAR, "Clear", 2);
 	profile_register(PS_H264_LAYER_PRED, "Predict", 2);
 	profile_register(PS_H264_LAYER_RES, "Residual", 2);
 	profile_register(PS_H264_LAYER_RES_ENC, "Encode", 3);
-	profile_register(PS_H264_RESIDUAL_LUMA, "Residual Luma", 3);
-	profile_register(PS_H264_RESIDUAL_CHROMA, "Residual Chroma", 3);
-	profile_register(PS_H264_INTRAPRED_4X4, "IntraPred 4x4", 4);
-	profile_register(PS_H264_INTRAPRED_16X16, "IntraPred 16x16", 4);
+	profile_register(PS_H264_MACROB, "MacroB", 1);
 	profile_register(PS_H264_INTERPRED, "InterPred", 2);
 	profile_register(PS_H264_INTERPRED_LUMA, "InterPred Luma", 3);
 	profile_register(PS_H264_INTERPRED_CHROMA, "InterPred Chroma", 3);
+	profile_register(PS_H264_RESIDUAL_LUMA, "Residual Luma", 2);
+	profile_register(PS_H264_INTRAPRED_4X4, "IntraPred 4x4", 2);
+	profile_register(PS_H264_INTRAPRED_16X16, "IntraPred 16x16", 2);
+	profile_register(PS_H264_RESIDUAL_CHROMA, "Residual Chroma", 2);
 }
 
 video_codec_t h264_codec = {
