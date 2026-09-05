@@ -417,7 +417,7 @@ yuv_blitter_t yuv_blitter_new_fmv(int video_width, int video_height,
 
     float scalew = final_width / (float)video_width;
     float scaleh = final_height / (float)video_height;
-    bool filtering = final_width != screen_width || final_height != screen_height;
+    bool filtering = final_width != video_width || final_height != video_height;
 
     int x0 = 0, y0 = 0;
     if (screen_width) {
