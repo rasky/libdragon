@@ -632,8 +632,11 @@ static void tex_xblit(const surface_t *surf, float x0, float y0, const rdpq_blit
         float v1[5] = { k1x, k1y, s1, t0, 1.0f };
         float v2[5] = { k2x, k2y, s1, t1, 1.0f };
         float v3[5] = { k3x, k3y, s0, t1, 1.0f };
-        rdpq_triangle(&TRIFMT_TEX, v0, v1, v2);
-        rdpq_triangle(&TRIFMT_TEX, v0, v2, v3);
+
+        rdpq_trifmt_t trifmt = TRIFMT_TEX;
+        trifmt.tex_tile = tile;
+        rdpq_triangle(&trifmt, v0, v1, v2);
+        rdpq_triangle(&trifmt, v0, v2, v3);
     }
 
     (*ltd)(tile, surf, os0, ot0, os1, ot1, draw_cb, parms->filtering);
