@@ -256,7 +256,7 @@ typedef struct yuv_fmv_parms_s {
     yuv_align_t halign;			    ///< Frame horizontal alignment to the output buffer (default: centered)
     yuv_align_t valign;				///< Frame vertical alignment to the output buffer (default: centered)
     yuv_zoom_t zoom;				///< Frame zooming algorithm to use (default: keep aspect ratio)
-    color_t bkg_color;              ///< Color to use to clear the reset of the output buffer
+    color_t bkg_color;              ///< Color to use to clear the rest of the output buffer (default: opaque black)
     /** 
      * @brief Display aspect ratio (DAR) of the video
      *
