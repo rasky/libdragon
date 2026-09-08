@@ -56,7 +56,7 @@ u32 h264bsdInterPrediction(mbStorage_t *pMb, macroblockLayer_t *pMbLayer,
 
 #ifdef H264BSD_N64
 /* Must be called once per slice, before decoding its macroblocks. */
-void h264bsdPrepareWeights(const sliceHeader_t *pSliceHeader);
+void h264bsdPrepareWeights(sliceHeader_t *pSliceHeader);
 #endif
 
 #endif /* #ifdef H264SWDEC_INTER_PREDICTION_H */

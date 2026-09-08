@@ -97,6 +97,8 @@ u32 h264bsdDecodeSliceData(strmData_t *pStrmData, storage_t *pStorage,
     u32 currMbAddr;
     u32 moreMbs;
     u32 mbCount;
+    u32 budget;
+    u32 doneThisCall;
     i32 qpY;
     macroblockLayer_t *mbLayer;
 
@@ -107,26 +109,38 @@ u32 h264bsdDecodeSliceData(strmData_t *pStrmData, storage_t *pStorage,
     ASSERT(pStorage);
     ASSERT(pSliceHeader->firstMbInSlice < pStorage->picSizeInMbs);
 
-    currMbAddr = pSliceHeader->firstMbInSlice;
-    skipRun = 0;
-    prevSkipped = HANTRO_FALSE;
+    if (pStorage->sliceDataPending)
+    {
+        currMbAddr = pStorage->sliceMbAddr;
+        skipRun = pStorage->sliceSkipRun;
+        prevSkipped = pStorage->slicePrevSkipped;
+        mbCount = pStorage->sliceMbCount;
+        qpY = pStorage->sliceQpY;
+        pStorage->sliceDataPending = 0;
+    }
+    else
+    {
+        currMbAddr = pSliceHeader->firstMbInSlice;
+        skipRun = 0;
+        prevSkipped = HANTRO_FALSE;
+        mbCount = 0;
+        qpY = (i32)pStorage->activePps->picInitQp + pSliceHeader->sliceQpDelta;
 
 #ifdef H264BSD_N64
-    h264bsdPrepareWeights(pSliceHeader);
+        h264bsdPrepareWeights(pSliceHeader);
 #endif
 
-    /* increment slice index, will be one for decoding of the first slice of
-     * the picture */
-    pStorage->slice->sliceId++;
+        /* increment slice index, will be one for decoding of the first slice of
+         * the picture */
+        pStorage->slice->sliceId++;
 
-    /* lastMbAddr stores address of the macroblock that was last successfully
-     * decoded, needed for error handling */
-    pStorage->slice->lastMbAddr = 0;
+        /* lastMbAddr stores address of the macroblock that was last successfully
+         * decoded, needed for error handling */
+        pStorage->slice->lastMbAddr = 0;
+    }
 
-    mbCount = 0;
-    /* initial quantization parameter for the slice is obtained as the sum of
-     * initial QP for the picture and sliceQpDelta for the current slice */
-    qpY = (i32)pStorage->activePps->picInitQp + pSliceHeader->sliceQpDelta;
+    budget = pStorage->sliceMbBudget;
+    doneThisCall = 0;
     do
     {
         mbLayer = &pStorage->mbLayers[pStorage->mbLayerIdx];
@@ -213,6 +227,7 @@ u32 h264bsdDecodeSliceData(strmData_t *pStrmData, storage_t *pStorage,
         if (pStorage->mb[currMbAddr].decoded == 1)
 #endif          
             mbCount++;
+        doneThisCall++;
 
         /* keep on processing as long as there is stream data left or
          * processing of macroblocks to be skipped based on the last skipRun is
@@ -235,6 +250,19 @@ u32 h264bsdDecodeSliceData(strmData_t *pStrmData, storage_t *pStorage,
         {
             EPRINT("Next mb address");
             return(HANTRO_NOK);
+        }
+
+        /* Timeslice: pause after the budget so poll() can return to the game.
+         * State is kept in storage; strm bit position stays in *pStrmData. */
+        if (budget && moreMbs && doneThisCall >= budget)
+        {
+            pStorage->sliceDataPending = 1;
+            pStorage->sliceMbAddr = currMbAddr;
+            pStorage->sliceSkipRun = skipRun;
+            pStorage->slicePrevSkipped = prevSkipped;
+            pStorage->sliceMbCount = mbCount;
+            pStorage->sliceQpY = qpY;
+            return(HANTRO_OK);
         }
 
     } while (moreMbs);

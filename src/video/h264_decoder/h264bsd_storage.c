@@ -453,6 +453,7 @@ void h264bsdResetStorage(storage_t *pStorage)
 
     pStorage->slice->numDecodedMbs = 0;
     pStorage->slice->sliceId = 0;
+    pStorage->sliceDataPending = 0;
 
     for (i = 0; i < pStorage->picSizeInMbs; i++)
     {
@@ -510,10 +511,11 @@ void h264bsdRewindStorage(storage_t *pStorage)
     pStorage->pendingActivation = 0;
     pStorage->mbLayerIdx = 0;
 
-    /* reset stream pointers */
+    /* reset stream pointers and mid-slice timeslice state */
     pStorage->prevBufNotFinished = 0;
     pStorage->prevBufPointer = NULL;
     pStorage->prevBytesConsumed = 0;
+    pStorage->sliceDataPending = 0;
     H264SwDecMemset(pStorage->strm, 0, sizeof(strmData_t));
 
     /* reset POC, AUB, NAL unit, and slice header state */

@@ -141,12 +141,12 @@ static void release_current_picture(h264_t *player) {
     }
 }
 
-static int decode_next_slice(h264_t *player) {
+static int decode_next_slice(h264_t *player, u32 mb_budget) {
     int left = player->buf_len - player->idx;
 
-    // If there's not enough data for a full slice, we need to compact the
-    // buffer and do a I/O from ROM.
-    if (left <= player->max_slice_size) {
+    // Mid-slice resume keeps absolute pointers into player->buf; do not
+    // compact/move the buffer while a slice is pending.
+    if (!h264bsdIsSlicePending(&player->s) && left <= (int)player->max_slice_size) {
         memmove(player->buf, player->buf+player->idx, left);
         int n = read(player->fd, player->buf+left, H264_BUF_SIZE-left);
         if (n < 0) n = 0;
@@ -157,14 +157,15 @@ static int decode_next_slice(h264_t *player) {
             return H264BSD_EOF;
     }
 
-    // Do the actual decoding
+    // Do the actual decoding. mb_budget 0 = unlimited (finish the slice).
     unsigned int np;
     PROFILE_START(PS_H264);
-    int status = h264bsdDecode(&player->s, player->buf+player->idx, player->buf_len-player->idx, 0, &np);
+    int status = h264bsdDecodePartial(&player->s, player->buf+player->idx,
+        player->buf_len-player->idx, 0, &np, mb_budget);
     PROFILE_STOP(PS_H264);
 
     player->idx += np;
-    if (!player->has_slice_metadata)
+    if (!player->has_slice_metadata && np)
         player->max_slice_size = MAX(player->max_slice_size, np*1.3f);
 
     return status;
@@ -247,7 +248,7 @@ static void h264_rewind(video_t *v) {
 
     rsph264_begin_frame();
     while (1) {
-        int status = decode_next_slice(player);
+        int status = decode_next_slice(player, 0);
         switch (status) {
             case H264BSD_RDY:
                 continue;
@@ -322,7 +323,7 @@ typedef enum {
     POLL_EOF = -1,
 } poll_status_t;
 
-static poll_status_t poll(h264_t *player)
+static poll_status_t poll(h264_t *player, u32 mb_budget)
 {
     // If the output buffer is full, we can't decode more, as there
     // wouldn't be space for further pictures. Just exit.
@@ -330,7 +331,7 @@ static poll_status_t poll(h264_t *player)
         h264bsdDpbNumOutputPictures(player->s.dpb) >= (u32)player->max_buffered_pics)
         return POLL_NOTHING;
 
-    int status = decode_next_slice(player);
+    int status = decode_next_slice(player, mb_budget);
 
     switch (status) {
     case H264BSD_EOF:
@@ -352,7 +353,8 @@ static poll_status_t poll(h264_t *player)
 static bool poll_loop(h264_t *player)
 {
     while (1) {
-        poll_status_t status = poll(player);
+        /* Unlimited MB budget: finish the frame as fast as possible. */
+        poll_status_t status = poll(player, 0);
         assertf(status != POLL_NOTHING, "Decoder stalled while decoding frame");
         if (status == POLL_EOF)
             return false;
@@ -370,7 +372,10 @@ static int h264_poll(video_t *v)
     if (player->max_buffered_pics == 0)
         return 0;
 
-    switch (poll(player))
+    /* How many macroblocks to decode per poll */
+    const u32 budget = 32;
+
+    switch (poll(player, budget))
     {
         case POLL_DECODING:
         case POLL_READY:

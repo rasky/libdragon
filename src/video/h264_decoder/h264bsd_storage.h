@@ -157,6 +157,17 @@ typedef struct
     u32 prevBytesConsumed;
     strmData_t strm[1];
 
+    /* Mid-slice timeslice state for h264bsdDecodePartial. Opaque to callers;
+     * query with h264bsdIsSlicePending(). sliceMbBudget is MBs per call
+     * (0 = unlimited), set by DecodePartial. */
+    u32 sliceDataPending;
+    u32 sliceMbBudget;
+    u32 sliceMbAddr;
+    u32 sliceSkipRun;
+    u32 slicePrevSkipped;
+    u32 sliceMbCount;
+    i32 sliceQpY;
+
     /* macroblock layer structure, there is no need to store this but it
      * would have increased the stack size excessively and needed to be
      * allocated from head -> easiest to put it here */

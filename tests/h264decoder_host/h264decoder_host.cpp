@@ -48,6 +48,7 @@ struct Options {
     bool verbose = false;
     bool debug = false;
     uint32_t max_frames = 0; // 0 = unlimited
+    uint32_t mb_budget = 0;  // 0 = unlimited; >0 exercises mid-slice resume
 };
 
 static void usage() {
@@ -56,6 +57,7 @@ static void usage() {
         "Options:\n"
         "  -o, --output <file.mp4>   Output MP4 path (default: <input>.mp4)\n"
         "      --max-frames <N>      Decode at most N frames\n"
+        "      --mb-budget <N>       Timeslice decode to N macroblocks per call\n"
         "      --debug               Keep PNG frames in <input>_frames/\n"
         "  -v, --verbose             Verbose logs and progress\n"
         "      --ffmpeg-path <path>  ffmpeg executable (default: ffmpeg)\n"
@@ -89,6 +91,9 @@ static bool parse_args(int argc, char **argv, Options &opt) {
         } else if (arg == "--max-frames") {
             if (++i >= argc) return false;
             if (!parse_u32(argv[i], opt.max_frames) || opt.max_frames == 0) return false;
+        } else if (arg == "--mb-budget") {
+            if (++i >= argc) return false;
+            if (!parse_u32(argv[i], opt.mb_budget) || opt.mb_budget == 0) return false;
         } else if (arg == "--debug") {
             opt.debug = true;
         } else if (arg == "-v" || arg == "--verbose") {
@@ -378,9 +383,13 @@ int main(int argc, char **argv) {
 
         while (remaining > 0 && !stop_at_max()) {
             u32 num_read = 0;
-            u32 status = h264bsdDecode(&storage, const_cast<uint8_t *>(cur), static_cast<u32>(remaining), frame_idx, &num_read);
+            u32 status = h264bsdDecodePartial(&storage, const_cast<uint8_t *>(cur),
+                static_cast<u32>(remaining), frame_idx, &num_read, opt.mb_budget);
+            // Mid-slice timeslice returns H264BSD_RDY with 0 bytes consumed; HDRS_RDY
+            // likewise rewinds the NAL. Anything else with 0 bytes means we are stuck.
             if (num_read == 0) {
-                if (status != H264BSD_HDRS_RDY) {
+                if (status != H264BSD_HDRS_RDY &&
+                    !(status == H264BSD_RDY && h264bsdIsSlicePending(&storage))) {
                     fprintf(stderr, "Decoder consumed 0 bytes (stuck), status=%u\n", status);
                     h264bsdShutdown(&storage);
                     return 1;

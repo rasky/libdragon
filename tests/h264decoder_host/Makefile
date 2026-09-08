@@ -10,8 +10,10 @@ LODEPNG_DIR := $(ROOT_ABS)/tools/common
 CXX := c++
 CC := cc
 
-CXXFLAGS := -O2 -g -std=c++17 -Wall -Wextra -MMD -MP -I$(DECODER_DIR) -I$(OMXDL_DIR) -I$(LODEPNG_DIR)
-CFLAGS := -O2 -g -std=c11 -Wall -Wextra -MMD -MP -I$(DECODER_DIR) -I$(OMXDL_DIR) -I$(LODEPNG_DIR) -D_ERROR_PRINT
+INCLUDES := -I$(DECODER_DIR) -I$(OMXDL_DIR) -I$(LODEPNG_DIR) \
+	-I$(ROOT_ABS)/include -I$(ROOT_ABS)/include/newlib_overrides
+CXXFLAGS := -O2 -g -std=c++17 -Wall -Wextra -MMD -MP $(INCLUDES)
+CFLAGS := -O2 -g -std=c11 -Wall -Wextra -MMD -MP $(INCLUDES) -D_ERROR_PRINT
 LDFLAGS :=
 LDLIBS := -lm
 

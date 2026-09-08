@@ -58,8 +58,26 @@ enum {
 ------------------------------------------------------------------------------*/
 
 u32 h264bsdInit(storage_t *pStorage, u32 noOutputReordering);
+
+/**
+ * @brief Decode stream data, optionally timesliced by macroblock count
+ *
+ * Same as h264bsdDecode, but stops after decoding at most @p mbBudget
+ * macroblocks of the current slice (0 = no limit, finish the whole slice /
+ * NAL as before). When the budget is exhausted mid-slice the function returns
+ * H264BSD_RDY with *readBytes == 0; call again with the same buffer pointer
+ * to continue. Use h264bsdIsSlicePending() to query that state.
+ */
+u32 h264bsdDecodePartial(storage_t *pStorage, u8 *byteStrm, u32 len, u32 picId,
+    u32 *readBytes, u32 mbBudget);
+
+/** @brief Decode one NAL / finish the current slice (unlimited MB budget) */
 u32 h264bsdDecode(storage_t *pStorage, u8 *byteStrm, u32 len, u32 picId,
     u32 *readBytes);
+
+/** @brief True while a previous h264bsdDecodePartial() stopped mid-slice */
+u32 h264bsdIsSlicePending(storage_t *pStorage);
+
 void h264bsdShutdown(storage_t *pStorage);
 
 /**

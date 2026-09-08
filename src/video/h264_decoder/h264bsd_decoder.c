@@ -286,8 +286,8 @@ static void h264bsdDecodeSeiMessages(storage_t *pStorage, strmData_t *strm)
 ------------------------------------------------------------------------------*/
 
 
-u32 h264bsdDecode(storage_t *pStorage, u8 *byteStrm, u32 len, u32 picId,
-    u32 *readBytes)
+u32 h264bsdDecodePartial(storage_t *pStorage, u8 *byteStrm, u32 len, u32 picId,
+    u32 *readBytes, u32 mbBudget)
 {
 
 /* Variables */
@@ -307,6 +307,53 @@ u32 h264bsdDecode(storage_t *pStorage, u8 *byteStrm, u32 len, u32 picId,
     ASSERT(byteStrm);
     ASSERT(len);
     ASSERT(readBytes);*/
+
+    pStorage->sliceMbBudget = mbBudget;
+
+    /* Resume a timesliced slice: stream bit position and MB loop locals are
+     * already in storage; do not re-extract or re-parse the NAL. */
+    if (pStorage->sliceDataPending)
+    {
+        ASSERT(byteStrm == pStorage->prevBufPointer);
+        strm = pStorage->strm[0];
+        *readBytes = 0;
+
+        tmp = h264bsdDecodeSliceData(&strm, pStorage,
+            pStorage->currImage, pStorage->sliceHeader);
+        if (tmp != HANTRO_OK)
+        {
+            EPRINT("SLICE_DATA");
+            pStorage->sliceDataPending = 0;
+#ifndef OPTIMIZE_NO_DECODED_FLAG
+            h264bsdMarkSliceCorrupted(pStorage,
+                pStorage->sliceHeader->firstMbInSlice);
+#endif
+            return(H264BSD_ERROR);
+        }
+
+        pStorage->strm[0] = strm;
+        if (pStorage->sliceDataPending)
+        {
+            /* Still mid-slice: keep the caller's buffer pointer stable. */
+            pStorage->prevBufNotFinished = HANTRO_TRUE;
+            return(H264BSD_RDY);
+        }
+
+        /* Slice finished: consume the NAL bytes now. */
+        *readBytes = pStorage->prevBytesConsumed;
+        pStorage->prevBufNotFinished = HANTRO_FALSE;
+
+#ifndef SINGLE_SLICE
+        if (h264bsdIsEndOfPicture(pStorage))
+        {
+            pStorage->skipRedundantSlices = HANTRO_TRUE;
+#endif
+            picReady = HANTRO_TRUE;
+#ifndef SINGLE_SLICE
+        }
+#endif
+        goto picture_done;
+    }
 
     /* if previous buffer was not finished and same pointer given -> skip NAL
      * unit extraction */
@@ -593,6 +640,14 @@ u32 h264bsdDecode(storage_t *pStorage, u8 *byteStrm, u32 len, u32 picId,
                         pStorage->sliceHeader->firstMbInSlice));
                 tmp = h264bsdDecodeSliceData(&strm, pStorage,
                     pStorage->currImage, pStorage->sliceHeader);
+                pStorage->strm[0] = strm;
+                if (pStorage->sliceDataPending)
+                {
+                    /* Mid-slice timeslice: do not consume NAL bytes yet. */
+                    *readBytes = 0;
+                    pStorage->prevBufNotFinished = HANTRO_TRUE;
+                    return(H264BSD_RDY);
+                }
           // in single slice mode every slice is a ready picture
 #ifndef SINGLE_SLICE
                 if (tmp != HANTRO_OK)
@@ -624,6 +679,7 @@ u32 h264bsdDecode(storage_t *pStorage, u8 *byteStrm, u32 len, u32 picId,
         }
     }
 
+picture_done:
     if (picReady)
     {
         #ifndef H264BSD_N64
@@ -701,6 +757,18 @@ u32 h264bsdDecode(storage_t *pStorage, u8 *byteStrm, u32 len, u32 picId,
     else
         return(H264BSD_RDY);
 
+}
+
+u32 h264bsdDecode(storage_t *pStorage, u8 *byteStrm, u32 len, u32 picId,
+    u32 *readBytes)
+{
+    return h264bsdDecodePartial(pStorage, byteStrm, len, picId, readBytes, 0);
+}
+
+u32 h264bsdIsSlicePending(storage_t *pStorage)
+{
+    ASSERT(pStorage);
+    return pStorage->sliceDataPending ? HANTRO_TRUE : HANTRO_FALSE;
 }
 
 /*------------------------------------------------------------------------------

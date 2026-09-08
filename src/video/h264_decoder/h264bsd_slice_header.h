@@ -138,6 +138,13 @@ typedef struct
     refPicListReordering_t refPicListReordering;
     decRefPicMarking_t decRefPicMarking;
     predWeightTable_t predWeightTable;
+#ifdef H264BSD_N64
+    /* predWeightTable repacked for the RSP by h264bsdPrepareWeights: see there
+     * for why. Kept in the slice header so that concurrent decoder instances
+     * (and a decode paused mid-slice) cannot clobber each other. */
+    u32 packedWeights[MAX_NUM_REF_PICS][3];
+    u32 numPackedWeights;
+#endif
 } sliceHeader_t;
 
 /*------------------------------------------------------------------------------
