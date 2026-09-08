@@ -113,6 +113,9 @@ int main(void)
 
             if (rumble_supported)
             {
+                // NOTE: Rumble is suported on both N64 and GameCube controllers
+                // Checking for JOYPAD_ACCESSORY_TYPE_RUMBLE_PAK would only cover
+                // the N64 controller, as GameCube controllers do not have accessories.
                 rumble_active = joypad_get_rumble_active(port);
                 if (inputs.btn.a && !rumble_active)
                 {

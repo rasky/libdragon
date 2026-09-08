@@ -501,6 +501,9 @@ joypad_accessory_type_t joypad_get_accessory_type(joypad_port_t port);
 
 /**
  * @brief Is rumble supported for a Joypad port?
+ *
+ * Check if the Joypad port supports rumble motors (on either the N64 or
+ * GameCube controller).
  * 
  * @param port Joypad port number (#joypad_port_t)
  * 
@@ -510,6 +513,9 @@ bool joypad_get_rumble_supported(joypad_port_t port);
 
 /**
  * @brief Is rumble active for a Joypad port?
+ *
+ * Check if rumble is currently active for a Joypad port, for either the N64 or
+ * GameCube controller.
  * 
  * @param port Joypad port number (#joypad_port_t)
  * 
@@ -519,6 +525,9 @@ bool joypad_get_rumble_active(joypad_port_t port);
 
 /**
  * @brief Activate or deactivate rumble on a Joypad port.
+ *
+ * Activate or deactivate rumble on a Joypad port, for either the N64 or
+ * GameCube controller.
  * 
  * @param port Joypad port number (#joypad_port_t)
  * @param active Whether rumble should be active
