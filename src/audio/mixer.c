@@ -1804,29 +1804,28 @@ static bool mixer_loop_fits(int i) {
 	return sloop > 0 && mixer_pin_span(sbuf, sloop) <= sbuf->size;
 }
 
-// Wrap a large loop: rebase the position within the loop and restart the
-// stream there. Must be done between rounds, as the RSP never wraps these.
+// Restart a loop that the RSP does not wrap by itself, from its loop start.
+// Must be done between rounds.
+//
+// A round stops a couple of samples past the loop point (see
+// #mixer_round_length), and #mixer_ch_set_loop can leave the position much
+// further than that: those samples play again. Resuming on them instead would
+// keep the loop period exact, but only the loop start is a position that every
+// codec can restart from (a VADPCM asset only carries the decoder state of the
+// frames it was built with). The loops that reach this function are too large
+// to be pinned in the samplebuffer, so a couple of samples per iteration are
+// inaudible; the short loops that would detune are wrapped by the RSP.
 static void mixer_large_loop_wrap(int i) {
 	mixer_channel_t *ch = &Mixer.channels[i];
 	bool vadpcm = (ch->flags & CH_FLAGS_VADPCM) != 0;
 	int bps_fx64 = (vadpcm ? 0 : (ch->flags & CH_FLAGS_BPS_SHIFT)) + MIXER_FX64_FRAC;
 	int wpos = ch->pos >> bps_fx64;
-	// A round can stop a few samples past the loop point (see
-	// #mixer_round_length), and those samples have already been mixed, out of
-	// the overread that #waveform_read fills from the loop start. Resuming
-	// right there is what keeps the loop period exact, which short tracker
-	// loops need to stay in tune. A codec that only restarts on its seek
-	// points cannot do that, so for those we go back to the loop start and
-	// let the handful of samples play twice.
-	waveform_t *wave = Mixer.ch_buf[i].wave;
-	int wpos2 = (wave && wave->loop_restart_only)
-		? (ch->len - ch->loop_len) >> bps_fx64
-		: waveform_wrap_wpos(wpos, ch->len >> bps_fx64, ch->loop_len >> bps_fx64);
-	ch->pos -= (int64_t)(wpos - wpos2) << bps_fx64;
+	int loop_start = (ch->len - ch->loop_len) >> bps_fx64;
+	ch->pos -= (int64_t)(wpos - loop_start) << bps_fx64;
 	samplebuffer_flush(&Mixer.ch_buf[i]);
 	if (vadpcm)
-		mixer_vadpcm_seek(ch, wpos2);
-	tracef("ch:%d large-loop seek %x -> %x\n", i, wpos, wpos2);
+		mixer_vadpcm_seek(ch, loop_start);
+	tracef("ch:%d large-loop restart %x -> %x\n", i, wpos, loop_start);
 }
 
 // End-of-sample, loop-cache transition and large-loop seek. Runs before each
@@ -1853,12 +1852,14 @@ static void mixer_update_loops(void) {
 		if (ch->flags & (CH_FLAGS_RESIDENT | CH_FLAGS_LOOP_CACHED))
 			continue;
 
-		if (mixer_loop_fits(i)) {
-			if (wpos >= len - loop_len || mixer_wave_fits(i))
-				mixer_fill_loop_cache(i);
-		} else if (wpos >= len) {
+		// #mixer_ch_set_loop shrinks len to the loop end, and can do it with
+		// playback already past it: restart before anything reads from there.
+		if (wpos >= len) {
 			mixer_large_loop_wrap(i);
+			wpos = ch->pos >> bps_fx64;
 		}
+		if (mixer_loop_fits(i) && (wpos >= len - loop_len || mixer_wave_fits(i)))
+			mixer_fill_loop_cache(i);
 	}
 }
 
@@ -2361,8 +2362,8 @@ static void mixer_advance(int ns) {
 			if (ch->flags & (CH_FLAGS_RESIDENT | CH_FLAGS_LOOP_CACHED)) {
 				while (ch->pos >= ch->len)
 					ch->pos -= ch->loop_len;
-			} else if (!mixer_loop_fits(i)) {
-				// Large loop crossing len between two rounds of the same call.
+			} else {
+				// Streamed loop crossed between two rounds of the same call.
 				mixer_large_loop_wrap(i);
 			}
 		}

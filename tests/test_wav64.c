@@ -1,9 +1,9 @@
 /**
  * @file test_wav64.c
- * @brief Standalone testrom for in-mixer VADPCM + PCM Hermite resampling
+ * @brief Standalone testrom for the mixer and wav64 playback
  *
- * Exercises MIX_CHANNEL: VADPCM decode into the sample cache followed by the
- * same 4-tap Hermite resampler used for PCM, compared against a C reference.
+ * Covers in-mixer VADPCM and PCM resampling, streamed and resident waveforms,
+ * looping (including mixer_ch_set_loop), and channel allocation.
  */
 #include <libdragon.h>
 #include <malloc.h>
@@ -570,8 +570,13 @@ static waveform_t sv_wave_loop = {
     .codec = &sv_codec, .state_size = sizeof(wav64_state_vadpcm_t),
 };
 
+static bool sv_inited;
+
 static void sv_init(void)
 {
+    if (sv_inited)
+        return;
+    sv_inited = true;
     my_srand(4321);
     // Two codebooks, one per plane, with the same content: identical frames
     // must decode to identical samples on both sides. Each plane is
@@ -1185,7 +1190,7 @@ static void bc_read(void *ctx, samplebuffer_t *sbuf, int wpos, int wlen, bool se
 static waveform_t bc_wave = {
     .name = "bc-block", .bits = 16, .channels = 1, .frequency = 44100,
     .len = BC_LEN, .loop_len = BC_LEN, .read = bc_read,
-    .append_units = BC_BLOCK, .rsp_written = true, .loop_restart_only = true,
+    .append_units = BC_BLOCK, .rsp_written = true,
 };
 
 static bool test_mixer_block_codec_loop(float freq)
@@ -2912,6 +2917,162 @@ static bool test_mixer_vol_dolby(void)
     return true;
 }
 
+//////////////////////////////////////////////////////////////////////////////
+// Looping VADPCM that is too long to keep in the sample buffer
+//
+// VADPCM is decoded in frames of 16 samples. The decoder cannot start at an
+// arbitrary sample: it needs a saved state for that frame, and a wav64 only
+// stores those at the beginning of the file and at the loop start (if the
+// file has one). Looping a file that has no loop marker (wav64_set_loop)
+// means the only legal restart is sample 0. A real reader asserts on any
+// other jump ("invalid VADPCM seeking point").
+//
+// rf_read in this file does not: it rebuilds decoder state from PCM, so the
+// mixer can jump to any frame and the test still passes. This reader matches
+// wav64 and allows a seek only at sample 0.
+//
+// When a loop fits in the sample buffer, the mixer copies it once and the
+// RSP wraps it; no seek. When it does not fit, the CPU has to restart the
+// stream each time playback reaches the end. A mix round cannot stop on an
+// exact sample (it emits an even number of output samples, and resampling
+// consumes a fractional number of input samples), so the position ends a
+// few samples past the end. The mixer then asks the reader to continue from
+// that leftover, as if those samples were already the start of the next
+// iteration.
+//
+// At 1:1 the leftover is 1-2 samples, still inside the first VADPCM frame,
+// so a restart at 0 is legal. Played 16× faster, each leftover output sample
+// consumes 16 input samples, so the restart lands in the next frame.
+//
+// mixer_ch_set_loop(false) is another way to get a large leftover at 1:1:
+// with looping off the mixer no longer stops at the end, so a whole poll
+// can run past it. Turning looping back on then seeks to that leftover.
+// Toggling every poll (a game that re-asserts looping each frame) is how
+// the in-game crash at seeking point 0x1e0 was reproduced.
+//////////////////////////////////////////////////////////////////////////////
+
+// Same length as the in-game WAV that crashed (273 VADPCM frames). The
+// whole sample is the loop, so the only legal restart is 0.
+#define LL_LEN     4368
+
+static void ll_read(void *ctx, samplebuffer_t *sbuf, int wpos, int wlen, bool seeking)
+{
+    wav64_state_vadpcm_t *st = sbuf->state;
+    (void)ctx;
+    if (seeking) {
+        assertf(wpos == 0, "wav64: ll-loop: invalid VADPCM seeking point: 0x%x",
+            wpos * 16);
+        memset(st->state, 0, sizeof(st->state));
+    }
+    int fb = VADPCM_FRAME_BYTES(4);
+    while (wlen > 0) {
+        int n = wlen < SAMPLEBUFFER_MARGIN_UNITS ? wlen : SAMPLEBUFFER_MARGIN_UNITS;
+        uint8_t *dst = samplebuffer_append(sbuf, n);
+        for (int i = 0; i < n; i++)
+            sv_gen_frame(dst + i * fb, wpos + i, 4);
+        wlen -= n;
+        wpos += n;
+    }
+}
+
+static waveform_t ll_wave = {
+    .name = "ll-loop", .bits = 16, .channels = 1, .frequency = 16000,
+    .len = LL_LEN, .loop_len = LL_LEN, .read = ll_read,
+    .format = WAVEFORM_FORMAT_VADPCM,
+    .codec = &sv_codec, .state_size = sizeof(wav64_state_vadpcm_t),
+};
+
+// Long enough that the default sample buffer cannot hold the loop, even
+// at 16× playback. That rate is what pushes the leftover into the second
+// VADPCM frame (see the section comment).
+#define LL8_LEN     (4096 * 16)
+
+static waveform_t ll_wave_8x = {
+    .name = "ll-loop-8x", .bits = 16, .channels = 1, .frequency = 44100,
+    .len = LL8_LEN, .loop_len = LL8_LEN, .read = ll_read,
+    .format = WAVEFORM_FORMAT_VADPCM,
+    .codec = &sv_codec, .state_size = sizeof(wav64_state_vadpcm_t),
+};
+
+static bool test_mixer_vadpcm_large_loop_seek(waveform_t *wave, float freq)
+{
+    sv_silence();
+    sv_set_bits(4);
+    // The 4368-sample loop would otherwise fit and wrap without seeking.
+    // Shrink the buffer so the CPU has to restart the stream at the end.
+    // The longer waveform already does not fit at 16× (default size).
+    int max_buf = (wave->len == LL_LEN) ? 1024 : 0;
+    mixer_ch_set_limits(SV_CHANNEL, 16, freq > 48000 ? freq : 48000, max_buf);
+    mixer_ch_play(SV_CHANNEL, wave);
+    mixer_ch_set_freq(SV_CHANNEL, freq);
+    mixer_ch_set_vol(SV_CHANNEL, 0.5f, 0.5f);
+
+    // Cross the end of the waveform at least once. ll_read asserts if the
+    // mixer then tries to resume at any sample other than 0.
+    for (int i = 0; i < 8; i++)
+        sv_mix(4096);
+
+    mixer_ch_stop(SV_CHANNEL);
+    mixer_ch_set_freq(SV_CHANNEL, 44100);
+    mixer_ch_set_limits(SV_CHANNEL, 0, 48000, 0);
+    return true;
+}
+
+// With looping on, the mixer stops a mix round at the end of the waveform,
+// so the leftover is 1-2 samples (still in frame 0 at 1:1).
+// mixer_ch_set_loop(false) removes that stop: a whole poll can run past the
+// end. Turning looping on again then seeks to that leftover.
+//
+// A game that re-asserts looping every frame (true, false, true, ...) hits
+// this whenever a "false" poll crosses the end. Play at the mixer rate so
+// one output sample is one waveform sample: a 512-sample poll past the end
+// is a leftover of hundreds of samples, not 1-2. That leftover was 0x1e0
+// in the in-game crash.
+static bool test_mixer_vadpcm_set_loop_toggle(void)
+{
+    sv_silence();
+    sv_set_bits(4);
+    mixer_ch_set_limits(SV_CHANNEL, 16, 48000, 1024);
+    mixer_ch_play(SV_CHANNEL, &ll_wave);
+    mixer_ch_set_freq(SV_CHANNEL, 44100);
+    mixer_ch_set_vol(SV_CHANNEL, 0.5f, 0.5f);
+
+    for (int i = 0; i < 32; i++) {
+        mixer_ch_set_loop(SV_CHANNEL, (i & 1) == 0);
+        sv_mix(512);
+        if (!mixer_ch_playing(SV_CHANNEL))
+            break;
+    }
+
+    mixer_ch_stop(SV_CHANNEL);
+    mixer_ch_set_freq(SV_CHANNEL, 44100);
+    mixer_ch_set_limits(SV_CHANNEL, 0, 48000, 0);
+    return true;
+}
+
+// Same leftover, isolated: walk up to the end while still looping, disable
+// looping, mix one poll past it, re-enable. The next mix wraps and seeks.
+static bool test_mixer_vadpcm_set_loop_overshoot(void)
+{
+    sv_silence();
+    sv_set_bits(4);
+    mixer_ch_set_limits(SV_CHANNEL, 16, 48000, 1024);
+    mixer_ch_play(SV_CHANNEL, &ll_wave);
+    mixer_ch_set_freq(SV_CHANNEL, 44100);
+    mixer_ch_set_vol(SV_CHANNEL, 0.5f, 0.5f);
+
+    sv_mix((LL_LEN - 256) & ~1);
+    mixer_ch_set_loop(SV_CHANNEL, false);
+    sv_mix(512);
+    mixer_ch_set_loop(SV_CHANNEL, true);
+    sv_mix(64);
+
+    mixer_ch_stop(SV_CHANNEL);
+    mixer_ch_set_freq(SV_CHANNEL, 44100);
+    mixer_ch_set_limits(SV_CHANNEL, 0, 48000, 0);
+    return true;
+}
+
 // Resident VADPCM loop: same content as rf_wave, but addressed from RDRAM.
 static uint8_t *rf_mem_res;
 static waveform_t rf_wave_resident;
@@ -3243,7 +3404,7 @@ int main(void)
 
     console_init();
 
-    printf("WAV64 VADPCM Hermite tests\n\n");
+    printf("WAV64 mixer tests\n\n");
 
     audio_init(44100, 4);
     mixer_init(8);
@@ -3495,6 +3656,13 @@ int main(void)
     total++; if (!test_mixer_alloc_stereo()) failed++;
     total++; if (!test_mixer_alloc_limits()) failed++;
     total++; if (!test_mixer_play()) failed++;
+
+    printf("VADPCM large-loop wrap seek\n");
+    fflush(stdout);
+    total++; if (!test_mixer_vadpcm_set_loop_toggle()) failed++;
+    total++; if (!test_mixer_vadpcm_set_loop_overshoot()) failed++;
+    total++; if (!test_mixer_vadpcm_large_loop_seek(&ll_wave_8x, 44100.f * 16)) failed++;
+    total++; if (!test_mixer_vadpcm_large_loop_seek(&ll_wave, 16000)) failed++;
 
     sv_silence();
     mixer_ch_set_limits(SV_CHANNEL, 0, 48000, 0);
