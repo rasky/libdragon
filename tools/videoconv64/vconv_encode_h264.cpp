@@ -329,7 +329,7 @@ EncodeResult vconv_encode_h264(const CodecInfo &ci, const AnalysisResult &ar) {
 	// Our decoder is baseline plus weighted prediction, so the stream must be
 	// Main profile with CABAC and 8x8 transform disabled (B-frames are already
 	// disabled via -bf below).
-	std::string x264_params = "no-deblock=1:no-info=1:slices=4:weightp=1:cabac=0:8x8dct=0";
+	std::string x264_params = "no-deblock=1:no-info=1:slices=1:weightp=1:cabac=0:8x8dct=0";
 
 	std::vector<std::string> cmd = {
 		cfg.ffmpeg_path,
@@ -352,7 +352,6 @@ EncodeResult vconv_encode_h264(const CodecInfo &ci, const AnalysisResult &ar) {
 		"-bufsize", std::to_string(bufsize_kbps) + "k",
 		"-bf", "0",
 		"-preset", cfg.quick ? "veryfast" : "slower",
-		// Force 4 slices per frame for easier background decoding
 		"-x264-params", x264_params,
 		"-f", "h264",
 		"-progress", "pipe:1",
