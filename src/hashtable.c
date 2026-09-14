@@ -53,14 +53,17 @@ static uint32_t* hashtable_lookup_slot(hashtable_t *h, uint32_t k) {
     // If no EMPTY_KEY was found but we saw a tombstone, reuse it.
     if (tomb_key) return tomb_key;
 
-    // Should never reach here if load factor is kept reasonable
+    // A miss can only be reported by finding an EMPTY_KEY or a tombstone, so
+    // hashtable_insert must never let the table fill up completely.
     assert(0 && "hashtable full");
     return NULL;
 }
 
 int hashtable_init(hashtable_t *h, size_t initial_entries, hashtable_loader_fn loader) {
-    // Round up to next power of 2, ensuring capacity is at least initial_entries
-    size_t capacity = 1;
+    // Round up to next power of 2, ensuring capacity is at least initial_entries.
+    // The minimum keeps the allocation a multiple of the 16-byte alignment
+    // (required by aligned_alloc) and leaves room for the load factor.
+    size_t capacity = 4;
     while (capacity < initial_entries) capacity <<= 1;
     
     h->capacity = capacity;
@@ -107,9 +110,12 @@ static void hashtable_resize(hashtable_t *h, size_t new_capacity) {
 void* hashtable_insert(hashtable_t *h, uint32_t k, void *value) {
     assert(k != EMPTY_KEY && k != TOMBSTONE_KEY);
 
-    // Resize when load factor exceeds 75%
+    // Resize when the load factor would exceed 75% *after* this insertion.
+    // Checking the size beforehand would let a table of capacity 4 fill up
+    // completely (3/4 of 4 is capacity-1), leaving no empty slot for
+    // hashtable_lookup_slot to stop at when looking up a missing key.
     size_t threshold = h->capacity * 3 / 4;
-    if (h->size > threshold) hashtable_resize(h, h->capacity * 2);
+    if (h->size + 1 > threshold) hashtable_resize(h, h->capacity * 2);
 
     uint32_t *kk = hashtable_lookup_slot(h, k);
     counted_ptr_t *vv = (counted_ptr_t*)(kk + 1); // value is immediately after key

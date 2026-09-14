@@ -226,6 +226,46 @@ static int test_tombstone_full(hashtable_t *h) {
     return 0;
 }
 
+/* hashtable_lookup_slot can only report a miss if it finds an EMPTY_KEY or a
+   tombstone, so the load factor check in hashtable_insert must always leave at
+   least one slot free. Check that, for every initial capacity, the table never
+   saturates and a lookup miss keeps working. */
+static int test_lookup_miss_while_growing(void) {
+    printf("[TEST] Lookup miss on a nearly full table...\n");
+
+    for (size_t initial = 1; initial <= 64; initial *= 2) {
+        hashtable_t ht;
+        hashtable_init(&ht, initial, NULL);
+
+        for (uint32_t k = 1; k <= 64; k++) {
+            hashtable_insert(&ht, k, (void*)(uintptr_t)(0x1000 + k));
+
+            if (ht.size >= ht.capacity) {
+                printf("[ERROR] initial=%zu: table is 100%% full (size=%zu, capacity=%zu)\n",
+                    initial, ht.size, ht.capacity);
+                return 1;
+            }
+
+            // This is the operation that used to trip the "hashtable full" assert
+            if (hashtable_lookup(&ht, 0xDEAD0000 + k) != NULL) {
+                printf("[ERROR] initial=%zu: found key %u which was never inserted\n",
+                    initial, 0xDEAD0000 + k);
+                return 1;
+            }
+        }
+
+        for (uint32_t k = 1; k <= 64; k++) {
+            if (hashtable_lookup(&ht, k) != (void*)(uintptr_t)(0x1000 + k)) {
+                printf("[ERROR] initial=%zu: key %u was lost\n", initial, k);
+                return 1;
+            }
+        }
+
+        hashtable_free(&ht);
+    }
+    return 0;
+}
+
 int main(void) {
     srand((unsigned)time(NULL));
     hashtable_t h;
@@ -238,6 +278,7 @@ int main(void) {
     if (test_random_stress(&h) != 0) return 1;
     if (test_visit_functionality(&h) != 0) return 1;
     if (test_tombstone_full(&h) != 0) return 1;
+    if (test_lookup_miss_while_growing() != 0) return 1;
 
     printf("[TEST] ALL TESTS PASSED. Final size=%zu\n", h.size);
     hashtable_free(&h);
